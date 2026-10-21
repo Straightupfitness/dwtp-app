@@ -1,36 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DWTP app
 
-## Getting Started
+The client app for the Driven Woman Transformation Program: Capacity Circles, the 26-week Main Trajectory, weekly check-ins with AI-drafted replies, AI food logging (photo and voice), daily weight, community and messaging. Trainerize keeps the workouts until Phase 3.
 
-First, run the development server:
+Built with Next.js (App Router), Supabase (database, login, storage) and Vercel (hosting). Lives at **app.straightupfitness.com**.
+
+Program design docs (in the Claude project): 23 Capacity Circles · 24 App Plan · 26 Reply Voice Guide · 27 26-Week Trajectory · 28 Check-in Questions · 29 7X and Onboarding.
+
+## Setup (Michael)
+
+1. **Supabase:** create a project named "DWTP". In the SQL editor, run `supabase/migrations/0001_init.sql`.
+2. **Vercel:** Add New → Project → import `Straightupfitness/dwtp-app`.
+3. **Environment variables** (Vercel → Project → Settings → Environment Variables), using `.env.example` as the list. Values come from Supabase (Project Settings → API) and console.anthropic.com. Never commit them.
+4. **Domain:** Vercel → Project → Settings → Domains → add `app.straightupfitness.com`, then add the CNAME record Vercel shows at your domain provider.
+
+## Develop
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
