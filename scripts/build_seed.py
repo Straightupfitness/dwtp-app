@@ -1,4 +1,4 @@
-"""Build supabase/seed/0002_circles.sql from the Capacity Circles design doc (doc 23, Section 11).
+"""Build supabase/seed/01_circles.sql from the Capacity Circles design doc (doc 23, Section 11).
 
 Usage: python3 scripts/build_seed.py path/to/DWTP_Circle_System_Design.md
 Re-run whenever the design doc changes; the output is plain INSERTs.
@@ -111,6 +111,6 @@ for i, (h, slug, name, kind, part) in enumerate(CIRCLES):
             sql.append(f"insert into public.ring_items (ring_id, item_type, cadence, title, detail, sort) values "
                        f"({q(str(rid))}, {q(t)}, {q(cad)}, {q(title)}, {q(detail)}, {j});")
 sql.append("commit;")
-open("supabase/seed/0002_circles.sql", "w", encoding="utf-8").write("\n".join(sql) + "\n")
+open("supabase/seed/01_circles.sql", "w", encoding="utf-8").write("\n".join(sql) + "\n")
 print("rings:", sum(1 for s in sql if s.startswith("insert into public.rings")),
       "items:", sum(1 for s in sql if s.startswith("insert into public.ring_items")))

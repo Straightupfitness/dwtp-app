@@ -1,4 +1,4 @@
-"""Build supabase/seed/0003_trajectory.sql from the 26-week Main Trajectory (doc 27, Section 3).
+"""Build supabase/seed/02_trajectory.sql from the 26-week Main Trajectory (doc 27, Section 3).
 Usage: python3 scripts/build_trajectory_seed.py path/to/DWTP_26_Week_Main_Trajectory.md
 """
 import re, sys, uuid
@@ -29,5 +29,5 @@ for line in DOC.splitlines():
             rid = uuid.uuid5(NS, f"{slug}:{int(m.group(1))}")
             out.append(f"insert into public.trajectory_week_rings (week_number, ring_id) values ({wk}, '{rid}') on conflict do nothing;")
 out.append("commit;")
-open("supabase/seed/0003_trajectory.sql", "w", encoding="utf-8").write("\n".join(out) + "\n")
+open("supabase/seed/02_trajectory.sql", "w", encoding="utf-8").write("\n".join(out) + "\n")
 print("weeks:", sum(1 for l in out if "trajectory_weeks (" in l), "week-rings:", sum(1 for l in out if "week_rings" in l))
