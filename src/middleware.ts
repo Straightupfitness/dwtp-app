@@ -5,9 +5,15 @@ const PUBLIC_PATHS = ["/login", "/auth", "/api/webhooks"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    // Keys missing in Vercel: show a clear message instead of crashing every page.
+    return new NextResponse("DWTP setup: the Supabase URL or publishable key is missing in Vercel's environment variables.", { status: 503 });
+  }
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
@@ -19,7 +25,12 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch (err) {
+    console.error("auth check failed", err);
+  }
   const path = request.nextUrl.pathname;
   const isPublic = path === "/" || PUBLIC_PATHS.some((p) => path.startsWith(p));
   if (!user && !isPublic) {
