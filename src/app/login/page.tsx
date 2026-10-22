@@ -6,15 +6,26 @@ import { createClient } from "@/lib/supabase/client";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [message, setMessage] = useState("");
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
     setState("sending");
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: email.trim().toLowerCase(),
       options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: false },
     });
+    if (error) {
+      const m = error.message.toLowerCase();
+      setMessage(
+        m.includes("signups not allowed") || m.includes("not found")
+          ? "We couldn't find that email. Use the email you signed up with, or message Michael."
+          : m.includes("rate limit") || error.status === 429
+            ? "Too many sign-in emails were sent in a short time. Wait a few minutes and try again."
+            : `Something went wrong: ${error.message}`,
+      );
+    }
     setState(error ? "error" : "sent");
   }
 
@@ -32,9 +43,7 @@ export default function LoginPage() {
             className="rounded-lg bg-accent px-4 py-3 font-semibold text-black disabled:opacity-60">
             {state === "sending" ? "Sending…" : "Send me a sign-in link"}
           </button>
-          {state === "error" && (
-            <p className="text-sm text-[var(--red)]">We couldn&apos;t find that email. Use the email you signed up with, or message Michael.</p>
-          )}
+          {state === "error" && <p className="text-sm text-[var(--red)]">{message}</p>}
         </form>
       )}
     </main>
