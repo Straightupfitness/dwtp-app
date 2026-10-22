@@ -1,3 +1,4 @@
+import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -5,8 +6,8 @@ const PUBLIC_PATHS = ["/login", "/auth", "/api/webhooks"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = supabaseUrl();
+  const key = supabaseKey();
   if (!url || !key) {
     // Keys missing in Vercel: show a clear message instead of crashing every page.
     return new NextResponse("DWTP setup: the Supabase URL or publishable key is missing in Vercel's environment variables.", { status: 503 });
