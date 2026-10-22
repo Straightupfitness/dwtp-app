@@ -41,6 +41,19 @@ export async function POST(req: Request) {
     return NextResponse.json(estimate);
   } catch (e) {
     console.error("food analyze failed", e);
-    return NextResponse.json({ error: "The AI couldn't read that meal. Try again, or type it in." }, { status: 502 });
+    return NextResponse.json({ error: explain(String((e as Error).message ?? e)) }, { status: 502 });
   }
+}
+
+/** Turn setup problems into a message that says what to fix; everything else stays friendly. */
+function explain(msg: string): string {
+  if (msg.includes("ANTHROPIC_API_KEY is not set")) return "Setup: ANTHROPIC_API_KEY isn't reaching the app. Check it's in Vercel for Production, then redeploy.";
+  if (msg.includes(" 401")) return "Setup: Anthropic rejected the API key (401). Re-copy the key into Vercel and redeploy.";
+  if (/credit|billing|balance/i.test(msg)) return "Setup: the Anthropic account has no credit. Add credit at console.anthropic.com → Billing.";
+  if (msg.includes(" 403")) return "Setup: the API key doesn't have permission (403). Check the key's workspace at console.anthropic.com.";
+  if (msg.includes(" 404") || /model/i.test(msg)) return `Setup: model problem. ${msg.slice(0, 200)}`;
+  if (msg.includes(" 429")) return "Too many requests right now. Wait a minute and try again.";
+  if (msg.includes(" 529") || msg.includes(" 503")) return "The AI is busy right now. Try again in a minute.";
+  if (msg.startsWith("Anthropic API")) return `AI error: ${msg.slice(0, 200)}`;
+  return "The AI couldn't read that meal. Try again, or type it in.";
 }
