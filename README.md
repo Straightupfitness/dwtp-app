@@ -13,6 +13,7 @@ Program design docs (in the Claude project): 23 Capacity Circles · 24 App Plan 
    - `supabase/migrations/0002_profile_on_signup.sql`
    - `supabase/seed/01_circles.sql` (all Capacity Circles, rings and items)
    - `supabase/seed/02_trajectory.sql` (the 26-week Main Trajectory)
+   - `supabase/migrations/0003_food_photos.sql` (private storage for meal photos)
 2. **Your coach login:** Supabase → Authentication → Users → Add user (your email). Then in the SQL editor:
    `update public.profiles set role = 'coach', full_name = 'Michael Duivis' where email = 'YOUR EMAIL';`
 3. **Vercel:** Add New → Project → import `Straightupfitness/dwtp-app`.
