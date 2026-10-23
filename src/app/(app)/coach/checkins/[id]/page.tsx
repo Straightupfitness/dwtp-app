@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { weekData } from "@/lib/coach-data";
 import { questionLabels } from "@/lib/checkin";
 import ReplyEditor from "./ReplyEditor";
+import TranscribeButton from "./TranscribeButton";
+
+export const maxDuration = 120;
 
 const SCORES = ["sleep", "energy", "stress", "hunger"] as const;
 
@@ -65,6 +68,19 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
       {c.video_path && signed.get(c.video_path) && (
         <div className="space-y-1"><p className="text-sm text-dim">Her video</p>
           <video src={signed.get(c.video_path)} controls playsInline className="w-full rounded-xl bg-black" /></div>
+      )}
+      {c.video_path && (
+        c.transcript ? (
+          <details className="rounded-xl border border-border bg-card p-3">
+            <summary className="cursor-pointer text-sm uppercase tracking-widest text-dim">Transcript</summary>
+            <p className="mt-2 whitespace-pre-line text-[15px]">{c.transcript}</p>
+          </details>
+        ) : (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 text-sm">
+            <span className="text-dim">{c.transcript_status === "pending" ? "Transcribing her video…" : c.transcript_status === "failed" ? "The transcript failed (is DEEPGRAM_API_KEY set in Vercel?)." : "No transcript yet."}</span>
+            <TranscribeButton checkinId={c.id} label={c.transcript_status === "pending" ? "Check again" : "Transcribe"} />
+          </div>
+        )
       )}
 
       <div className="space-y-3">

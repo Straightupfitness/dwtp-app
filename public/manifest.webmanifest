@@ -1,9 +1,17 @@
 {
   "name": "DWTP",
   "short_name": "DWTP",
-  "start_url": "/",
+  "start_url": "/today",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
-  "icons": [{ "src": "/brand/dwtp-logo.png", "sizes": "512x512", "type": "image/png" }]
+  "icons": [
+    {
+      "src": "/brand/dwtp-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "scope": "/"
 }

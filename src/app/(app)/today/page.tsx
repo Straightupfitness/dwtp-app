@@ -4,6 +4,7 @@ import { PHASE_LABEL } from "@/lib/program";
 import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
 import Link from "next/link";
+import NotificationSettings from "@/components/NotificationSettings";
 import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 
 export default async function TodayPage() {
@@ -63,6 +64,8 @@ export default async function TodayPage() {
           <p className="text-sm text-dim">Closes {closes} Pacific · +10 CPs</p>
         </Link>
       )}
+
+      <NotificationSettings compact />
 
       <form action={logWeight} className="flex items-end gap-2 rounded-xl border border-border bg-card p-3">
         <input type="hidden" name="date" value={today} />

@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyLater } from "@/lib/notify";
+import { shortName } from "@/lib/names";
 
 async function me() {
   const supabase = await createClient();
@@ -31,6 +33,13 @@ export async function addComment(postId: string, body: string) {
   const { supabase, id } = await me();
   if (!body.trim()) return;
   await supabase.from("comments").insert({ post_id: postId, author_id: id, body: body.trim() });
+  const [{ data: post }, { data: who }] = await Promise.all([
+    supabase.from("posts").select("author_id").eq("id", postId).single(),
+    supabase.from("member_names").select("full_name, role").eq("id", id).single(),
+  ]);
+  if (post && post.author_id !== id) {
+    notifyLater(post.author_id, { title: `${who?.role === "coach" ? "Michael" : shortName(who?.full_name)} commented on your post`, body: body.trim().slice(0, 120), url: "/community" });
+  }
   done();
 }
 

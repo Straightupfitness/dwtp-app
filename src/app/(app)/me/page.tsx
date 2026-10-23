@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { programWeek, todayIn } from "@/lib/program";
-import { signOut, updateName } from "./actions";
+import { setEmailNotifications, signOut, updateName } from "./actions";
+import NotificationSettings from "@/components/NotificationSettings";
 
 export default async function MePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: p }, { data: cps }] = await Promise.all([
-    supabase.from("profiles").select("full_name, email, program_start, timezone, plan").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, email, program_start, timezone, plan, email_notifications").eq("id", user!.id).single(),
     supabase.from("cp_totals").select("total").eq("client_id", user!.id).maybeSingle(),
   ]);
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
@@ -24,6 +25,14 @@ export default async function MePage() {
         </label>
         <button className="min-h-11 rounded-lg border border-border px-4">Save</button>
       </form>
+      <div className="space-y-2">
+        <h2 className="text-sm uppercase tracking-widest text-dim">Notifications</h2>
+        <NotificationSettings />
+        <form action={setEmailNotifications.bind(null, !(p?.email_notifications ?? true))} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
+          <span className="text-sm">Email: {p?.email_notifications ?? true ? "on" : "off"}<span className="block text-xs text-dim">Replies and check-in reminders. Messages only when push is off.</span></span>
+          <button className="min-h-11 rounded-lg border border-border px-3 text-sm">{p?.email_notifications ?? true ? "Turn off" : "Turn on"}</button>
+        </form>
+      </div>
       <div className="space-y-2">
         <Link href="/checkin" className="block rounded-xl border border-border bg-card p-3">Check-ins and Michael&apos;s replies</Link>
         <Link href="/chat" className="block rounded-xl border border-border bg-card p-3">Message Michael</Link>

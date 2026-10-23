@@ -17,3 +17,11 @@ export async function updateName(form: FormData) {
   await supabase.from("profiles").update({ full_name: name }).eq("id", user.id);
   revalidatePath("/", "layout");
 }
+
+export async function setEmailNotifications(on: boolean) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("profiles").update({ email_notifications: on }).eq("id", user.id);
+  revalidatePath("/me");
+}

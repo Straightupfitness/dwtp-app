@@ -2,7 +2,7 @@ import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/api/webhooks"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/webhooks", "/api/cron", "/sw.js", "/manifest.webmanifest", "/brand"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

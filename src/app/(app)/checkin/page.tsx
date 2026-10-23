@@ -3,6 +3,8 @@ import { currentWindow, questionsFor, DEADLINE_TZ } from "@/lib/checkin";
 import { loadProgram } from "@/lib/circles";
 import CheckinForm, { type NewHabit } from "./CheckinForm";
 
+export const maxDuration = 120;
+
 const fmt = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d) + " Pacific";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 

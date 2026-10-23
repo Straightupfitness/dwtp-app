@@ -5,6 +5,8 @@ export const metadata: Metadata = {
   title: "DWTP",
   description: "The Driven Woman Transformation Program",
   manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "DWTP", statusBarStyle: "black-translucent" },
+  icons: { icon: "/brand/dwtp-logo.png", apple: "/brand/dwtp-logo.png" },
 };
 
 export const viewport: Viewport = {

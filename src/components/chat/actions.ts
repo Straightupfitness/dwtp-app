@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyLater, coachIds } from "@/lib/notify";
 
 export async function sendMessage(clientId: string, body: string, attachmentPath: string | null) {
   const supabase = await createClient();
@@ -9,6 +10,13 @@ export async function sendMessage(clientId: string, body: string, attachmentPath
   if (!body.trim() && !attachmentPath) return { error: "Write a message first." };
   const { error } = await supabase.from("messages").insert({ client_id: clientId, sender_id: user.id, body: body.trim() || null, attachment_path: attachmentPath });
   if (error) return { error: error.message };
+  const fromClient = user.id === clientId;
+  const { data: me } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+  const preview = body.trim() ? body.trim().slice(0, 120) : "Sent a photo";
+  notifyLater(fromClient ? coachIds() : clientId, {
+    title: fromClient ? (me?.full_name ?? "New message") : "Michael", body: preview,
+    url: fromClient ? `/coach/inbox/${clientId}` : "/chat", email: "push-fallback",
+  });
   revalidatePath("/", "layout");
   return { ok: true };
 }
