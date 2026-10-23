@@ -3,6 +3,8 @@ import { loadProgram, type ItemState } from "@/lib/circles";
 import { PHASE_LABEL } from "@/lib/program";
 import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
+import Link from "next/link";
+import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 
 export default async function TodayPage() {
   const supabase = await createClient();
@@ -22,10 +24,13 @@ export default async function TodayPage() {
     );
   }
 
-  const [{ data: tw }, { data: weightToday }] = await Promise.all([
+  const { open } = currentWindow(state.programStart);
+  const [{ data: tw }, { data: weightToday }, { data: done }] = await Promise.all([
     supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(week, 52)).maybeSingle(),
     supabase.from("weight_logs").select("weight_lbs").eq("client_id", user!.id).eq("log_date", today).maybeSingle(),
+    open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const closes = open ? new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "long", hour: "numeric" }).format(open.closes) : "";
 
   // Every daily and weekly habit from her open rings; a habit that lives in two circles shows once.
   const seen = new Set<string>();
@@ -48,6 +53,13 @@ export default async function TodayPage() {
         </p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Today</h1>
       </header>
+
+      {open && !done && (
+        <Link href="/checkin" className="block rounded-xl border border-accent bg-accent/10 p-4">
+          <p className="font-semibold text-accent">Your Week {open.week} check-in is open</p>
+          <p className="text-sm text-dim">Closes {closes} Pacific · +10 CPs</p>
+        </Link>
+      )}
 
       <form action={logWeight} className="flex items-end gap-2 rounded-xl border border-border bg-card p-3">
         <input type="hidden" name="date" value={today} />
