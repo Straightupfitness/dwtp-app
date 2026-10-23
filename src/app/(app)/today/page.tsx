@@ -47,7 +47,10 @@ export default async function TodayPage() {
 
   return (
     <section className="space-y-6">
-      <header>
+      <header className="relative">
+        <Link href="/me" aria-label="Me" className="absolute right-0 top-0 grid size-11 place-items-center rounded-full border border-border text-dim">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+        </Link>
         <p className="text-sm uppercase tracking-widest text-accent">
           Week {week} · {PHASE_LABEL[tw?.phase ?? "rested"]}{tw?.is_diet_break ? " · Diet break" : ""}
         </p>
