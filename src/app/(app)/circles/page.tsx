@@ -2,26 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, daysUntil, type CircleState } from "@/lib/circles";
 import { PHASE_LABEL } from "@/lib/program";
+import RingTarget from "@/components/RingTarget";
 
 function Donut({ c, size }: { c: CircleState; size: number }) {
-  // One segment per ring, in that ring's color: complete rings full, the current ring partly.
-  const r = size / 2 - 4, circ = 2 * Math.PI * r, seg = circ / c.rings.length;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img"
-      aria-label={`${c.ringsComplete} of ${c.rings.length} rings complete`} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#262626" strokeWidth={size > 40 ? 6 : 4} />
-      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-        {c.rings.map((ring, i) => ring.fraction > 0 && (
-          <circle key={ring.id} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={ring.color} strokeWidth={size > 40 ? 6 : 4}
-            strokeDasharray={`0 ${i * seg} ${Math.max(1, seg * ring.fraction - 1)} ${circ}`} />
-        ))}
-      </g>
-      {size > 40 && (
-        <text x={size / 2} y={size / 2 + 5} textAnchor="middle" fill="#f5f5f5" fontSize="14" fontFamily="Oswald, sans-serif">
-          {c.ringsComplete}/{c.rings.length}
-        </text>
-      )}
-    </svg>
+    <RingTarget rings={c.rings.map((r) => ({ color: r.color, fraction: r.fraction }))} size={size} gap={size > 40 ? 4 : 6}
+      label={`${c.ringsComplete} of ${c.rings.length} rings complete`} />
   );
 }
 
