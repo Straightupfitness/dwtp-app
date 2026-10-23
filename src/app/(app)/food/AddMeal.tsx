@@ -34,6 +34,8 @@ export default function AddMeal({ userId, defaultSlot }: { userId: string; defau
   const [busy, setBusy] = useState<"" | "analyzing" | "saving">("");
   const [error, setError] = useState("");
   const [listening, setListening] = useState(false);
+  const [extra, setExtra] = useState("");
+  const [adding, setAdding] = useState(false);
   const recRef = useRef<SpeechRec | null>(null);
   const usedVoice = useRef(false);
 
@@ -75,6 +77,24 @@ export default function AddMeal({ userId, defaultSlot }: { userId: string; defau
       setItems(data.items); setNotes(data.notes ?? "");
     } catch (e) { setError((e as Error).message || "Something went wrong."); }
     setBusy("");
+  }
+
+  /** She types what's missing ("1 tbsp olive oil") and the AI fills in the numbers. */
+  async function addExtra() {
+    if (!extra.trim() || !items) return;
+    setAdding(true); setError("");
+    try {
+      const res = await fetch("/api/food/analyze", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: extra }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (!data.items?.length) throw new Error("Couldn't find that food. Try wording it differently.");
+      setItems((list) => [...(list ?? []), ...data.items]);
+      setExtra("");
+    } catch (e) { setError((e as Error).message || "Something went wrong."); }
+    setAdding(false);
   }
 
   async function save() {
@@ -150,8 +170,16 @@ export default function AddMeal({ userId, defaultSlot }: { userId: string; defau
                 </div>
               </div>
             ))}
+            <div className="flex gap-2">
+              <input value={extra} onChange={(e) => setExtra(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addExtra(); }}
+                placeholder="Missed something? e.g. 1 tbsp olive oil"
+                className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-base outline-none focus:border-accent" />
+              <button disabled={adding || !extra.trim()} onClick={addExtra}
+                className="rounded-lg bg-accent px-4 font-semibold text-black disabled:opacity-50">{adding ? "…" : "Add"}</button>
+            </div>
             <button onClick={() => setItems([...items, { name: "", amount: "", calories: 0, protein_g: 0, fiber_g: 0, potassium_mg: 0 }])}
-              className="text-sm text-accent">+ Add an item</button>
+              className="text-xs text-dim">or enter the numbers yourself</button>
           </div>
           {t && <p className="text-sm">Total: <b>{Math.round(t.calories)}</b> kcal · <b>{t.protein_g.toFixed(1)}</b> g protein · {t.fiber_g.toFixed(1)} g fiber · {Math.round(t.potassium_mg)} mg potassium</p>}
           <div className="flex gap-2">
