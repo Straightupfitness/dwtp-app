@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram } from "@/lib/circles";
-import RingTarget from "@/components/RingTarget";
+import MedalCircle from "@/components/MedalCircle";
 import { ProfileForm, FocusPicker, OpenRingButton, SignOffButton } from "./ClientForms";
 
 export default async function CoachClient({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +35,7 @@ export default async function CoachClient({ params }: { params: Promise<{ id: st
           <h2 className="text-sm uppercase tracking-widest text-dim">Milestones to sign off</h2>
           {toSignOff.map(({ c, r, i }) => (
             <div key={i.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-              <div className="flex-1"><p className="text-xs text-dim">{c.name} · Ring {r.number}</p><p className="text-sm">{i.title}</p></div>
+              <div className="flex-1"><p className="text-xs text-dim">{c.name} · Medal {r.number}</p><p className="text-sm">{i.title}</p></div>
               <SignOffButton clientId={id} itemId={i.id} />
             </div>
           ))}
@@ -48,12 +48,12 @@ export default async function CoachClient({ params }: { params: Promise<{ id: st
           const next = c.rings.find((r) => r.status === "upcoming" || r.status === "locked");
           return (
             <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
-              <RingTarget rings={c.rings.map((r) => ({ color: r.color, fraction: r.fraction }))} size={36} gap={6} label={`${c.ringsComplete} of ${c.rings.length}`} />
+              <MedalCircle medals={c.rings.map((r) => r.fraction)} color={c.color} size={40} label={`${c.ringsComplete} of ${c.rings.length} medals`} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm">{c.name}{c.focus ? <span className="text-accent"> · focus</span> : ""}</p>
-                <p className="truncate text-xs text-dim">{c.ringsComplete}/{c.rings.length} done{c.current ? ` · Ring ${c.current.number} ${c.current.name}, day ${c.current.day}` : ""}</p>
+                <p className="truncate text-xs text-dim">{c.ringsComplete}/{c.rings.length} done{c.current ? ` · Medal ${c.current.number} ${c.current.name}, day ${c.current.day}` : ""}</p>
               </div>
-              {next && <OpenRingButton clientId={id} circleId={c.id} label={c.status === "open" ? `Open ring ${next.number}` : c.kind === "growth" ? "Open early" : "Open fix-it"} />}
+              {next && <OpenRingButton clientId={id} circleId={c.id} label={c.status === "open" ? `Open medal ${next.number}` : c.kind === "growth" ? "Open early" : "Open fix-it"} />}
             </div>
           );
         })}

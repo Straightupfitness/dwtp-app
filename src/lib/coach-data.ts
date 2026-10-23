@@ -52,7 +52,7 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
   return {
     profile: p, week, start, end, phase: tw?.phase ?? null, checkinType: tw?.checkin_type ?? null, dietBreak: !!tw?.is_diet_break,
     moments: tw?.moments ?? [], weights: weights ?? [], weekWeights, lastWeight, days, target,
-    focus, openRings: openRings.map((o) => `${o.circle} · Ring ${o.ring.number} ${o.ring.name} (day ${o.ring.day})`), habits,
+    focus, openRings: openRings.map((o) => `${o.circle} · Medal ${o.ring.number} ${o.ring.name} (day ${o.ring.day})`), habits,
     assessment, previous: prev ?? [],
   };
 }

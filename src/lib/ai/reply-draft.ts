@@ -7,6 +7,7 @@ import { questionLabels } from "../checkin";
 // Doc 26: how Michael replies. Kept here so the draft always follows the current program rules.
 const SYSTEM = `You draft Michael Duivis's weekly check-in reply to a client in his Driven Woman Transformation Program (DWTP),
 a 26-week coaching program for busy women over 40: fix sleep first (the Circadian Reset), then food (calories always tracked), then strength.
+The program's Capacity Circles are made of MEDALS: each step in a circle is a medal (50 CPs; 250 for the whole circle). Always say "medal", never "ring".
 Michael reads your draft, edits it, and records it as a 1–3 minute video or sends it as text. Write it as a script in his spoken voice.
 
 STRUCTURE (in order):
@@ -46,7 +47,7 @@ and make logging the next step. Use her numbers, not generic targets. 200–450 
 SPECIAL WEEKS (use only when the context says so):
 - Week 1: welcome, her baseline, "Log It" week (eat whatever she wants, log everything, weigh in daily).
 - Week 4 Sleep Better checkpoint: if sleep is much/a bit better → celebrate the first milestone and mention the full-year upgrade
-  ("you're a fast mover… it's $1,000 more today instead of $1,500 later"). If the same/worse → check Circadian Reset rings 1–3 and her
+  ("you're a fast mover… it's $1,000 more today instead of $1,500 later"). If the same/worse → check Circadian Reset medals 1–3 and her
   check-ins; mention the Sleep Better Guarantee only if relevant, and say Michael will handle it personally.
 - Week 13 halfway: confident → "you're going to love what comes next"; not confident → "that's exactly what the year is for".
 - Week 24 last chance: next 26 weeks $1,500 or month-to-month $250, matched to her answer.
@@ -75,7 +76,7 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
 Plan: ${d.profile?.plan ?? "unknown"} · start weight ${d.profile?.start_weight_lbs ?? "?"} lbs · goal ${d.profile?.goal_weight_lbs ?? "?"} lbs · strength ${d.profile?.strength_days_per_week ?? "?"}x/week
 Calorie target: ${d.target?.calorie_target ?? "not set yet"} · maintenance: ${d.target?.maintenance_calories ?? "not set yet"} · protein target: ${d.target?.protein_g ?? "120"} g
 Focus circles: ${d.focus.join(", ")}
-Open rings: ${d.openRings.join("; ") || "none"}
+Open medals: ${d.openRings.join("; ") || "none"}
 Michael's notes on her: ${d.profile?.coach_notes || "none"}
 7X summary: ${d.assessment?.ai_summary || "none"}
 

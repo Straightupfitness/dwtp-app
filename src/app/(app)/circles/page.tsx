@@ -2,18 +2,15 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, daysUntil, type CircleState } from "@/lib/circles";
 import { PHASE_LABEL } from "@/lib/program";
-import RingTarget from "@/components/RingTarget";
+import MedalCircle from "@/components/MedalCircle";
 
-function Donut({ c, size }: { c: CircleState; size: number }) {
+function Medals({ c, size, center }: { c: CircleState; size: number; center?: boolean }) {
   return (
-    <RingTarget rings={c.rings.map((r) => ({ color: r.color, fraction: r.fraction }))} size={size} gap={size > 40 ? 4 : 6}
-      label={`${c.ringsComplete} of ${c.rings.length} rings complete`} />
+    <MedalCircle medals={c.rings.map((r) => r.fraction)} color={c.color} size={size}
+      center={center ? `${c.ringsComplete}/${c.rings.length}` : undefined}
+      label={`${c.name}: ${c.ringsComplete} of ${c.rings.length} medals`} />
   );
 }
-
-const Chevron = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-);
 const Label = ({ children }: { children: React.ReactNode }) => (
   <h2 className="mt-2 text-xs uppercase tracking-[0.15em] text-accent">{children}</h2>
 );
@@ -49,25 +46,18 @@ export default async function CirclesPage() {
       </header>
 
       <Label>Your 3 focus circles</Label>
-      {focus.map((c) => (
-        <Link key={c.id} href={`/circles/${c.slug}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-          <Donut c={c} size={56} />
-          <div className="min-w-0 flex-1">
-            <p className="font-[family-name:var(--font-display)] text-lg uppercase">{c.name}</p>
-            {c.current ? (
-              <>
-                <p className="truncate text-sm text-dim">Ring {c.current.number} · {c.current.name} · day {Math.min(c.current.day, 14)} of 14</p>
-                <div className="mt-1.5 h-1.5 rounded-full bg-[#262626]">
-                  <div className="h-1.5 rounded-full" style={{ width: `${Math.round(c.current.fraction * 100)}%`, background: c.current.color }} />
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-dim">{c.ringsComplete === c.rings.length ? "Complete" : state.week ? "Next ring opening soon" : "Opens on your start day"}</p>
-            )}
-          </div>
-          <Chevron />
-        </Link>
-      ))}
+      <div className="grid grid-cols-3 gap-2">
+        {focus.map((c) => (
+          <Link key={c.id} href={`/circles/${c.slug}`} className="flex flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-1 pb-2.5 pt-3 text-center">
+            <Medals c={c} size={96} center />
+            <span className="font-[family-name:var(--font-display)] text-[15px] uppercase leading-tight">{c.name}</span>
+            <span className="text-xs" style={{ color: c.color }}>
+              {c.current ? `Medal ${c.current.number} · day ${Math.min(c.current.day, 14)}`
+                : c.ringsComplete === c.rings.length ? "Complete" : state.week ? "Next medal soon" : "Starts Monday"}
+            </span>
+          </Link>
+        ))}
+      </div>
 
       {alsoOpen.length > 0 && (
         <>
@@ -75,10 +65,10 @@ export default async function CirclesPage() {
           <div className="grid grid-cols-2 gap-2">
             {alsoOpen.map((c) => (
               <Link key={c.id} href={`/circles/${c.slug}`} className="flex min-h-11 items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
-                <Donut c={c} size={30} />
+                <Medals c={c} size={38} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm">{c.name}</span>
-                  <span className="block text-xs text-dim">{c.current ? `Ring ${c.current.number} · day ${Math.min(c.current.day, 14)}` : `${c.ringsComplete}/${c.rings.length} rings`}</span>
+                  <span className="block text-xs text-dim">{c.current ? `Medal ${c.current.number} · day ${Math.min(c.current.day, 14)}` : `${c.ringsComplete}/${c.rings.length} medals`}</span>
                 </span>
               </Link>
             ))}
@@ -96,7 +86,7 @@ export default async function CirclesPage() {
                 ? `In ${daysUntil(state.today, next.opensOn)} days` : c.firstPlanWeek ? `Week ${c.firstPlanWeek}` : "Ask Michael";
               return (
                 <Link key={c.id} href={`/circles/${c.slug}`} className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-card px-1 py-2.5 text-center">
-                  <Donut c={c} size={34} />
+                  <Medals c={c} size={40} />
                   <span className="text-xs leading-tight">{c.name}</span>
                   <span className="text-[11px] text-dim">{when}</span>
                 </Link>
@@ -109,7 +99,8 @@ export default async function CirclesPage() {
       <Label>Fix-its</Label>
       <div className="flex flex-wrap gap-2">
         {fixits.map((c) => (
-          <Link key={c.id} href={`/circles/${c.slug}`} className="inline-flex min-h-9 items-center rounded-full border border-[#2a2a2a] px-3.5 text-sm">
+          <Link key={c.id} href={`/circles/${c.slug}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#2a2a2a] px-3.5 text-sm">
+            <span className="size-2 rounded-full" style={{ background: c.color }} aria-hidden="true" />
             {c.name}
           </Link>
         ))}

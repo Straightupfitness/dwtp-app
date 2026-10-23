@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, daysUntil, type ItemState, type RingState } from "@/lib/circles";
 import { CIRCLE_CPS } from "@/lib/program";
-import RingTarget from "@/components/RingTarget";
+import MedalCircle from "@/components/MedalCircle";
 import ItemCheck from "../ItemCheck";
 
 const Check = () => (
@@ -14,7 +14,7 @@ const Lock = ({ color }: { color: string }) => (
 );
 const TYPE_LABEL: Record<string, string> = { do: "Do", eat: "Eat", take: "Take", get: "Get", learn: "Learn", hit: "Hit" };
 
-/** A habit in a ring that isn't open yet: shown as a preview, with credit if she's already doing it elsewhere. */
+/** A habit in a medal that isn't open yet: shown as a preview, with credit if she's already doing it elsewhere. */
 function PreviewItem({ it, color }: { it: ItemState; color: string }) {
   const credit = it.complete ? "Already done" : it.progress > 0
     ? `Already doing this${it.alsoIn.length ? ` in ${it.alsoIn.join(", ")}` : ""} · ${it.cadence === "weekly" ? "week" : "day"} ${it.progress} of ${it.target}` : null;
@@ -30,9 +30,9 @@ function PreviewItem({ it, color }: { it: ItemState; color: string }) {
 function OpenRing({ r }: { r: RingState }) {
   return (
     <div className="flex-1 space-y-2 rounded-2xl border bg-card p-3.5" style={{ borderColor: r.color }}>
-      <div className="flex items-baseline justify-between gap-2">
+      <div>
+        <p className="text-xs uppercase tracking-[0.15em]" style={{ color: r.color }}>Medal {r.number} · day {Math.min(r.day, 14)} of 14</p>
         <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">{r.name}</h2>
-        <span className="shrink-0 text-xs text-dim">Day {r.day}</span>
       </div>
       {r.outcome && <p className="text-sm text-dim">{r.outcome}</p>}
       <div className="h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full" style={{ width: `${Math.round(r.fraction * 100)}%`, background: r.color }} /></div>
@@ -57,7 +57,7 @@ function OpenRing({ r }: { r: RingState }) {
 
 function opensLabel(r: RingState, today: string) {
   const when = r.opensOn ? (daysUntil(today, r.opensOn) <= 7 ? `in ${daysUntil(today, r.opensOn)} days` : `Week ${r.planWeek}`) : null;
-  if (r.halfwayOf) return `Opens when you're halfway through Ring ${r.halfwayOf}${when ? ` (or ${when})` : ""}`;
+  if (r.halfwayOf) return `Opens when you're halfway through Medal ${r.halfwayOf}${when ? ` (or ${when})` : ""}`;
   return when ? `Opens ${when}` : "";
 }
 
@@ -87,14 +87,10 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
         {c.goal && <p className="mt-1 text-sm text-dim">Goal: {c.goal}</p>}
       </header>
 
-      <div className="flex items-center gap-4">
-        <RingTarget rings={c.rings.map((r) => ({ color: r.color, fraction: r.fraction }))} size={150}
-          label={`${c.name}: ${c.ringsComplete} of ${c.rings.length} rings complete`} />
-        <div>
-          <p className="font-[family-name:var(--font-display)] text-4xl leading-none">{c.ringsComplete}<span className="text-xl text-dim"> / {c.rings.length}</span></p>
-          <p className="text-sm text-dim">rings complete</p>
-          <p className="mt-2 text-xs text-dim">50 CPs a ring · {CIRCLE_CPS} for the circle</p>
-        </div>
+      <div className="flex flex-col items-center gap-1">
+        <MedalCircle medals={c.rings.map((r) => r.fraction)} color={c.color} size={280} detail center={`${c.ringsComplete}/${c.rings.length}`}
+          label={`${c.name}: ${c.ringsComplete} of ${c.rings.length} medals`} />
+        <p className="text-xs text-dim">medals done · 50 CPs a medal · {CIRCLE_CPS} for the circle</p>
       </div>
 
       {banner && <p className="rounded-xl border border-border bg-card p-3 text-sm">{banner}</p>}
@@ -133,7 +129,7 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
           </li>
         ))}
         <li className="relative flex items-center gap-3.5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-dashed border-[#818cf8] bg-card">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-dashed bg-card" style={{ borderColor: c.color }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffcc75" strokeWidth="2" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
           </span>
           <span>

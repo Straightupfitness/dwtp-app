@@ -21,11 +21,19 @@ export const AUTO_HABITS: Record<string, string> = {
   "log-food": "Checks itself off when you log a meal",
 };
 
-const BASE_COLORS = ["#ef4444", "#f97316", "#f5a623", "#facc15", "#a3e635", "#22c55e", "#2dd4bf", "#38bdf8", "#818cf8", "#c084fc"];
-const LIGHT_COLORS = ["#fca5a5", "#fdba74", "#fcd34d", "#fde68a", "#d9f99d", "#86efac"];
-/** Ring 1 red → ring 10 violet; rings 11–16 (Mindset) repeat the colors in a lighter shade. */
-export function ringColor(n: number): string {
-  return n <= 10 ? BASE_COLORS[n - 1] : LIGHT_COLORS[(n - 11) % LIGHT_COLORS.length];
+/**
+ * One color per circle (decided October 23): every medal in a circle shares it.
+ * Fix-its are a neutral silver so they look different from the growth circles.
+ * (In the database a medal is still a "ring".)
+ */
+export const CIRCLE_COLORS: Record<string, string> = {
+  "circadian-reset": "#818cf8", "food-quality": "#22c55e", "food-philosophy": "#f97316", kitchen: "#ef4444",
+  supplements: "#2dd4bf", strength: "#f5a623", cardio: "#fb7185", mobility: "#38bdf8", mindset: "#c084fc",
+  "healthy-home": "#a3e635", "role-model": "#facc15",
+};
+export const FIXIT_COLOR = "#cbd5e1";
+export function circleColor(slug: string): string {
+  return CIRCLE_COLORS[slug] ?? FIXIT_COLOR;
 }
 
 export type ItemState = {
@@ -50,6 +58,7 @@ export type RingState = {
 };
 export type CircleState = {
   id: string; slug: string; name: string; kind: string; goal: string | null; seeAPro: string | null; sort: number;
+  color: string;
   focus: boolean; workAhead: boolean;
   status: "open" | "upcoming" | "locked";
   firstPlanWeek: number | null;
@@ -201,7 +210,7 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
       const fraction = status === "complete" ? 1 : status === "open" && parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
       const ring: RingState = {
         id: rid, number: n, name: r.name as string, outcome: (r.outcome as string) ?? null, cps: (r.cps as number) ?? 50,
-        color: ringColor(n), status, opensOn, halfwayOf, planWeek, saved: !!row,
+        color: circleColor(slug), status, opensOn, halfwayOf, planWeek, saved: !!row,
         day: status === "open" && opensOn ? daysBetween(opensOn, today) + 1 : 0, fraction, items: its,
       };
       ringStates.push(ring);
@@ -213,7 +222,7 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
     const weeks = ringStates.map((r) => r.planWeek).filter((w): w is number => w !== null);
     return {
       id, slug, name, kind: c.kind as string, goal: (c.goal as string) ?? null, seeAPro: (c.see_a_professional as string) ?? null,
-      sort: c.sort as number, focus, workAhead,
+      sort: c.sort as number, color: circleColor(slug), focus, workAhead,
       status: anyOpen ? "open" : anyUpcoming ? "upcoming" : "locked",
       firstPlanWeek: weeks.length ? Math.min(...weeks) : null,
       rings: ringStates,

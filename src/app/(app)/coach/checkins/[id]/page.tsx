@@ -110,7 +110,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
                 <td className="text-center">{x.meals ? `${x.protein} g` : "–"}</td><td className="text-center">{x.meals ? `${x.fiber} g` : "–"}</td>
               </tr>))}</tbody>
           </table>
-          <p><b>Rings open:</b> {d.openRings.join(" · ") || "none"}</p>
+          <p><b>Medals open:</b> {d.openRings.join(" · ") || "none"}</p>
         </div>
       </details>
 
