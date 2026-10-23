@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { askClaude, parseJson } from "@/lib/ai/anthropic";
+import { askClaude } from "@/lib/ai/anthropic";
 import { weekData } from "@/lib/coach-data";
 import { questionLabels } from "@/lib/checkin";
 
@@ -54,9 +54,13 @@ SPECIAL WEEKS (use only when the context says so):
 - Week 24 last chance: next 26 weeks $1,500 or month-to-month $250, matched to her answer.
 - Diet-break weeks: maintenance calories, keep logging and 40 g protein per meal.
 
-Return ONLY JSON:
-{"summary":{"win":"","obstacle":"","questions":"","flags":[""]},"draft":""}
-"summary" is for Michael: one short line each. "flags": health or safety concerns, upsell/renewal moments, missing data. "draft": the reply script.`;
+Answer in exactly this format, with these four labels and nothing before or after:
+WIN: (her win, one short line, for Michael)
+OBSTACLE: (her obstacle, one short line)
+QUESTIONS: (what she asked, one short line, or "none")
+FLAGS: (health or safety concerns, upsell or renewal moments, missing data; separated by " | ", or "none")
+DRAFT:
+(the reply script, plain text, as many lines as needed)`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -108,7 +112,7 @@ ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin
 
   try {
     const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context }], maxTokens: 2500 });
-    const out = parseJson<{ summary: Record<string, unknown>; draft: string }>(reply);
+    const out = parseDraft(reply);
     await supabase.from("checkins").update({ ai_summary: out.summary }).eq("id", c.id);
     await supabase.from("checkin_replies").upsert({ checkin_id: c.id, ai_draft: out.draft, updated_at: new Date().toISOString() }, { onConflict: "checkin_id" });
     return NextResponse.json(out);
@@ -116,4 +120,15 @@ ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin
     console.error("draft failed", e);
     return NextResponse.json({ error: `The AI draft failed: ${String((e as Error).message).slice(0, 200)}` }, { status: 502 });
   }
+}
+
+/** Read the labeled answer. Plain text, so quotes in the script can't break it. */
+function parseDraft(text: string) {
+  const line = (label: string) => text.match(new RegExp(`^\\s*${label}:\\s*(.*)$`, "mi"))?.[1]?.trim() ?? "";
+  const i = text.search(/^\s*DRAFT:/mi);
+  const draft = (i >= 0 ? text.slice(i).replace(/^\s*DRAFT:\s*/i, "") : text).trim();
+  if (!draft) throw new Error("The AI didn't return a draft");
+  const none = (v: string) => (/^none\.?$/i.test(v) ? "" : v);
+  const flags = none(line("FLAGS")).split("|").map((f) => f.trim()).filter(Boolean);
+  return { summary: { win: none(line("WIN")), obstacle: none(line("OBSTACLE")), questions: none(line("QUESTIONS")), flags }, draft };
 }
