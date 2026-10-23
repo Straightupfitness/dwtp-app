@@ -1,50 +1,44 @@
 import { createClient } from "@/lib/supabase/server";
-import { dailyStreak, programWeek, todayIn, PHASE_LABEL, STREAK_DAYS } from "@/lib/program";
-import HabitCheck from "./HabitCheck";
+import { loadProgram, type ItemState } from "@/lib/circles";
+import { PHASE_LABEL } from "@/lib/program";
+import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
-
-type Item = { id: string; title: string; detail: string | null; item_type: string; cadence: string;
-  rings: { name: string; ring_number: number; circles: { name: string } } };
 
 export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles")
-    .select("full_name, timezone, program_start").eq("id", user!.id).single();
-
-  const today = todayIn(profile?.timezone ?? "America/Los_Angeles");
-  const week = programWeek(profile?.program_start ?? null, today);
+  const [{ data: profile }, state] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user!.id).single(),
+    loadProgram(supabase, user!.id),
+  ]);
+  const { today, week } = state;
 
   if (week === 0) {
     return (
       <section className="space-y-3">
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Welcome{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
-        <p className="text-dim">Your program starts on {profile?.program_start ?? "your first Monday"}. Your workouts go live that morning.</p>
+        <p className="text-dim">Your program starts on {state.programStart ?? "your first Monday"}. Your workouts go live that morning.</p>
       </section>
     );
   }
 
-  const [{ data: tw }, { data: weekRings }, { data: ownRings }] = await Promise.all([
+  const [{ data: tw }, { data: weightToday }] = await Promise.all([
     supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(week, 52)).maybeSingle(),
-    supabase.from("trajectory_week_rings").select("ring_id").lte("week_number", week),
-    supabase.from("client_rings").select("ring_id, status").eq("client_id", user!.id),
-  ]);
-  const done = new Set((ownRings ?? []).filter((r) => r.status === "complete").map((r) => r.ring_id));
-  const ringIds = [...new Set([...(weekRings ?? []).map((r) => r.ring_id), ...(ownRings ?? []).map((r) => r.ring_id)])]
-    .filter((id) => !done.has(id));
-
-  const { data: items } = ringIds.length
-    ? await supabase.from("ring_items").select("id, title, detail, item_type, cadence, rings(name, ring_number, circles(name))")
-        .in("ring_id", ringIds).in("item_type", ["do", "eat", "take"]).eq("cadence", "daily").order("sort")
-    : { data: [] as Item[] };
-
-  const since = new Date(Date.parse(today) - 21 * 86_400_000).toISOString().slice(0, 10);
-  const [{ data: logs }, { data: weightToday }] = await Promise.all([
-    supabase.from("habit_logs").select("item_id, log_date").eq("client_id", user!.id).gte("log_date", since),
     supabase.from("weight_logs").select("weight_lbs").eq("client_id", user!.id).eq("log_date", today).maybeSingle(),
   ]);
-  const byItem = new Map<string, Set<string>>();
-  (logs ?? []).forEach((l) => byItem.set(l.item_id, (byItem.get(l.item_id) ?? new Set()).add(l.log_date)));
+
+  // Every daily and weekly habit from her open rings; a habit that lives in two circles shows once.
+  const seen = new Set<string>();
+  const groups: { label: string; color: string; daily: ItemState[]; weekly: ItemState[] }[] = [];
+  for (const c of state.circles) {
+    for (const r of c.rings) {
+      if (r.status !== "open") continue;
+      const its = r.items.filter((i) => ["do", "eat", "take"].includes(i.type) && i.cadence !== "once")
+        .filter((i) => { const k = i.habitKey ?? i.id; if (seen.has(k)) return false; seen.add(k); return true; });
+      if (its.length) groups.push({ label: `${c.name} · ${r.name}`, color: r.color,
+        daily: its.filter((i) => i.cadence === "daily"), weekly: its.filter((i) => i.cadence === "weekly") });
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -65,19 +59,18 @@ export default async function TodayPage() {
         <button className="rounded-lg bg-accent px-4 py-2 font-semibold text-black">{weightToday ? "Update" : "Log"}</button>
       </form>
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-dim">Your habits</h2>
-        {(items as unknown as Item[] ?? []).map((it) => {
-          const dates = byItem.get(it.id) ?? new Set<string>();
-          return (
-            <div key={it.id}>
-              <p className="mb-1 text-xs text-dim">{it.rings.circles.name} · {it.rings.name}</p>
-              <HabitCheck itemId={it.id} date={today} done={dates.has(today)} title={it.title} detail={it.detail}
-                streak={dailyStreak(dates, today)} target={STREAK_DAYS} />
-            </div>
-          );
-        })}
-        {!items?.length && <p className="text-dim">No habits yet. They start in Week 1.</p>}
+        {groups.map((g) => (
+          <div key={g.label} className="rounded-xl border border-border bg-card px-3 py-1">
+            <p className="pt-2 text-xs uppercase tracking-wider" style={{ color: g.color }}>{g.label}</p>
+            {[...g.daily, ...g.weekly].map((it) => (
+              <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
+                progress={it.progress} target={it.target} cadence={it.cadence} color={g.color} auto={it.auto} />
+            ))}
+          </div>
+        ))}
+        {!groups.length && <p className="text-dim">No habits open yet.</p>}
       </div>
     </section>
   );

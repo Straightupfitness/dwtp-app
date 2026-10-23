@@ -2,6 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { totals, type FoodItem } from "@/lib/food";
+import { todayIn } from "@/lib/program";
+import { awardAutoHabit, closeOutRings } from "@/lib/progress";
 
 export async function saveMeal(input: {
   items: FoodItem[];
@@ -29,7 +31,10 @@ export async function saveMeal(input: {
     confirmed: true,
   });
   if (error) return { error: error.message };
-  revalidatePath("/food");
+  const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+  await awardAutoHabit(supabase, user.id, "log-food", todayIn(profile?.timezone ?? "America/Los_Angeles"));
+  await closeOutRings(supabase, user.id);
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 
