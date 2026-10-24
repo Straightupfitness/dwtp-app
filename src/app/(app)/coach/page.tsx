@@ -54,6 +54,7 @@ export default async function CoachHome() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Clients</h1>
         <p className="text-sm text-dim">{toReply ? `${toReply} check-in${toReply > 1 ? "s" : ""} to reply to` : "All caught up"} · {rows.length} clients</p>
       </header>
+      <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add a client</Link>
       <ul className="space-y-2">
         {rows.map(({ c, week, status, lastWeight, daysSinceWeight, flags, cps }) => (
           <li key={c.id} className="rounded-xl border border-border bg-card p-3">
