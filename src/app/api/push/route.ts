@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { vapidKeys } from "@/lib/notify";
+import { safeError } from "@/lib/supabase/admin";
 
 /** GET: the public key a phone needs to subscribe. POST: save this phone. DELETE: forget it. */
 export async function GET() {
   try { return NextResponse.json({ publicKey: (await vapidKeys()).publicKey }); }
-  catch (e) { return NextResponse.json({ error: String((e as Error).message) }, { status: 500 }); }
+  catch (e) { return NextResponse.json({ error: safeError(e) }, { status: 500 }); }
 }
 
 export async function POST(req: Request) {

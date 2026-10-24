@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { adminClient } from "@/lib/supabase/admin";
+import { adminClient, safeError } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/notify";
 
 /** Michael adds a client: creates her login (no password; she signs in with an email link) and her profile. */
@@ -19,9 +19,15 @@ export async function addClient(_: unknown, form: FormData) {
   if (!name) return { error: "Enter her name." };
   if (start && new Date(start + "T00:00:00Z").getUTCDay() !== 1) return { error: "The program always starts on a Monday." };
 
-  const db = adminClient();
-  const { data: created, error } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name: name } });
-  if (error) return { error: /already|registered|exists/i.test(error.message) ? "There's already an account with that email." : error.message };
+  let db, created, error;
+  try {
+    db = adminClient();
+    ({ data: created, error } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name: name } }));
+  } catch (e) {
+    console.error("add client failed", safeError(e));
+    return { error: /header|invalid|key/i.test(String(e)) ? "Setup: SUPABASE_SERVICE_ROLE_KEY in Vercel isn't valid. Re-paste it (no spaces or line breaks) and redeploy." : `Couldn't add her: ${safeError(e)}` };
+  }
+  if (error) return { error: /already|registered|exists/i.test(error.message) ? "There's already an account with that email." : `Couldn't add her: ${safeError(error)}` };
   const id = created.user!.id;
   await db.from("profiles").upsert({
     id, email, full_name: name, role: "client", status: start ? "active" : "onboarding", program_start: start,

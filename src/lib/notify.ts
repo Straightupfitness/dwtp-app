@@ -18,13 +18,15 @@ const APP_URL = () => (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightu
 
 export async function vapidKeys() {
   const db = adminClient();
-  const { data } = await db.from("app_config").select("key, value").in("key", ["vapid_public", "vapid_private"]);
+  const { data, error } = await db.from("app_config").select("key, value").in("key", ["vapid_public", "vapid_private"]);
+  if (error || !data) throw new Error("The app couldn't reach its settings. Check SUPABASE_SERVICE_ROLE_KEY in Vercel.");
   const pub = data?.find((r) => r.key === "vapid_public")?.value, priv = data?.find((r) => r.key === "vapid_private")?.value;
   if (pub && priv) return { publicKey: pub, privateKey: priv };
   const k = webpush.generateVAPIDKeys();
   await db.from("app_config").upsert([{ key: "vapid_public", value: k.publicKey }, { key: "vapid_private", value: k.privateKey }], { onConflict: "key", ignoreDuplicates: true });
   const { data: again } = await db.from("app_config").select("key, value").in("key", ["vapid_public", "vapid_private"]);
-  return { publicKey: again!.find((r) => r.key === "vapid_public")!.value, privateKey: again!.find((r) => r.key === "vapid_private")!.value };
+  if (!again?.length) throw new Error("The app couldn't save its push settings. Check SUPABASE_SERVICE_ROLE_KEY in Vercel.");
+  return { publicKey: again.find((r) => r.key === "vapid_public")!.value, privateKey: again.find((r) => r.key === "vapid_private")!.value };
 }
 
 export async function notify(userIds: string | string[], note: Note) {
