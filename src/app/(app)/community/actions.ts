@@ -29,17 +29,31 @@ export async function toggleLike(postId: string, on: boolean) {
   done();
 }
 
-export async function addComment(postId: string, body: string) {
+export async function addComment(postId: string, body: string, parentId: string | null = null) {
   const { supabase, id } = await me();
   if (!body.trim()) return;
-  await supabase.from("comments").insert({ post_id: postId, author_id: id, body: body.trim() });
-  const [{ data: post }, { data: who }] = await Promise.all([
+  await supabase.from("comments").insert({ post_id: postId, author_id: id, body: body.trim(), parent_id: parentId });
+  const [{ data: post }, { data: parent }, { data: who }] = await Promise.all([
     supabase.from("posts").select("author_id").eq("id", postId).single(),
+    parentId ? supabase.from("comments").select("author_id").eq("id", parentId).single() : Promise.resolve({ data: null }),
     supabase.from("member_names").select("full_name, role").eq("id", id).single(),
   ]);
-  if (post && post.author_id !== id) {
-    notifyLater(post.author_id, { title: `${who?.role === "coach" ? "Michael" : shortName(who?.full_name)} commented on your post`, body: body.trim().slice(0, 120), url: "/community" });
+  const name = who?.role === "coach" ? "Michael" : shortName(who?.full_name);
+  const notified = new Set<string>([id]);
+  if (parent && !notified.has(parent.author_id)) {
+    notified.add(parent.author_id);
+    notifyLater(parent.author_id, { title: `${name} replied to your comment`, body: body.trim().slice(0, 120), url: "/community" });
   }
+  if (post && !notified.has(post.author_id)) {
+    notifyLater(post.author_id, { title: `${name} commented on your post`, body: body.trim().slice(0, 120), url: "/community" });
+  }
+  done();
+}
+
+export async function toggleCommentLike(commentId: string, on: boolean) {
+  const { supabase, id } = await me();
+  if (on) await supabase.from("comment_likes").upsert({ comment_id: commentId, user_id: id });
+  else await supabase.from("comment_likes").delete().match({ comment_id: commentId, user_id: id });
   done();
 }
 

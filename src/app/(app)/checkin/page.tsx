@@ -5,6 +5,12 @@ import CheckinForm, { type NewHabit } from "./CheckinForm";
 
 export const maxDuration = 120;
 
+function timeLeft(until: Date) {
+  const mins = Math.max(0, Math.round((until.getTime() - Date.now()) / 60_000));
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
+  return d ? `${d} day${d > 1 ? "s" : ""} ${h} hrs left` : h ? `${h} hrs left` : `${mins} min left`;
+}
+
 const fmt = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d) + " Pacific";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
@@ -18,6 +24,9 @@ export default async function CheckinPage() {
     .select("id, week_number, submitted_at, checkin_replies(final_text, video_path, sent_at)")
     .eq("client_id", user!.id).order("week_number", { ascending: false });
   const thisOne = open ? history?.find((c) => c.week_number === open.week) : null;
+  const { data: prev } = open ? await supabase.from("checkins").select("sleep, energy, stress, hunger").eq("client_id", user!.id)
+    .lt("week_number", open.week).order("week_number", { ascending: false }).limit(1).maybeSingle() : { data: null };
+  const lastScores = prev as Record<string, number | null> | null;
 
   const replyVideos = new Map<string, string>();
   const paths = (history ?? []).flatMap((c) => {
@@ -48,7 +57,9 @@ export default async function CheckinPage() {
       }
     }
     form = (
-      <CheckinForm week={open.week} userId={user!.id} isVideo={!!tw?.checkin_is_video} habits={habits} closes={fmt(open.closes)}
+      <CheckinForm week={open.week} userId={user!.id} isVideo={!!tw?.checkin_is_video} habits={habits}
+        closes={new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short", hour: "numeric" }).format(open.closes)}
+        timeLeft={timeLeft(open.closes)} last={lastScores}
         questions={questionsFor(open.week, tw, { onFullYear: profile.plan === "52_weeks" })} />
     );
   }
@@ -56,10 +67,8 @@ export default async function CheckinPage() {
   return (
     <section className="space-y-6">
       <header>
-        <p className="text-xs uppercase tracking-[0.15em] text-accent">Weekly check-in</p>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">
-          {open ? `Week ${open.week} check-in` : "Check-in"}
-        </h1>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Weekly check-in{form ? " · +10 CPs" : ""}</p>
+        {!form && <h1 className="mt-1 font-[family-name:var(--font-display)] text-[30px] font-semibold uppercase">{open ? `Week ${open.week} check-in` : "Check-in"}</h1>}
       </header>
 
       {form}

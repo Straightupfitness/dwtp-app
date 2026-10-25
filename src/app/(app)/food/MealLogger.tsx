@@ -1,0 +1,268 @@
+"use client";
+import { useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { shrinkImage } from "@/lib/image";
+import { totals, type FoodItem } from "@/lib/food";
+import { saveMeal, deleteGoTo } from "./actions";
+import FoodSearch from "./FoodSearch";
+import BarcodeScanner from "./BarcodeScanner";
+
+type Slot = "meal_1" | "meal_2" | "meal_3" | "other";
+const SLOTS: { v: Slot; label: string }[] = [{ v: "meal_1", label: "Meal 1" }, { v: "meal_2", label: "Meal 2" }, { v: "meal_3", label: "Meal 3" }, { v: "other", label: "Other" }];
+export type GoTo = { id: string; name: string; items: FoodItem[] };
+type SpeechRec = { lang: string; interimResults: boolean; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; onend: () => void; start: () => void; stop: () => void };
+
+const toDataUrl = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsDataURL(b); });
+const Cam = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>;
+const Mic = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+const Spark = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z" /><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></svg>;
+
+export default function MealLogger({ userId, defaultSlot, goTos }: { userId: string; defaultSlot: Slot; goTos: GoTo[] }) {
+  const [mode, setMode] = useState<"home" | "describe" | "review">("home");
+  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [slot, setSlot] = useState<Slot>(defaultSlot);
+  const [items, setItems] = useState<FoodItem[]>([]);
+  const [notes, setNotes] = useState("");
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [adder, setAdder] = useState<"type" | "search" | "scan">("type");
+  const [extra, setExtra] = useState("");
+  const [saveAs, setSaveAs] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"" | "estimating" | "adding" | "saving">("");
+  const [error, setError] = useState("");
+  const [listening, setListening] = useState(false);
+  const [manage, setManage] = useState(false);
+  const rec = useRef<SpeechRec | null>(null);
+  const voice = useRef(false);
+
+  function reset() {
+    setMode("home"); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot);
+  }
+  async function estimate(image: Blob | null, description: string) {
+    setMode("review"); setBusy("estimating"); setError("");
+    try {
+      const res = await fetch("/api/food/analyze", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image: image ? await toDataUrl(image) : undefined, text: description }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setItems(data.items ?? []); setNotes(data.notes ?? "");
+      if (!data.items?.length) setError("I couldn't find food in that. Add the items below.");
+    } catch (e) { setError((e as Error).message || "Something went wrong."); }
+    setBusy("");
+  }
+  async function onPhoto(f?: File) {
+    if (!f) return;
+    const small = await shrinkImage(f, 1024, 0.8);
+    setPhoto(small); setPreview(URL.createObjectURL(small));
+    estimate(small, "");
+  }
+  function toggleVoice() {
+    const W = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
+    const Rec = W.SpeechRecognition ?? W.webkitSpeechRecognition;
+    if (!Rec) { setError("Tap the microphone on your keyboard to speak instead."); return; }
+    if (listening) { rec.current?.stop(); return; }
+    const r = new Rec(); r.lang = "en-US"; r.interimResults = false;
+    r.onresult = (e) => { voice.current = true; setText((t) => (t ? t + " " : "") + e.results[0][0].transcript); };
+    r.onend = () => setListening(false);
+    rec.current = r; setListening(true); r.start();
+  }
+  async function addTyped() {
+    if (!extra.trim()) return;
+    setBusy("adding"); setError("");
+    try {
+      const res = await fetch("/api/food/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: extra }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (!data.items?.length) throw new Error("Couldn't find that food. Try wording it differently.");
+      setItems((l) => [...l, ...data.items]); setExtra("");
+    } catch (e) { setError((e as Error).message); }
+    setBusy("");
+  }
+  async function save() {
+    setBusy("saving"); setError("");
+    let photoPath: string | null = null;
+    if (photo) {
+      photoPath = `${userId}/${crypto.randomUUID()}.jpg`;
+      const { error: e } = await createClient().storage.from("food-photos").upload(photoPath, photo, { contentType: "image/jpeg" });
+      if (e) photoPath = null;
+    }
+    const r = await saveMeal({ items, mealSlot: slot, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
+      description: text, photoPath, savedMealId: savedId, saveAs });
+    setBusy("");
+    if (r?.error) setError(r.error); else reset();
+  }
+  const edit = (i: number, k: keyof FoodItem, v: string) =>
+    setItems((l) => l.map((it, j) => (j === i ? { ...it, [k]: k === "name" || k === "amount" ? v : Number(v) } : it)));
+
+  const slotLabel = SLOTS.find((s) => s.v === slot)!.label;
+  const input = "min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-base text-text outline-none focus:border-accent";
+
+  if (mode === "home") {
+    return (
+      <div className="space-y-2">
+        <p className="text-[13px] text-[#a8a8a8]">Add <b className="text-text">{slotLabel}</b></p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-accent text-base font-semibold text-black">
+            <Cam />Snap it
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
+          </label>
+          <button type="button" onClick={() => setMode("describe")} className="flex min-h-16 items-center justify-center gap-2.5 rounded-2xl border border-accent bg-card text-base font-semibold">
+            <span className="text-accent"><Mic /></span>Say it
+          </button>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+          {goTos.map((g) => (
+            <button key={g.id} type="button" onClick={() => { setItems(g.items); setSavedId(g.id); setText(g.name); setNotes(""); setMode("review"); }}
+              className="min-h-10 shrink-0 rounded-full border border-[#2a2a2a] px-3.5 text-[13px]">+ {g.name}</button>
+          ))}
+          {goTos.length > 0
+            ? <button type="button" onClick={() => setManage(!manage)} className="min-h-10 shrink-0 rounded-full px-2 text-[13px] text-dim">{manage ? "Done" : "Edit"}</button>
+            : <span className="py-2 text-xs text-dim">Save a meal as a go-to to log it again with one tap.</span>}
+        </div>
+        {manage && (
+          <ul className="divide-y divide-border rounded-xl border border-border">
+            {goTos.map((g) => (
+              <li key={g.id} className="flex items-center justify-between px-3 py-2 text-sm">{g.name}
+                <button type="button" onClick={() => deleteGoTo(g.id)} className="min-h-9 text-xs text-[var(--red)]">Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+      </div>
+    );
+  }
+
+  if (mode === "describe") {
+    return (
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-3.5">
+        <p className="font-semibold">What did you eat?</p>
+        <div className="flex gap-2">
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} autoFocus aria-label="Describe your meal"
+            placeholder="e.g. 2 eggs, 1 slice sourdough with butter, black coffee"
+            className="flex-1 rounded-xl border border-[#2a2a2a] bg-bg p-3 text-base outline-none focus:border-accent" />
+          <button type="button" onClick={toggleVoice} aria-label={listening ? "Stop listening" : "Speak your meal"}
+            className={`grid w-14 place-items-center rounded-xl border ${listening ? "border-accent bg-accent/20 text-accent" : "border-[#2a2a2a] text-text"}`}><Mic /></button>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={reset} className="min-h-12 flex-1 rounded-xl border border-border">Cancel</button>
+          <button type="button" disabled={!text.trim()} onClick={() => estimate(null, text)} className="min-h-12 flex-1 rounded-xl bg-accent font-semibold text-black disabled:opacity-40">Estimate</button>
+        </div>
+        {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+      </div>
+    );
+  }
+
+  const t = totals(items);
+  return (
+    <div className="fixed inset-0 z-30 flex flex-col bg-bg">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button type="button" onClick={reset} className="flex min-h-11 items-center gap-1 px-2 text-[15px] text-[#a8a8a8]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back
+        </button>
+        <p className="font-[family-name:var(--font-display)] text-lg uppercase">Check your meal</p>
+        <span className="w-16" />
+      </div>
+
+      <div className="mx-auto w-full max-w-md flex-1 space-y-3.5 overflow-y-auto px-4 pb-4 pt-1">
+        {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+        {preview && <img src={preview} alt="Your meal" className="max-h-44 w-full rounded-[18px] object-cover" />}
+
+        <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-border bg-card p-1">
+          {SLOTS.map((s) => (
+            <button key={s.v} type="button" onClick={() => setSlot(s.v)} aria-pressed={slot === s.v}
+              className={`min-h-10 rounded-[10px] text-[13px] ${slot === s.v ? "bg-accent font-semibold text-black" : "text-dim"}`}>{s.label}</button>
+          ))}
+        </div>
+
+        {busy === "estimating" && <p className="rounded-[14px] border border-border bg-card p-4 text-center text-sm text-[#a8a8a8]">Estimating your meal…</p>}
+        {notes && (
+          <div className="flex gap-2.5 rounded-[14px] border border-[#2b2418] bg-[#161310] p-3">
+            <Spark /><p className="text-[13px] leading-relaxed text-[#d9c9a8]">{notes} Change anything that&apos;s off.</p>
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card px-3.5">
+            {items.map((it, i) => editing === i ? (
+              <div key={i} className="space-y-2 py-3">
+                <div className="flex gap-2">
+                  <input value={it.name} onChange={(e) => edit(i, "name", e.target.value)} aria-label="Food" className={input} />
+                  <input value={it.amount} onChange={(e) => edit(i, "amount", e.target.value)} aria-label="Amount" className={`${input} w-28`} />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {([["calories", "kcal"], ["protein_g", "protein g"], ["fiber_g", "fiber g"], ["potassium_mg", "K mg"]] as const).map(([k, l]) => (
+                    <label key={k} className="text-[11px] text-dim">{l}
+                      <input type="number" inputMode="decimal" value={it[k]} onChange={(e) => edit(i, k, e.target.value)} className={`${input} mt-1 px-2 text-sm`} />
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-between">
+                  <button type="button" onClick={() => { setItems(items.filter((_, j) => j !== i)); setEditing(null); }} className="min-h-10 text-sm text-[var(--red)]">Remove</button>
+                  <button type="button" onClick={() => setEditing(null)} className="min-h-10 text-sm font-semibold text-accent">Done</button>
+                </div>
+              </div>
+            ) : (
+              <button key={i} type="button" onClick={() => setEditing(i)} className="flex min-h-[58px] w-full items-center gap-2.5 text-left">
+                <span className="flex-1"><span className="block text-[15px] font-medium">{it.name}</span><span className="block text-xs text-dim">{it.amount}</span></span>
+                <span className="text-right"><span className="block text-sm font-semibold">{Math.round(it.calories)}</span><span className="block text-xs text-[#a8a8a8]">{it.protein_g} g protein</span></span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {busy !== "estimating" && (
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-3 gap-1 rounded-[14px] border border-border bg-card p-1">
+              {([["type", "Type it"], ["search", "Search foods"], ["scan", "Scan barcode"]] as const).map(([v, l]) => (
+                <button key={v} type="button" onClick={() => setAdder(v)} aria-pressed={adder === v}
+                  className={`min-h-10 rounded-[10px] text-[13px] ${adder === v ? "bg-[#2a2a2a] font-semibold text-text" : "text-dim"}`}>{l}</button>
+              ))}
+            </div>
+            {adder === "type" && (
+              <div className="flex gap-2">
+                <input value={extra} onChange={(e) => setExtra(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTyped(); }}
+                  placeholder={items.length ? "Missed something? e.g. 1 tbsp butter" : "e.g. 6 oz salmon"} aria-label="Add a food by typing it"
+                  className="min-h-12 flex-1 rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
+                <button type="button" disabled={busy !== "" || !extra.trim()} onClick={addTyped} className="min-h-12 rounded-xl border border-accent px-4 font-semibold text-accent disabled:opacity-40">{busy === "adding" ? "…" : "Add"}</button>
+              </div>
+            )}
+            {adder === "search" && <FoodSearch onAdd={(it) => setItems((l) => [...l, it])} />}
+            {adder === "scan" && <BarcodeScanner onAdd={(it) => setItems((l) => [...l, it])} onClose={() => setAdder("type")} />}
+          </div>
+        )}
+
+        {items.length > 0 && !savedId && (
+          <label className="flex items-center gap-2.5 text-sm">
+            <input type="checkbox" checked={saveAs !== null} onChange={(e) => setSaveAs(e.target.checked ? "" : null)} className="size-5 accent-[var(--accent)]" />
+            Save as a go-to meal
+          </label>
+        )}
+        {saveAs !== null && (
+          <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder="Name it, e.g. MVP bowl" aria-label="Go-to meal name"
+            className="min-h-11 w-full rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
+        )}
+        {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+      </div>
+
+      <div className="border-t border-border bg-[#0f0f0f] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto w-full max-w-md space-y-2.5 px-4 pt-3">
+          <div className="flex justify-between text-[13px] text-[#a8a8a8]">
+            <span><b className="text-base text-text">{Math.round(t.calories)}</b> kcal</span>
+            <span><b className="text-text">{Math.round(t.protein_g)} g</b> protein</span>
+            <span><b className="text-text">{Math.round(t.fiber_g)} g</b> fiber</span>
+            <span><b className="text-text">{(t.potassium_mg / 1000).toFixed(1)}k</b> mg K</span>
+          </div>
+          <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim())} onClick={save}
+            className="min-h-[54px] w-full rounded-[14px] bg-accent text-[17px] font-semibold text-black disabled:opacity-40">
+            {busy === "saving" ? "Saving…" : `Save ${slotLabel}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

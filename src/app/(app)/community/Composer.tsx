@@ -27,8 +27,8 @@ export default function Composer({ userId, coach }: { userId: string; coach: boo
   }
 
   return (
-    <div className="space-y-2 rounded-2xl border border-border bg-card p-3">
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Share a win, a meal, a question…"
+    <div className="space-y-2 rounded-[18px] border border-border bg-card p-3">
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Share a win, a meal, a question…" aria-label="Write a post"
         className="w-full resize-none rounded-lg bg-transparent p-1 text-base outline-none" />
       {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
       {preview && <img src={preview} alt="" className="max-h-64 rounded-lg" />}

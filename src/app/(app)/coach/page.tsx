@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { currentWindow, windowFor } from "@/lib/checkin";
 import { programWeek, todayIn } from "@/lib/program";
+import Avatar from "@/components/Avatar";
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
@@ -10,7 +11,7 @@ type Status = { label: string; tone: "act" | "ok" | "warn" | "dim"; href?: strin
 export default async function CoachHome() {
   const supabase = await createClient();
   const { data: clients } = await supabase.from("profiles")
-    .select("id, full_name, email, program_start, status, timezone")
+    .select("id, full_name, email, program_start, status, timezone, avatar_path")
     .or("role.eq.client,program_start.not.is.null").order("full_name");
   const ids = (clients ?? []).map((c) => c.id);
   const [{ data: checkins }, { data: weights }, { data: cps }] = await Promise.all([
@@ -59,10 +60,13 @@ export default async function CoachHome() {
         {rows.map(({ c, week, status, lastWeight, daysSinceWeight, flags, cps }) => (
           <li key={c.id} className="rounded-xl border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-2">
-              <Link href={`/coach/clients/${c.id}`} className="min-w-0">
+              <Link href={`/coach/clients/${c.id}`} className="flex min-w-0 items-center gap-3">
+                <Avatar name={c.full_name || c.email} path={c.avatar_path} size={40} />
+                <span className="min-w-0">
                 <p className="truncate font-semibold">{c.full_name || c.email}</p>
                 <p className="text-xs text-dim">{week ? `Week ${week}` : "Not started"} · {cps} CPs this week · {lastWeight
                   ? `weighed in ${daysSinceWeight === 0 ? "today" : `${daysSinceWeight}d ago`}` : "no weigh-ins"}</p>
+                </span>
               </Link>
               {status.href
                 ? <Link href={status.href} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${tone[status.tone]}`}>{status.label}</Link>

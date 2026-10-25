@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { programWeek, todayIn } from "@/lib/program";
 import { setEmailNotifications, signOut, updateName } from "./actions";
 import NotificationSettings from "@/components/NotificationSettings";
+import AvatarPicker from "./AvatarPicker";
 
 export default async function MePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: p }, { data: cps }] = await Promise.all([
-    supabase.from("profiles").select("full_name, email, program_start, timezone, plan, email_notifications").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, email, program_start, timezone, plan, email_notifications, avatar_path").eq("id", user!.id).single(),
     supabase.from("cp_totals").select("total").eq("client_id", user!.id).maybeSingle(),
   ]);
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
@@ -19,6 +20,7 @@ export default async function MePage() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p?.full_name || "Me"}</h1>
         <p className="text-sm text-dim">{p?.email} · {cps?.total ?? 0} CPs all time</p>
       </header>
+      <AvatarPicker userId={user!.id} name={p?.full_name ?? null} path={p?.avatar_path ?? null} />
       <form action={updateName} className="flex items-end gap-2">
         <label className="flex-1 text-sm text-dim">Your name (the community sees your first name and last initial)
           <input name="full_name" defaultValue={p?.full_name ?? ""} className="mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent" />

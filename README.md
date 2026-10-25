@@ -19,6 +19,7 @@ Program design docs (in the Claude project): 23 Capacity Circles · 24 App Plan 
    - `supabase/migrations/0006_community.sql` (community feed, leaderboard, chat, live updates, photos)
    - `supabase/migrations/0007_notifications.sql` (push notifications, email settings, video transcripts)
    - `supabase/migrations/0008_medal_wording.sql` (program text says "medal" instead of "ring")
+   - `supabase/migrations/0009_design_pass.sql` (profile pictures, comment likes and replies, go-to meals, FAQ, "you" wording)
 2. **Your coach login:** Supabase → Authentication → Users → Add user (your email). Then in the SQL editor:
    `update public.profiles set role = 'coach', full_name = 'Michael Duivis' where email = 'YOUR EMAIL';`
 3. **Vercel:** Add New → Project → import `Straightupfitness/dwtp-app`.

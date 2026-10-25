@@ -29,9 +29,9 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
             <li key={m.id}>
               {showTime && <p className="py-2 text-center text-xs text-dim">{fmt(m.created_at)}</p>}
               <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] space-y-1 rounded-2xl px-3.5 py-2 text-[15px] ${mine ? "rounded-br-md bg-accent text-black" : "rounded-bl-md bg-card"}`}>
+                <div className={`max-w-[80%] space-y-1 rounded-[18px] px-3.5 py-2.5 text-[15px] leading-snug ${mine ? "rounded-br-md bg-accent text-black" : "rounded-bl-md bg-[#1b1b1b]"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
-                  {m.attachment_path && photos.get(m.attachment_path) && <img src={photos.get(m.attachment_path)} alt="" className="rounded-xl" />}
+                  {m.attachment_path && photos.get(m.attachment_path) && <img src={photos.get(m.attachment_path)} alt="" className="rounded-[14px]" />}
                   {m.body && <p className="whitespace-pre-line">{m.body}</p>}
                 </div>
               </div>

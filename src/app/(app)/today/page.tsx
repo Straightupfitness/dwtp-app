@@ -1,95 +1,178 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
-import { PHASE_LABEL } from "@/lib/program";
+import { PHASE_LABEL, todayIn } from "@/lib/program";
+import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
+import { DAILY_TARGETS } from "@/lib/food";
+import NotificationSettings from "@/components/NotificationSettings";
+import { IconCheckin } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
-import Link from "next/link";
-import NotificationSettings from "@/components/NotificationSettings";
-import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
+
+const display = "font-[family-name:var(--font-display)] uppercase";
+const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
+
+function greeting(tz: string) {
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(new Date()));
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+function timeLeft(until: Date) {
+  const mins = Math.max(0, Math.round((until.getTime() - Date.now()) / 60_000));
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
+  return d ? `${d} day${d > 1 ? "s" : ""} ${h} hrs left` : h ? `${h} hrs left` : `${mins} min left`;
+}
+
+/** A small trend line of her last 14 days of weigh-ins. */
+function Spark({ points }: { points: number[] }) {
+  if (points.length < 2) return <div className="h-[26px]" />;
+  const min = Math.min(...points), max = Math.max(...points), span = max - min || 1;
+  const xy = points.map((p, i) => `${(2 + (i * 136) / (points.length - 1)).toFixed(1)},${(4 + ((max - p) / span) * 18).toFixed(1)}`);
+  const last = xy[xy.length - 1].split(",");
+  return (
+    <svg width="140" height="26" viewBox="0 0 140 26" aria-hidden="true">
+      <polyline points={xy.join(" ")} fill="none" stroke="#f5a623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last[0]} cy={last[1]} r="3" fill="#f5a623" />
+    </svg>
+  );
+}
 
 export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, state] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, timezone").eq("id", user!.id).single(),
     loadProgram(supabase, user!.id),
   ]);
   const { today, week } = state;
+  const tz = profile?.timezone ?? "America/Los_Angeles";
+  const first = profile?.full_name?.split(" ")[0];
 
   if (week === 0) {
     return (
-      <section className="space-y-3">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Welcome{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}</h1>
-        <p className="text-dim">Your program starts on {state.programStart ?? "your first Monday"}. Your workouts go live that morning.</p>
+      <section className="space-y-4 pt-4">
+        <p className="text-xs uppercase tracking-[0.15em] text-accent">Drained · Rested · Fueled · Driven</p>
+        <h1 className={`${display} text-3xl font-semibold`}>Welcome{first ? `, ${first}` : ""}</h1>
+        <p className="text-[15px] leading-relaxed text-[#a8a8a8]">
+          Your program starts on <b className="text-text">{state.programStart
+            ? new Date(state.programStart + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })
+            : "your first Monday"}</b>. Your workouts and your first habits go live that morning.
+        </p>
+        <NotificationSettings />
+        <Link href="/faq" className="flex min-h-12 items-center justify-center rounded-xl border border-border text-sm font-semibold">Browse the FAQ while you wait</Link>
       </section>
     );
   }
 
   const { open } = currentWindow(state.programStart);
-  const [{ data: tw }, { data: weightToday }, { data: done }] = await Promise.all([
+  const [{ data: tw }, { data: weights }, { data: meals }, { data: target }, { data: done }] = await Promise.all([
     supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(week, 52)).maybeSingle(),
-    supabase.from("weight_logs").select("weight_lbs").eq("client_id", user!.id).eq("log_date", today).maybeSingle(),
+    supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", user!.id).gte("log_date", addDays(today, -14)).order("log_date"),
+    supabase.from("food_logs").select("eaten_at, calories, protein_g").eq("client_id", user!.id).gte("eaten_at", addDays(today, -1) + "T00:00:00Z"),
+    supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  const closes = open ? new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "long", hour: "numeric" }).format(open.closes) : "";
+  const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
+  const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
+  const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
+  const proteinTarget = target?.protein_g ?? DAILY_TARGETS.protein_g;
+  const w = weights ?? [];
+  const weightToday = w.find((x) => x.log_date === today);
+  const change = w.length >= 2 ? Number(w[w.length - 1].weight_lbs) - Number(w[0].weight_lbs) : null;
 
-  // Every daily and weekly habit from her open rings; a habit that lives in two circles shows once.
+  // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
-  const groups: { label: string; color: string; daily: ItemState[]; weekly: ItemState[] }[] = [];
+  const groups: { label: string; color: string; items: ItemState[] }[] = [];
   for (const c of state.circles) {
     for (const r of c.rings) {
       if (r.status !== "open") continue;
       const its = r.items.filter((i) => ["do", "eat", "take"].includes(i.type) && i.cadence !== "once")
-        .filter((i) => { const k = i.habitKey ?? i.id; if (seen.has(k)) return false; seen.add(k); return true; });
-      if (its.length) groups.push({ label: `${c.name} · ${r.name}`, color: r.color,
-        daily: its.filter((i) => i.cadence === "daily"), weekly: its.filter((i) => i.cadence === "weekly") });
+        .filter((i) => { const k = i.habitKey ?? i.id; if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => (a.cadence === "daily" ? 0 : 1) - (b.cadence === "daily" ? 0 : 1));
+      if (its.length) groups.push({ label: `${c.name} · Medal ${r.number} ${r.name}`, color: c.color, items: its });
     }
   }
+  const all = groups.flatMap((g) => g.items);
+  const doneCount = all.filter((i) => i.doneNow).length;
+  const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date());
 
   return (
-    <section className="space-y-6">
-      <header className="relative">
-        <Link href="/me" aria-label="Me" className="absolute right-0 top-0 grid size-11 place-items-center rounded-full border border-border text-dim">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
-        </Link>
-        <p className="text-sm uppercase tracking-widest text-accent">
-          Week {week} · {PHASE_LABEL[tw?.phase ?? "rested"]}{tw?.is_diet_break ? " · Diet break" : ""}
+    <section className="space-y-3.5">
+      <header>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">
+          {dateLabel} · Week {week} · {PHASE_LABEL[tw?.phase ?? "rested"]}{tw?.is_diet_break ? " · Diet break" : ""}
         </p>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Today</h1>
+        <h1 className={`${display} mt-1 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? `, ${first}` : ""}</h1>
       </header>
 
       {open && !done && (
-        <Link href="/checkin" className="block rounded-xl border border-accent bg-accent/10 p-4">
-          <p className="font-semibold text-accent">Your Week {open.week} check-in is open</p>
-          <p className="text-sm text-dim">Closes {closes} Pacific · +10 CPs</p>
+        <Link href="/checkin" className="flex items-center gap-3 rounded-2xl border border-accent bg-[#1f1708] p-3.5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-black"><IconCheckin /></span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-semibold">Your Week {open.week} check-in is open</span>
+            <span className="block text-xs text-[#c9b48a]">
+              Closes {new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short", hour: "numeric" }).format(open.closes)} · {timeLeft(open.closes)} · +10 CPs
+            </span>
+          </span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
         </Link>
       )}
 
       <NotificationSettings compact />
 
-      <form action={logWeight} className="flex items-end gap-2 rounded-xl border border-border bg-card p-3">
-        <input type="hidden" name="date" value={today} />
-        <label className="flex-1 text-sm text-dim">
-          Today&apos;s weight (lbs)
-          <input name="weight" type="number" step="0.1" inputMode="decimal" defaultValue={weightToday?.weight_lbs ?? ""}
-            className="mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-lg text-text outline-none focus:border-accent" />
-        </label>
-        <button className="rounded-lg bg-accent px-4 py-2 font-semibold text-black">{weightToday ? "Update" : "Log"}</button>
-      </form>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-dim">Weight</p>
+          {weightToday ? (
+            <>
+              <p className={`${display} text-[26px] leading-none`}>{Number(weightToday.weight_lbs).toFixed(1)} <span className="text-[13px] text-dim">lbs</span></p>
+              <Spark points={w.map((x) => Number(x.weight_lbs))} />
+              <p className={`text-xs ${change !== null && change <= 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>
+                {change === null ? "Logged today" : `${change > 0 ? "+" : "−"}${Math.abs(change).toFixed(1)} lbs in 2 weeks`}
+              </p>
+            </>
+          ) : (
+            <form action={logWeight} className="flex flex-col gap-1.5">
+              <input type="hidden" name="date" value={today} />
+              <label className="sr-only" htmlFor="weight">Today&apos;s weight in lbs</label>
+              <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder="lbs" required
+                className="min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent" />
+              <button className="min-h-10 rounded-lg bg-accent text-sm font-semibold text-black">Log today</button>
+            </form>
+          )}
+        </div>
+        <Link href="/food" className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-dim">Food today</p>
+          <p className={`${display} text-[26px] leading-none`}>{kcal.toLocaleString()} <span className="text-[13px] text-dim">kcal</span></p>
+          <span className="mt-0.5 flex justify-between text-[11px] text-[#a8a8a8]"><span>Protein</span><span>{protein} / {proteinTarget} g</span></span>
+          <span className="h-[5px] rounded-full bg-[#262626]"><span className="block h-[5px] rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round((protein / proteinTarget) * 100))}%` }} /></span>
+          <span className="text-xs text-accent">{todayMeals.length ? `${todayMeals.length} meal${todayMeals.length > 1 ? "s" : ""} · ` : ""}Add meal →</span>
+        </Link>
+      </div>
 
-      <div className="space-y-4">
-        <h2 className="text-sm uppercase tracking-widest text-dim">Your habits</h2>
-        {groups.map((g) => (
-          <div key={g.label} className="rounded-xl border border-border bg-card px-3 py-1">
-            <p className="pt-2 text-xs uppercase tracking-wider" style={{ color: g.color }}>{g.label}</p>
-            {[...g.daily, ...g.weekly].map((it) => (
+      {all.length > 0 && (
+        <>
+          <div className="flex items-center justify-between pt-1">
+            <h2 className={`${display} text-lg font-medium`}>Today&apos;s habits</h2>
+            <p className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</p>
+          </div>
+          <div className="-mt-1.5 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>
+        </>
+      )}
+
+      {groups.map((g) => (
+        <div key={g.label} className="rounded-2xl border border-border bg-card px-3.5 pb-1">
+          <p className="flex items-center gap-1.5 pb-0.5 pt-3 text-[11px] uppercase tracking-[0.12em]" style={{ color: g.color }}>
+            <span className="size-2 rounded-full" style={{ background: g.color }} aria-hidden="true" />{g.label}
+          </p>
+          <div className="divide-y divide-border">
+            {g.items.map((it) => (
               <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
-                progress={it.progress} target={it.target} cadence={it.cadence} color={g.color} auto={it.auto} />
+                progress={it.progress} target={it.target} cadence={it.cadence} color={g.color} auto={it.auto} alsoIn={it.alsoIn} />
             ))}
           </div>
-        ))}
-        {!groups.length && <p className="text-dim">No habits open yet.</p>}
-      </div>
+        </div>
+      ))}
+      {!groups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
     </section>
   );
 }

@@ -2,13 +2,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { timeAgo } from "@/lib/names";
 import LiveRefresh from "@/components/LiveRefresh";
+import Avatar from "@/components/Avatar";
 
 export default async function Inbox() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: msgs }, { data: clients }] = await Promise.all([
     supabase.from("messages").select("client_id, sender_id, body, attachment_path, created_at, read_at").order("created_at", { ascending: false }).limit(1000),
-    supabase.from("profiles").select("id, full_name, email").or("role.eq.client,program_start.not.is.null").order("full_name"),
+    supabase.from("profiles").select("id, full_name, email, avatar_path").or("role.eq.client,program_start.not.is.null").order("full_name"),
   ]);
   const threads = new Map<string, { last: NonNullable<typeof msgs>[number]; unread: number }>();
   for (const m of msgs ?? []) {
@@ -31,6 +32,7 @@ export default async function Inbox() {
         {rows.map(({ c, t }) => (
           <li key={c.id}>
             <Link href={`/coach/inbox/${c.id}`} className={`flex items-center gap-3 rounded-xl border p-3 ${t?.unread ? "border-accent bg-accent/10" : "border-border bg-card"}`}>
+              <Avatar name={c.full_name || c.email} path={c.avatar_path} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{c.full_name || c.email}</p>
                 <p className="truncate text-sm text-dim">{t ? `${t.last.sender_id === user!.id ? "You: " : ""}${t.last.body ?? "Photo"}` : "No messages yet"}</p>

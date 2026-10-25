@@ -1,11 +1,12 @@
 "use client";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { deleteMeal } from "./actions";
 
 export default function DeleteMeal({ id }: { id: string }) {
   const [pending, start] = useTransition();
+  const [ask, setAsk] = useState(false);
   return (
-    <button aria-label="Delete meal" disabled={pending} onClick={() => start(() => deleteMeal(id))}
-      className="self-start px-2 text-dim disabled:opacity-40">✕</button>
+    <button type="button" aria-label="Delete meal" disabled={pending} onClick={() => (ask ? start(() => deleteMeal(id)) : setAsk(true))}
+      className="min-h-9 px-1 text-xs text-dim disabled:opacity-40">{ask ? "Tap to delete" : "Delete"}</button>
   );
 }

@@ -8,9 +8,11 @@ import { awardAutoHabit, closeOutRings } from "@/lib/progress";
 export async function saveMeal(input: {
   items: FoodItem[];
   mealSlot: "meal_1" | "meal_2" | "meal_3" | "other";
-  source: "photo" | "voice" | "text";
+  source: "photo" | "voice" | "text" | "saved_meal";
   description: string;
   photoPath: string | null;
+  savedMealId?: string | null;
+  saveAs?: string | null;  // also save this meal as a go-to meal with this name
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -31,6 +33,8 @@ export async function saveMeal(input: {
     confirmed: true,
   });
   if (error) return { error: error.message };
+  if (input.savedMealId) await supabase.from("saved_meals").update({ last_used_at: new Date().toISOString() }).eq("id", input.savedMealId).eq("client_id", user.id);
+  if (input.saveAs?.trim()) await saveGoTo(input.saveAs, items);
   const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
   await awardAutoHabit(supabase, user.id, "log-food", todayIn(profile?.timezone ?? "America/Los_Angeles"));
   await closeOutRings(supabase, user.id);
@@ -45,5 +49,27 @@ export async function deleteMeal(id: string) {
   const { data } = await supabase.from("food_logs").select("photo_path").eq("id", id).eq("client_id", user.id).maybeSingle();
   if (data?.photo_path) await supabase.storage.from("food-photos").remove([data.photo_path]);
   await supabase.from("food_logs").delete().eq("id", id).eq("client_id", user.id);
+  revalidatePath("/food");
+}
+
+/** Save a go-to meal (her Favorite Three, Backup Three…) to log again with one tap. */
+export async function saveGoTo(name: string, items: FoodItem[]) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !name.trim()) return;
+  const t = totals(items);
+  await supabase.from("saved_meals").insert({
+    client_id: user.id, name: name.trim().slice(0, 60), kind: "favorite", items,
+    calories: Math.round(t.calories), protein_g: Math.round(t.protein_g * 10) / 10, fiber_g: Math.round(t.fiber_g * 10) / 10,
+    potassium_mg: Math.round(t.potassium_mg), last_used_at: new Date().toISOString(),
+  });
+  revalidatePath("/food");
+}
+
+export async function deleteGoTo(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("saved_meals").delete().eq("id", id).eq("client_id", user.id);
   revalidatePath("/food");
 }
