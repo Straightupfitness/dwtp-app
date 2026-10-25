@@ -32,7 +32,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   );
   const header = (
     <header>
-      <h1 className={`${display} text-[30px] font-semibold`}>Community</h1>
+      <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Get involved</p>
+      <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Community</h1>
     </header>
   );
 

@@ -204,15 +204,16 @@ export default async function TodayPage() {
             return (
               <details key={cg.name} className="group px-3.5">
                 <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3">
-                  <span className="grid size-7 shrink-0 place-items-center rounded-full"
-                    style={all ? { background: cg.color } : { border: `2px solid ${cg.color}` }}>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums"
+                    style={all ? { background: cg.color } : { border: `2px solid ${cg.color}`, color: cg.color }}
+                    aria-label={`${done} of ${cg.items.length} done`}>
+                    {!all && `${done}/${cg.items.length}`}
                     {all && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
                   </span>
                   <span className={`${display} flex-1 text-[17px]`} style={{ color: cg.color }}>{cg.name}</span>
-                  <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{cg.items.length}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
                 </summary>
-                <div className="mb-2 ml-9 divide-y divide-border border-t border-border">
+                <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
                   {cg.items.map((it) => (
                     <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
                       progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />

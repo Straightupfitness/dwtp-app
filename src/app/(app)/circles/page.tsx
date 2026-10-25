@@ -16,11 +16,11 @@ const Label = ({ children }: { children: React.ReactNode }) => (
 const pct = (c: CircleState) => Math.round((100 * c.rings.reduce((a, r) => a + r.fraction, 0)) / (c.rings.length || 1));
 
 /** One circle as a row: its name in its color, a line under it, and its medals on the right. */
-function Row({ c, sub }: { c: CircleState; sub: string }) {
+function Row({ c, sub, active = true }: { c: CircleState; sub: string; active?: boolean }) {
   return (
     <Link href={`/circles/${c.slug}`} className="flex min-h-[72px] items-center gap-3 px-3.5 py-2">
       <span className="min-w-0 flex-1">
-        <span className="block font-[family-name:var(--font-display)] text-[19px] uppercase leading-tight" style={{ color: c.color }}>{c.name}</span>
+        <span className="block font-[family-name:var(--font-display)] text-[19px] uppercase leading-tight" style={{ color: active ? c.color : "#cbd5e1" }}>{c.name}</span>
         <span className="block text-[13px] text-[#a8a8a8]">{sub}</span>
       </span>
       <Medals c={c} size={60} center />
@@ -35,10 +35,7 @@ const List = ({ children }: { children: React.ReactNode }) => (
 export default async function CirclesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const [state, { data: cps }] = await Promise.all([
-    loadProgram(supabase, user!.id),
-    supabase.from("cp_totals").select("total, this_week").eq("client_id", user!.id).maybeSingle(),
-  ]);
+  const state = await loadProgram(supabase, user!.id);
   const growth = state.circles.filter((c) => c.kind === "growth");
   const focus = growth.filter((c) => c.focus);
   const alsoOpen = state.circles.filter((c) => !c.focus && c.status === "open");
@@ -55,12 +52,8 @@ export default async function CirclesPage() {
 
   return (
     <section className="space-y-3">
-      <header className="flex items-end justify-between">
+      <header>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Capacity Circles</h1>
-        <div className="text-right">
-          <p className="font-[family-name:var(--font-display)] text-2xl text-gold">{cps?.total ?? 0} <span className="text-sm">CPs</span></p>
-          <p className="text-xs text-dim">+{cps?.this_week ?? 0} this week</p>
-        </div>
       </header>
 
       <Label>Here are the three circles I want you to prioritize:</Label>
@@ -73,12 +66,12 @@ export default async function CirclesPage() {
 
       {coming.length > 0 && <>
         <Label>Circles coming soon:</Label>
-        <List>{coming.map((c) => <Row key={c.id} c={c} sub={opens(c)} />)}</List>
+        <List>{coming.map((c) => <Row key={c.id} c={c} sub={opens(c)} active={false} />)}</List>
       </>}
 
       {fixits.length > 0 && <>
         <Label>Here are fix-it circles you can start when you need them:</Label>
-        <List>{fixits.map((c) => <Row key={c.id} c={c} sub={`${c.rings.length} medals · start it when you need it`} />)}</List>
+        <List>{fixits.map((c) => <Row key={c.id} c={c} sub={`${c.rings.length} medals · start it when you need it`} active={false} />)}</List>
       </>}
     </section>
   );

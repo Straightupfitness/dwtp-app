@@ -54,7 +54,8 @@ export default async function FoodPage() {
   return (
     <section className="space-y-3.5">
       <header>
-        <h1 className={`${display} text-[30px] font-semibold`}>Today&apos;s food</h1>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">What are you eating?</p>
+        <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Today&apos;s food</h1>
       </header>
 
       <div className="space-y-3.5 rounded-[18px] border border-border bg-card p-4">
