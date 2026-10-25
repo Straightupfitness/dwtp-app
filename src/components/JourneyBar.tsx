@@ -1,5 +1,3 @@
-import FitWidth from "./FitWidth";
-
 /** One color per stage, from tired gray to Driven gold. */
 export const STAGE_COLORS = ["#94a3b8", "#818cf8", "#22c55e", "#f5a623"] as const;
 export const JOURNEY_WEEKS = 26;
@@ -16,16 +14,13 @@ const Arrow = () => (
   </svg>
 );
 
-/** Under the top bar on every tab: the date, Week 1 of 26, and Drained → Rested → Fueled → Driven with a mark per week. */
-export default function JourneyBar({ day, startsIn, date }: { day: number; stage: number; startsIn: number; date: string }) {
-  const week = startsIn > 0 ? 0 : Math.ceil(day / 7);
-  const big = startsIn > 0 ? `Starts ${startsIn === 1 ? "tomorrow" : `in ${startsIn} days`}`
-    : week > JOURNEY_WEEKS ? `Week ${week}` : `Week ${week} of ${JOURNEY_WEEKS}`;
+export const journeyWeek = (day: number, startsIn: number) => (startsIn > 0 ? 0 : Math.ceil(day / 7));
+
+/** Drained → Rested → Fueled → Driven, with a mark per week. On the Today tab. */
+export default function StageBars({ week }: { week: number }) {
   const current = PHASES.find((p) => week >= p.from && week <= p.to);
   return (
-    <div className="mx-auto max-w-md px-4 pt-3">
-      <FitWidth top={date} big={big} className="font-[family-name:var(--font-display)] uppercase tracking-wide" />
-      <div className="mt-2 flex items-start" role="img"
+      <div className="flex items-start" role="img"
         aria-label={week ? `Week ${week} of ${JOURNEY_WEEKS}, in the ${current?.label ?? "Driven"} phase` : "Drained: your program hasn't started yet"}>
         <span className="text-[10px] font-semibold uppercase leading-[8px] tracking-[0.1em]" style={{ color: STAGE_COLORS[0] }}>Drained</span>
         {PHASES.map((p) => {
@@ -49,6 +44,5 @@ export default function JourneyBar({ day, startsIn, date }: { day: number; stage
           );
         })}
       </div>
-    </div>
   );
 }

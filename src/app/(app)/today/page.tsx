@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
-import { todayIn } from "@/lib/program";
+import { journey, todayIn } from "@/lib/program";
+import StageBars, { JOURNEY_WEEKS, journeyWeek } from "@/components/JourneyBar";
 import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
@@ -62,12 +63,31 @@ export default async function TodayPage() {
   const { today, week } = state;
   const tz = profile?.timezone ?? "America/Los_Angeles";
   const first = profile?.full_name?.split(" ")[0];
+  const { data: cps } = await supabase.from("cp_totals").select("total, this_week").eq("client_id", user!.id).maybeSingle();
+  const j = journey(state.programStart, today);
+  const jw = j ? journeyWeek(j.day, j.startsIn) : 0;
+  const date = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const pts = cps?.total ?? 0, wk = cps?.this_week ?? 0;
+  const top = (
+    <header className="space-y-2">
+      <div>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{date}</p>
+        <h1 className={`${display} mt-0.5 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
+      </div>
+      <p className={`${display} text-[22px] leading-tight tracking-wide`}>
+        {j && j.startsIn > 0
+          ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
+          : <>You are in Week {jw}{jw <= JOURNEY_WEEKS ? ` of ${JOURNEY_WEEKS}` : ""} and you have <span className="text-gold">{pts.toLocaleString()} CPs</span>{" "}
+            <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
+      </p>
+      <StageBars week={jw} />
+    </header>
+  );
 
   if (week === 0) {
     return (
-      <section className="space-y-4 pt-4">
-        <p className="text-xs uppercase tracking-[0.15em] text-accent">Drained · Rested · Fueled · Driven</p>
-        <h1 className={`${display} text-3xl font-semibold`}>Welcome{first ? `, ${first}` : ""}</h1>
+      <section className="space-y-4">
+        {top}
         <p className="text-[15px] leading-relaxed text-[#a8a8a8]">
           Your program starts on <b className="text-text">{state.programStart
             ? new Date(state.programStart + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })
@@ -117,10 +137,8 @@ export default async function TodayPage() {
 
   return (
     <section className="space-y-3.5">
-      <header>
-        <h1 className={`${display} text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
-        {tw?.is_diet_break && <p className="text-[13px] text-[#a8a8a8]">Diet break week: eat at maintenance.</p>}
-      </header>
+      {top}
+      {tw?.is_diet_break && <p className="text-[13px] text-[#a8a8a8]">Diet break week: eat at maintenance.</p>}
 
       {open && !done && (
         <Link href="/checkin" className="flex items-center gap-3 rounded-2xl border border-accent bg-[#1f1708] p-3.5">
