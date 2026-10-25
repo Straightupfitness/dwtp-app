@@ -38,7 +38,7 @@ export async function addClient(_: unknown, form: FormData) {
     const url = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightupfitness.com").replace(/\/$/, "");
     await sendEmail(email, "Welcome to DWTP: your app is ready", [
       "Your DWTP app is ready. This is where your habits, food logging, weekly check-ins and messages with me live.",
-      `1. Open ${url} on your phone and enter this email address. You'll get a sign-in link by email: tap it and you're in. No password needed.`,
+      `1. Open ${url}/login on your phone and enter this email address. You'll get a sign-in link by email: tap it and you're in. No password needed.`,
       "2. On iPhone: in Safari, tap the Share button, then Add to Home Screen. Open DWTP from your Home Screen from now on.",
       "3. Open the person icon (Me) and turn on notifications, so you see my replies.",
       "Any questions, message me right in the app (the Chat tab).",
