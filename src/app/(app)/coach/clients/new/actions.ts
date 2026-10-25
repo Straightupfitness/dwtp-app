@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient, safeError } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/notify";
+import { sendWelcome } from "@/lib/invite";
 
 /** Michael adds a client: creates her login (no password; she signs in with an email link) and her profile. */
 export async function addClient(_: unknown, form: FormData) {
@@ -35,15 +35,8 @@ export async function addClient(_: unknown, form: FormData) {
   });
 
   if (form.get("send_welcome") === "on") {
-    const url = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightupfitness.com").replace(/\/$/, "");
-    await sendEmail(email, "Welcome to DWTP: your app is ready", [
-      "Your DWTP app is ready. This is where your habits, food logging, weekly check-ins and messages with me live.",
-      `1. Open ${url}/login on your phone and enter this email address. You'll get a sign-in link by email: tap it and you're in. No password needed.`,
-      "2. On iPhone: in Safari, tap the Share button, then Add to Home Screen. Open DWTP from your Home Screen from now on.",
-      "3. Open the person icon (Me) and turn on notifications, so you see my replies.",
-      "Any questions, message me right in the app: tap Talk to Michael at the top.",
-      "Talk to you soon,\nMichael",
-    ].join("\n\n"), name);
+    const sent = await sendWelcome(id, email, name).catch((e) => { console.error("welcome failed", safeError(e)); return false; });
+    if (!sent) redirect(`/coach/clients/${id}?welcome=failed`);
   }
   redirect(`/coach/clients/${id}`);
 }

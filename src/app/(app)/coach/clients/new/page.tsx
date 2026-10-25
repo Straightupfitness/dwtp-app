@@ -34,7 +34,7 @@ export default function AddClientPage() {
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="send_welcome" defaultChecked className="size-4 accent-[var(--accent)]" />
-          Email her the welcome steps (sign in, Home Screen, notifications)
+          Email her a one-tap link to open the app (good for 14 days)
         </label>
         <button disabled={pending} className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">{pending ? "Adding…" : "Add client"}</button>
         {state?.error && <p className="text-sm text-[var(--red)]">{state.error}</p>}

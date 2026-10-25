@@ -1,11 +1,13 @@
 import Link from "next/link";
+import WelcomeButton from "./WelcomeButton";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram } from "@/lib/circles";
 import MedalCircle from "@/components/MedalCircle";
 import { ProfileForm, FocusPicker, OpenRingButton, SignOffButton } from "./ClientForms";
 
-export default async function CoachClient({ params }: { params: Promise<{ id: string }> }) {
+export default async function CoachClient({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ welcome?: string }> }) {
+  const { welcome } = await searchParams;
   const { id } = await params;
   const supabase = await createClient();
   const { data: p } = await supabase.from("profiles").select("*").eq("id", id).single();
@@ -28,6 +30,7 @@ export default async function CoachClient({ params }: { params: Promise<{ id: st
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : "Not started"} · {p.status}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email}</h1>
         <p className="text-xs text-dim">{p.email}</p>
+        <div className="mt-2"><WelcomeButton clientId={id} failed={welcome === "failed"} /></div>
       </header>
 
       {toSignOff.length > 0 && (

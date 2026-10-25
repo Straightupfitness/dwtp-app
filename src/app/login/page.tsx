@@ -1,12 +1,25 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { sendSignInLink } from "./actions";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState("");
+  const router = useRouter();
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    setCodeErr("");
+    const { error } = await createClient().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: "email" });
+    if (error) setCodeErr("That code didn't work. Check it, or send a new email.");
+    else router.replace("/");
+  }
 
   // Coming back from a link that expired or was already used.
   useEffect(() => {
@@ -43,6 +56,13 @@ export default function LoginPage() {
         <div className="mt-16 space-y-3">
           <h1 className={`${display} text-3xl font-semibold`}>Check your email</h1>
           <p className="text-[15px] leading-relaxed text-[#a8a8a8]">I sent a sign-in link to <b className="text-text">{email.trim().toLowerCase()}</b>. Tap the button in that email and you&apos;re in. Check spam if it isn&apos;t there in a minute.</p>
+          <form onSubmit={verify} className="flex flex-col gap-2.5 pt-3">
+            <label htmlFor="code" className="text-[13px] text-[#a8a8a8]">Or type the code from the email</label>
+            <input id="code" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className="min-h-[52px] rounded-[14px] border border-[#2a2a2a] bg-card px-4 text-[22px] tracking-[0.3em] outline-none focus:border-accent" />
+            <button disabled={code.length < 6} className="min-h-[50px] rounded-[14px] border border-accent text-[16px] font-semibold text-accent disabled:opacity-50">Sign in with code</button>
+            {codeErr && <p className="text-sm text-[var(--red)]">{codeErr}</p>}
+          </form>
           <button type="button" onClick={() => setState("idle")} className="min-h-11 text-sm text-accent">Use a different email</button>
         </div>
       ) : (

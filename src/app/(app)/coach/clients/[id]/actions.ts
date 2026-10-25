@@ -63,3 +63,13 @@ export async function signOff(clientId: string, itemId: string) {
   await closeOutRings(supabase, clientId);
   revalidatePath(`/coach/clients/${clientId}`);
 }
+
+/** Send (or re-send) her welcome email with a fresh one-tap link. */
+export async function resendWelcome(clientId: string) {
+  await coach();
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { sendWelcome } = await import("@/lib/invite");
+  const { data: p } = await adminClient().from("profiles").select("email, full_name").eq("id", clientId).single();
+  if (!p?.email) return { ok: false };
+  return { ok: await sendWelcome(clientId, p.email, p.full_name) };
+}
