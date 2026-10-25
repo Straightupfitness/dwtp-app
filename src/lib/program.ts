@@ -32,3 +32,22 @@ export function dailyStreak(doneDates: Set<string>, today: string): number {
 export const PHASE_LABEL: Record<string, string> = {
   rested: "Rested", fueled: "Fueled", driven: "Driven", continuation: "Driven",
 };
+
+/** The 26-week journey: day N of 182 and which stage she's in (Drained before she starts). */
+export const JOURNEY_DAYS = 182;
+export const STAGES = [
+  { key: "drained", label: "Drained", from: -Infinity, to: 0 },
+  { key: "rested", label: "Rested", from: 1, to: 28 },
+  { key: "fueled", label: "Fueled", from: 29, to: 112 },
+  { key: "driven", label: "Driven", from: 113, to: Infinity },
+] as const;
+export function journey(programStart: string | null, today: string) {
+  if (!programStart) return null;
+  const day = Math.floor((Date.parse(today) - Date.parse(programStart)) / 86_400_000) + 1;
+  const stage = STAGES.findIndex((s) => day >= s.from && day <= s.to);
+  return { day, stage, startsIn: day <= 0 ? 1 - day : 0 };
+}
+/** "in 37 days", "tomorrow", "today". */
+export function inDays(n: number) {
+  return n <= 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`;
+}

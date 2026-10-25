@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
-import { PHASE_LABEL, todayIn } from "@/lib/program";
+import { todayIn } from "@/lib/program";
 import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
-import { IconCheckin } from "@/components/Icons";
+import { IconCheckin, IconHabits, IconPlate, IconScale } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
 
@@ -20,6 +20,11 @@ function timeLeft(until: Date) {
   const mins = Math.max(0, Math.round((until.getTime() - Date.now()) / 60_000));
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
   return d ? `${d} day${d > 1 ? "s" : ""} ${h} hrs left` : h ? `${h} hrs left` : `${mins} min left`;
+}
+
+function SectionTitle({ icon, children, as = "p" }: { icon: React.ReactNode; children: React.ReactNode; as?: "p" | "h2" }) {
+  const Tag = as;
+  return <Tag className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent">{icon}</span>{children}</Tag>;
 }
 
 /** A small trend line of her last 14 days of weigh-ins. */
@@ -81,17 +86,20 @@ export default async function TodayPage() {
 
   // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
-  const groups: { label: string; color: string; items: ItemState[] }[] = [];
+  const circleGroups: { name: string; color: string; medals: { number: number; label: string; items: ItemState[] }[] }[] = [];
   for (const c of state.circles) {
     for (const r of c.rings) {
       if (r.status !== "open") continue;
       const its = r.items.filter((i) => ["do", "eat", "take"].includes(i.type) && i.cadence !== "once")
         .filter((i) => { const k = i.habitKey ?? i.id; if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((a, b) => (a.cadence === "daily" ? 0 : 1) - (b.cadence === "daily" ? 0 : 1));
-      if (its.length) groups.push({ label: `${c.name} · Medal ${r.number} ${r.name}`, color: c.color, items: its });
+      if (!its.length) continue;
+      let cg = circleGroups.find((x) => x.name === c.name);
+      if (!cg) { cg = { name: c.name, color: c.color, medals: [] }; circleGroups.push(cg); }
+      cg.medals.push({ number: r.number, label: `Medal ${r.number} · ${r.name}`, items: its });
     }
   }
-  const all = groups.flatMap((g) => g.items);
+  const all = circleGroups.flatMap((g) => g.medals.flatMap((m) => m.items));
   const doneCount = all.filter((i) => i.doneNow).length;
   const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date());
 
@@ -99,9 +107,9 @@ export default async function TodayPage() {
     <section className="space-y-3.5">
       <header>
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">
-          {dateLabel} · Week {week} · {PHASE_LABEL[tw?.phase ?? "rested"]}{tw?.is_diet_break ? " · Diet break" : ""}
+          {dateLabel} · Week {week}{tw?.is_diet_break ? " · Diet break" : ""}
         </p>
-        <h1 className={`${display} mt-1 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? `, ${first}` : ""}</h1>
+        <h1 className={`${display} mt-1 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
       </header>
 
       {open && !done && (
@@ -121,7 +129,7 @@ export default async function TodayPage() {
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-dim">Weight</p>
+          <SectionTitle icon={<IconScale />}>Weight</SectionTitle>
           {weightToday ? (
             <>
               <p className={`${display} text-[26px] leading-none`}>{Number(weightToday.weight_lbs).toFixed(1)} <span className="text-[13px] text-dim">lbs</span></p>
@@ -141,7 +149,7 @@ export default async function TodayPage() {
           )}
         </div>
         <Link href="/food" className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-dim">Food today</p>
+          <SectionTitle icon={<IconPlate />}>Food today</SectionTitle>
           <p className={`${display} text-[26px] leading-none`}>{kcal.toLocaleString()} <span className="text-[13px] text-dim">kcal</span></p>
           <span className="mt-0.5 flex justify-between text-[11px] text-[#a8a8a8]"><span>Protein</span><span>{protein} / {proteinTarget} g</span></span>
           <span className="h-[5px] rounded-full bg-[#262626]"><span className="block h-[5px] rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round((protein / proteinTarget) * 100))}%` }} /></span>
@@ -152,27 +160,47 @@ export default async function TodayPage() {
       {all.length > 0 && (
         <>
           <div className="flex items-center justify-between pt-1">
-            <h2 className={`${display} text-lg font-medium`}>Today&apos;s habits</h2>
+            <SectionTitle icon={<IconHabits />} as="h2">Today&apos;s habits</SectionTitle>
             <p className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</p>
           </div>
           <div className="-mt-1.5 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>
         </>
       )}
 
-      {groups.map((g) => (
-        <div key={g.label} className="rounded-2xl border border-border bg-card px-3.5 pb-1">
-          <p className="flex items-center gap-1.5 pb-0.5 pt-3 text-[11px] uppercase tracking-[0.12em]" style={{ color: g.color }}>
-            <span className="size-2 rounded-full" style={{ background: g.color }} aria-hidden="true" />{g.label}
-          </p>
-          <div className="divide-y divide-border">
-            {g.items.map((it) => (
-              <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
-                progress={it.progress} target={it.target} cadence={it.cadence} color={g.color} auto={it.auto} alsoIn={it.alsoIn} />
-            ))}
-          </div>
+      {circleGroups.length > 0 && (
+        <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+          {circleGroups.map((cg) => (
+            <div key={cg.name} className="px-3.5 py-2">
+              <p className="flex items-center gap-1.5 py-1.5 text-[11px] uppercase tracking-[0.12em]" style={{ color: cg.color }}>
+                <span className="size-2 rounded-full" style={{ background: cg.color }} aria-hidden="true" />{cg.name}
+              </p>
+              {cg.medals.map((m) => {
+                const done = m.items.filter((i) => i.doneNow).length, all = m.items.length === done;
+                return (
+                  <details key={m.label} className="group">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3">
+                      <span className="grid size-7 shrink-0 place-items-center rounded-full font-[family-name:var(--font-display)] text-[13px]"
+                        style={all ? { background: cg.color, color: "#0a0a0a" } : { border: `2px solid ${cg.color}`, color: cg.color }}>
+                        {all ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg> : m.number}
+                      </span>
+                      <span className="flex-1 text-[15px]">{m.label}</span>
+                      <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{m.items.length}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+                    </summary>
+                    <div className="mb-2 ml-10 divide-y divide-border border-l border-border pl-3">
+                      {m.items.map((it) => (
+                        <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
+                          progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />
+                      ))}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      ))}
-      {!groups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
+      )}
+      {!circleGroups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ListIcon } from "@/components/ListIcon";
 import type { FaqSection } from "@/lib/faq";
 
 const Play = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>;
@@ -44,8 +45,13 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
             </details>
           ) : (
             <div key={i.id} className="rounded-2xl border border-border bg-card px-4 pb-1 pt-3.5">
-              <p className="font-[family-name:var(--font-display)] text-lg uppercase">{i.title}</p>
-              {i.body && <p className="text-[13px] text-[#a8a8a8]">{i.body}</p>}
+              <div className="flex items-center gap-3">
+                <ListIcon title={i.title} color="#f5a623" />
+                <div className="min-w-0">
+                  <p className="font-[family-name:var(--font-display)] text-[27px] uppercase leading-tight tracking-[0.02em]">{i.title}</p>
+                  {i.body && <p className="text-[13px] text-[#a8a8a8]">{i.body}</p>}
+                </div>
+              </div>
               <ul className="mt-1 divide-y divide-border">
                 {i.links.map((l, k) => (
                   <li key={k} className="flex min-h-12 items-center gap-3 py-2">

@@ -35,7 +35,7 @@ export default async function CirclesPage() {
       <header className="flex items-end justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.15em] text-accent">
-            {state.week ? `Week ${state.week} · ${PHASE_LABEL[phase]}` : "Starts Monday"}
+            {state.week ? `Week ${state.week} · ${PHASE_LABEL[phase]}` : "Your circles"}
           </p>
           <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Capacity Circles</h1>
         </div>
@@ -82,8 +82,8 @@ export default async function CirclesPage() {
           <div className="grid grid-cols-3 gap-2">
             {coming.map((c) => {
               const next = c.rings.find((r) => r.status === "upcoming");
-              const when = next?.opensOn && daysUntil(state.today, next.opensOn) <= 7
-                ? `In ${daysUntil(state.today, next.opensOn)} days` : c.firstPlanWeek ? `Week ${c.firstPlanWeek}` : "Ask Michael";
+              const n = next?.opensOn ? daysUntil(state.today, next.opensOn) : null;
+              const when = n !== null ? (n <= 1 ? (n <= 0 ? "Opens today" : "Tomorrow") : `In ${n} days`) : "Ask Michael";
               return (
                 <Link key={c.id} href={`/circles/${c.slug}`} className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-card px-1 py-2.5 text-center">
                   <Medals c={c} size={40} />

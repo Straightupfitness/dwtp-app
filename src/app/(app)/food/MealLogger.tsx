@@ -38,7 +38,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   const voice = useRef(false);
 
   function reset() {
-    setMode("home"); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setMode("home"); setAdder("type"); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
     setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot);
   }
   async function estimate(image: Blob | null, description: string) {
@@ -104,13 +104,20 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
     return (
       <div className="space-y-2">
         <p className="text-[13px] text-[#a8a8a8]">Add <b className="text-text">{slotLabel}</b></p>
-        <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-accent text-base font-semibold text-black">
-            <Cam />Snap it
+        <div className="grid grid-cols-3 gap-2">
+          <label className="flex min-h-[118px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-accent px-2 text-center text-black">
+            <Cam /><span className="text-base font-semibold">Snap it</span>
+            <span className="text-[11px] leading-tight text-black/70">Take a picture of your meal.</span>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
           </label>
-          <button type="button" onClick={() => setMode("describe")} className="flex min-h-16 items-center justify-center gap-2.5 rounded-2xl border border-accent bg-card text-base font-semibold">
-            <span className="text-accent"><Mic /></span>Say it
+          <button type="button" onClick={() => setMode("describe")} className="flex min-h-[118px] flex-col items-center justify-center gap-1 rounded-2xl border border-accent bg-card px-2 text-center">
+            <span className="text-accent"><Mic /></span><span className="text-base font-semibold">Say it</span>
+            <span className="text-[11px] leading-tight text-[#a8a8a8]">Speak in what you ate.</span>
+          </button>
+          <button type="button" onClick={() => { setItems([]); setSavedId(null); setText(""); setNotes(""); setPhoto(null); setPreview(null); setAdder("search"); setMode("review"); }}
+            className="flex min-h-[118px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#2a2a2a] bg-card px-2 text-center">
+            <span className="text-accent"><Pencil /></span><span className="text-base font-semibold">Manual</span>
+            <span className="text-[11px] leading-tight text-[#a8a8a8]">Log it yourself, ingredient by ingredient.</span>
           </button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -183,6 +190,10 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
           <div className="flex gap-2.5 rounded-[14px] border border-[#2b2418] bg-[#161310] p-3">
             <Spark /><p className="text-[13px] leading-relaxed text-[#d9c9a8]">{notes} Change anything that&apos;s off.</p>
           </div>
+        )}
+
+        {!items.length && busy !== "estimating" && (
+          <p className="rounded-[14px] border border-dashed border-[#2a2a2a] p-4 text-center text-sm text-[#a8a8a8]">Add each ingredient below. Search the food database, scan a barcode, or type it in.</p>
         )}
 
         {items.length > 0 && (
@@ -265,4 +276,8 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
       </div>
     </div>
   );
+}
+
+function Pencil() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>;
 }

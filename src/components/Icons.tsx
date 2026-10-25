@@ -6,5 +6,8 @@ export const IconFood = () => <svg {...P}><circle cx="13" cy="13" r="7" /><circl
 export const IconCommunity = () => <svg {...P}><circle cx="9" cy="8" r="3.5" /><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14c2.8 0 5 2 5 5" /></svg>;
 export const IconFaq = () => <svg {...P}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7" /><path d="M12 17h.01" /></svg>;
 export const IconClients = () => <svg {...P}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
-export const IconChat = () => <svg {...P}><path d="M4 5h16v11H9l-5 4z" /></svg>;
+export const IconChat = () => <svg {...P} width={18} height={18}><path d="M4 5h16v11H9l-5 4z" /></svg>;
 export const IconCheckin = () => <svg {...P}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M9 13l2 2 4-4" /></svg>;
+export const IconScale = () => <svg {...P} width={18} height={18}><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M8 9a5 5 0 0 1 8 0" /><path d="M12 9l1.5-2" /></svg>;
+export const IconPlate = () => <svg {...P} width={18} height={18}><circle cx="13" cy="13" r="7" /><circle cx="13" cy="13" r="3.5" /><path d="M3 3v6a2 2 0 0 0 2 2M5 3v18" /></svg>;
+export const IconHabits = () => <svg {...P} width={18} height={18}><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" /><path d="M13 7h7M13 14h7M13 21h7" /></svg>;

@@ -3,7 +3,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { title: "DWTP", body: event.data && event.data.text() }; }
   event.waitUntil(self.registration.showNotification(data.title || "DWTP", {
-    body: data.body || "", icon: "/brand/dwtp-logo.png", badge: "/brand/dwtp-logo.png", data: { url: data.url || "/today" },
+    body: data.body || "", icon: "/brand/icon-192.png", badge: "/brand/icon-192.png", data: { url: data.url || "/today" },
   }));
 });
 self.addEventListener("notificationclick", (event) => {

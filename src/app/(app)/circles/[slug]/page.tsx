@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, daysUntil, type ItemState, type RingState } from "@/lib/circles";
-import { CIRCLE_CPS } from "@/lib/program";
+import { CIRCLE_CPS, inDays } from "@/lib/program";
 import MedalCircle from "@/components/MedalCircle";
 import ItemCheck from "../ItemCheck";
 
@@ -56,7 +56,7 @@ function OpenRing({ r }: { r: RingState }) {
 }
 
 function opensLabel(r: RingState, today: string) {
-  const when = r.opensOn ? (daysUntil(today, r.opensOn) <= 7 ? `in ${daysUntil(today, r.opensOn)} days` : `Week ${r.planWeek}`) : null;
+  const when = r.opensOn ? inDays(daysUntil(today, r.opensOn)) : null;
   if (r.halfwayOf) return `Opens when you're halfway through Medal ${r.halfwayOf}${when ? ` (or ${when})` : ""}`;
   return when ? `Opens ${when}` : "";
 }
@@ -72,7 +72,7 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
   const firstUpcoming = c.rings.find((r) => r.status === "upcoming");
   const banner = c.status === "open" ? null
     : c.kind !== "growth" ? "Fix-its are opened by Michael when you need one. Ask him in your check-in or a message."
-    : firstUpcoming?.opensOn ? `This circle opens ${daysUntil(state.today, firstUpcoming.opensOn) <= 7 ? `in ${daysUntil(state.today, firstUpcoming.opensOn)} days` : `in Week ${firstUpcoming.planWeek ?? c.firstPlanWeek}`}. Here's what's coming. Want to start early? Ask Michael.`
+    : firstUpcoming?.opensOn ? `This circle opens ${inDays(daysUntil(state.today, firstUpcoming.opensOn))}. Here's what's coming. Want to start early? Ask Michael.`
     : "Want to start this one early? Ask Michael and he can open it for you.";
 
   return (
