@@ -74,7 +74,7 @@ export default async function TodayPage() {
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{date}</p>
         <h1 className={`${display} mt-0.5 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
       </div>
-      <p className={`${display} text-[22px] leading-tight tracking-wide`}>
+      <p className={`${display} text-[13px] leading-tight`}>
         {j && j.startsIn > 0
           ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
           : <>You are in Week {jw}{jw <= JOURNEY_WEEKS ? ` of ${JOURNEY_WEEKS}` : ""} and you have <span className="text-gold">{pts.toLocaleString()} CPs</span>{" "}
@@ -212,7 +212,7 @@ export default async function TodayPage() {
                   <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{cg.items.length}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
                 </summary>
-                <div className="mb-2 divide-y divide-border border-t border-border">
+                <div className="mb-2 ml-9 divide-y divide-border border-t border-border">
                   {cg.items.map((it) => (
                     <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
                       progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />

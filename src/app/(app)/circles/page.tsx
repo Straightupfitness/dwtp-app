@@ -11,7 +11,7 @@ function Medals({ c, size, center }: { c: CircleState; size: number; center?: bo
   );
 }
 const Label = ({ children }: { children: React.ReactNode }) => (
-  <h2 className="pt-2 text-[15px] font-semibold leading-snug text-[#d8d8d8]">{children}</h2>
+  <h2 className="pt-2 text-[11px] uppercase tracking-[0.15em] text-accent">{children}</h2>
 );
 const pct = (c: CircleState) => Math.round((100 * c.rings.reduce((a, r) => a + r.fraction, 0)) / (c.rings.length || 1));
 
@@ -72,7 +72,7 @@ export default async function CirclesPage() {
       </>}
 
       {coming.length > 0 && <>
-        <Label>Circles coming soon</Label>
+        <Label>Circles coming soon:</Label>
         <List>{coming.map((c) => <Row key={c.id} c={c} sub={opens(c)} />)}</List>
       </>}
 
