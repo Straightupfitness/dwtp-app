@@ -53,7 +53,8 @@ export default async function CirclesPage() {
   return (
     <section className="space-y-3">
       <header>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Capacity Circles</h1>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Build the foundation</p>
+        <h1 className="mt-1 font-[family-name:var(--font-display)] text-3xl uppercase">Capacity Circles</h1>
       </header>
 
       <Label>Here are the three circles I want you to prioritize:</Label>
