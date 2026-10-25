@@ -44,15 +44,17 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
               </div>
             </details>
           ) : (
-            <div key={i.id} className="rounded-2xl border border-border bg-card px-4 pb-1 pt-3.5">
-              <div className="flex items-center gap-3">
+            <details key={i.id} open={!!q} className="group rounded-2xl border border-border bg-card">
+              <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3">
                 <ListIcon title={i.title} color="#f5a623" />
-                <div className="min-w-0">
-                  <p className="font-[family-name:var(--font-display)] text-[27px] uppercase leading-tight tracking-[0.02em]">{i.title}</p>
-                  {i.body && <p className="text-[13px] text-[#a8a8a8]">{i.body}</p>}
-                </div>
-              </div>
-              <ul className="mt-1 divide-y divide-border">
+                <span className="min-w-0 flex-1">
+                  <span className="block font-[family-name:var(--font-display)] text-[27px] uppercase leading-tight tracking-[0.02em]">{i.title}</span>
+                  {i.body && <span className="block text-[13px] text-[#a8a8a8]">{i.body}</span>}
+                </span>
+                <span className="text-xs text-dim">{i.links.length}</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+              </summary>
+              <ul className="mx-4 mb-1 divide-y divide-border border-t border-border">
                 {i.links.map((l, k) => (
                   <li key={k} className="flex min-h-12 items-center gap-3 py-2">
                     <span className="flex-1"><span className="block text-[15px]">{l.label}</span>{l.note && <span className="block text-xs text-dim">{l.note}</span>}</span>
@@ -60,7 +62,7 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ))}
         </div>
       ))}

@@ -48,15 +48,13 @@ export default async function FoodPage() {
   const used = new Set(meals.map((m) => m.meal_slot));
   const nextSlot = (["meal_1", "meal_2", "meal_3"] as const).find((s) => !used.has(s)) ?? "other";
   const kcalTarget = target?.calorie_target ?? null;
-  const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date());
   const time = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
   const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 
   return (
     <section className="space-y-3.5">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{dateLabel} · Food Philosophy</p>
-        <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Today&apos;s food</h1>
+        <h1 className={`${display} text-[30px] font-semibold`}>Today&apos;s food</h1>
       </header>
 
       <div className="space-y-3.5 rounded-[18px] border border-border bg-card p-4">

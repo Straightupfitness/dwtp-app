@@ -1,23 +1,33 @@
 import { JOURNEY_DAYS, STAGES } from "@/lib/program";
 
-/** Thin strip under the top bar on every tab: Day 3 of 182 and the Drained → Driven stages. */
-export default function JourneyBar({ day, stage, startsIn }: { day: number; stage: number; startsIn: number }) {
+/** One color per stage, from tired gray to Driven gold. */
+export const STAGE_COLORS = ["#94a3b8", "#818cf8", "#22c55e", "#f5a623"] as const;
+
+/** Under the top bar on every tab: the date, Day 21 of 182, and Drained → Rested → Fueled → Driven. */
+export default function JourneyBar({ day, stage, startsIn, date }: { day: number; stage: number; startsIn: number; date: string }) {
   const label = startsIn > 0 ? `Starts ${startsIn === 1 ? "tomorrow" : `in ${startsIn} days`}`
     : day > JOURNEY_DAYS ? `Day ${day}` : `Day ${day} of ${JOURNEY_DAYS}`;
   return (
-    <div className="mx-auto flex h-9 max-w-md items-center gap-3 px-4">
-      <p className="shrink-0 font-[family-name:var(--font-display)] text-[13px] uppercase tracking-wide">
-        {label}<span className="text-accent"> · {STAGES[stage].label}</span>
+    <div className="mx-auto max-w-md px-4 pt-3">
+      <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{date}</p>
+      <p className="mt-1 font-[family-name:var(--font-display)] text-[15px] uppercase tracking-wide">
+        {label}<span style={{ color: STAGE_COLORS[stage] }}> · {STAGES[stage].label}</span>
       </p>
-      <ol className="grid flex-1 grid-cols-4 gap-1" aria-label={`Stage ${stage + 1} of 4: ${STAGES[stage].label}`}>
+      <ol className="mt-2 flex items-start" aria-label={`Stage ${stage + 1} of 4: ${STAGES[stage].label}`}>
         {STAGES.map((s, i) => {
-          // How far through this stage she is (Drained is done the day she starts).
-          const fill = i < stage ? 1 : i > stage ? 0
-            : s.key === "drained" ? 0.5
-            : Math.min(1, (day - s.from + 1) / ((Number.isFinite(s.to) ? s.to : JOURNEY_DAYS) - s.from + 1));
+          const reached = i <= stage;
           return (
-            <li key={s.key} className="h-1.5 rounded-full bg-[#262626]" title={s.label}>
-              <span className="block h-1.5 rounded-full bg-accent" style={{ width: `${Math.round(fill * 100)}%` }} />
+            <li key={s.key} className="flex flex-1 items-start" aria-current={i === stage ? "step" : undefined}>
+              <span className="flex-1">
+                <span className="block h-2 rounded-full" style={{ background: STAGE_COLORS[i], opacity: reached ? 1 : 0.22 }} />
+                <span className={`mt-1 block text-[10px] uppercase tracking-[0.1em] ${i === stage ? "font-semibold" : ""}`}
+                  style={{ color: STAGE_COLORS[i], opacity: reached ? 1 : 0.45 }}>{s.label}</span>
+              </span>
+              {i < STAGES.length - 1 && (
+                <svg width="14" height="8" viewBox="0 0 14 8" fill="none" stroke="#6b6b6b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mx-0.5 shrink-0">
+                  <path d="M2 4h9M8.5 1.5L11 4 8.5 6.5" />
+                </svg>
+              )}
             </li>
           );
         })}

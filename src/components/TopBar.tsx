@@ -2,12 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import Avatar from "./Avatar";
 import { IconChat } from "./Icons";
-import JourneyBar from "./JourneyBar";
 
 /** Top of every screen: the lion on the left, Chat (with unread badge) and her picture on the right. */
-export default function TopBar({ coach, unread, name, avatarPath, journey }: {
+export default function TopBar({ coach, unread, name, avatarPath }: {
   coach: boolean; unread: number; name: string | null; avatarPath: string | null;
-  journey: { day: number; stage: number; startsIn: number } | null;
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur">
@@ -30,7 +28,6 @@ export default function TopBar({ coach, unread, name, avatarPath, journey }: {
           </Link>
         </div>
       </div>
-      {journey && <JourneyBar {...journey} />}
     </header>
   );
 }

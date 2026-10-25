@@ -27,6 +27,15 @@ function SectionTitle({ icon, children, as = "p" }: { icon: React.ReactNode; chi
   return <Tag className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent">{icon}</span>{children}</Tag>;
 }
 
+function Meter({ label, value, target, pct }: { label: string; value: string; target: string | null; pct: number }) {
+  return (
+    <span className="block">
+      <span className="flex justify-between text-[11px] text-[#a8a8a8]"><span>{label}</span><span><b className="text-text">{value}</b>{target ? ` / ${target}` : label === "Calories" ? " kcal" : ""}</span></span>
+      <span className="mt-1 block h-[5px] rounded-full bg-[#262626]"><span className="block h-[5px] rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></span>
+    </span>
+  );
+}
+
 /** A small trend line of her last 14 days of weigh-ins. */
 function Spark({ points }: { points: number[] }) {
   if (points.length < 2) return <div className="h-[26px]" />;
@@ -80,6 +89,7 @@ export default async function TodayPage() {
   const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
   const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
   const proteinTarget = target?.protein_g ?? DAILY_TARGETS.protein_g;
+  const kcalTarget = target?.calorie_target ?? null;
   const w = weights ?? [];
   const weightToday = w.find((x) => x.log_date === today);
   const change = w.length >= 2 ? Number(w[w.length - 1].weight_lbs) - Number(w[0].weight_lbs) : null;
@@ -96,20 +106,17 @@ export default async function TodayPage() {
       if (!its.length) continue;
       let cg = circleGroups.find((x) => x.name === c.name);
       if (!cg) { cg = { name: c.name, color: c.color, medals: [] }; circleGroups.push(cg); }
-      cg.medals.push({ number: r.number, label: `Medal ${r.number} · ${r.name}`, items: its });
+      cg.medals.push({ number: r.number, label: r.name, items: its });
     }
   }
   const all = circleGroups.flatMap((g) => g.medals.flatMap((m) => m.items));
   const doneCount = all.filter((i) => i.doneNow).length;
-  const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date());
 
   return (
     <section className="space-y-3.5">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">
-          {dateLabel} · Week {week}{tw?.is_diet_break ? " · Diet break" : ""}
-        </p>
-        <h1 className={`${display} mt-1 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
+        <h1 className={`${display} text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
+        {tw?.is_diet_break && <p className="text-[13px] text-[#a8a8a8]">Diet break week: eat at maintenance.</p>}
       </header>
 
       {open && !done && (
@@ -129,7 +136,7 @@ export default async function TodayPage() {
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <SectionTitle icon={<IconScale />}>Weight</SectionTitle>
+          <SectionTitle icon={<IconScale />}>Today&apos;s weight</SectionTitle>
           {weightToday ? (
             <>
               <p className={`${display} text-[26px] leading-none`}>{Number(weightToday.weight_lbs).toFixed(1)} <span className="text-[13px] text-dim">lbs</span></p>
@@ -139,22 +146,22 @@ export default async function TodayPage() {
               </p>
             </>
           ) : (
-            <form action={logWeight} className="flex flex-col gap-1.5">
+            <form action={logWeight} className="flex flex-1 flex-col gap-1.5">
               <input type="hidden" name="date" value={today} />
               <label className="sr-only" htmlFor="weight">Today&apos;s weight in lbs</label>
               <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder="lbs" required
                 className="min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent" />
-              <button className="min-h-10 rounded-lg bg-accent text-sm font-semibold text-black">Log today</button>
+              <button className="mt-auto min-h-10 rounded-lg bg-accent text-sm font-semibold text-black">Log</button>
             </form>
           )}
         </div>
-        <Link href="/food" className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <SectionTitle icon={<IconPlate />}>Food today</SectionTitle>
-          <p className={`${display} text-[26px] leading-none`}>{kcal.toLocaleString()} <span className="text-[13px] text-dim">kcal</span></p>
-          <span className="mt-0.5 flex justify-between text-[11px] text-[#a8a8a8]"><span>Protein</span><span>{protein} / {proteinTarget} g</span></span>
-          <span className="h-[5px] rounded-full bg-[#262626]"><span className="block h-[5px] rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round((protein / proteinTarget) * 100))}%` }} /></span>
-          <span className="text-xs text-accent">{todayMeals.length ? `${todayMeals.length} meal${todayMeals.length > 1 ? "s" : ""} · ` : ""}Add meal →</span>
-        </Link>
+        <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
+          <SectionTitle icon={<IconPlate />}>Today&apos;s food</SectionTitle>
+          <Meter label="Calories" value={kcal.toLocaleString()} target={kcalTarget ? kcalTarget.toLocaleString() : null} pct={kcalTarget ? kcal / kcalTarget : 0} />
+          <Meter label="Protein" value={`${protein}`} target={`${proteinTarget} g`} pct={protein / proteinTarget} />
+          <Link href="/food" className="text-xs text-accent">{todayMeals.length ? `${todayMeals.length} meal${todayMeals.length > 1 ? "s" : ""}` : "Meals"} →</Link>
+          <Link href="/food" className="mt-auto grid min-h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black">Add meal</Link>
+        </div>
       </div>
 
       {all.length > 0 && (
@@ -183,7 +190,7 @@ export default async function TodayPage() {
                         style={all ? { background: cg.color, color: "#0a0a0a" } : { border: `2px solid ${cg.color}`, color: cg.color }}>
                         {all ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg> : m.number}
                       </span>
-                      <span className="flex-1 text-[15px]">{m.label}</span>
+                      <span className="flex-1 text-[15px] leading-snug">{m.label}</span>
                       <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{m.items.length}</span>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
                     </summary>
