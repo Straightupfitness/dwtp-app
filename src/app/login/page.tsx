@@ -1,32 +1,33 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { sendSignInLink } from "./actions";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
 
+  // Coming back from a link that expired or was already used.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("error")) {
+      setState("error"); // eslint-disable-line react-hooks/set-state-in-effect -- read once from the URL
+      setMessage("That sign-in link has expired or was already used. Enter your email and I'll send a fresh one.");
+    }
+  }, []);
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     setState("sending");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: false },
-    });
-    if (error) {
-      const m = error.message.toLowerCase();
-      setMessage(
-        m.includes("signups not allowed") || m.includes("not found")
-          ? "We couldn't find that email. Use the email you signed up with, or message Michael."
-          : m.includes("rate limit") || error.status === 429
-            ? "Too many sign-in emails were sent in a short time. Wait a few minutes and try again."
-            : `Something went wrong: ${error.message}`,
-      );
+    const r = await sendSignInLink(email).catch(() => ({ ok: false as const, reason: "failed" as const }));
+    if (!r.ok) {
+      setMessage(r.reason === "notfound"
+        ? "I couldn't find that email. Use the email you signed up with, or message Michael."
+        : r.reason === "toomany"
+          ? "Several sign-in emails were just sent. Check your inbox (and spam), or wait 15 minutes and try again."
+          : "The email didn't go out. Try again in a minute, or message Michael.");
     }
-    setState(error ? "error" : "sent");
+    setState(r.ok ? "sent" : "error");
   }
 
   const display = "font-[family-name:var(--font-display)] uppercase";
@@ -41,7 +42,7 @@ export default function LoginPage() {
       {state === "sent" ? (
         <div className="mt-16 space-y-3">
           <h1 className={`${display} text-3xl font-semibold`}>Check your email</h1>
-          <p className="text-[15px] leading-relaxed text-[#a8a8a8]">I sent a sign-in link to <b className="text-text">{email.trim().toLowerCase()}</b>. Tap it on this phone and you&apos;re in.</p>
+          <p className="text-[15px] leading-relaxed text-[#a8a8a8]">I sent a sign-in link to <b className="text-text">{email.trim().toLowerCase()}</b>. Tap the button in that email and you&apos;re in. Check spam if it isn&apos;t there in a minute.</p>
           <button type="button" onClick={() => setState("idle")} className="min-h-11 text-sm text-accent">Use a different email</button>
         </div>
       ) : (

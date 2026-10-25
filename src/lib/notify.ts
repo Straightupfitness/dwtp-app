@@ -74,11 +74,11 @@ async function notifyOne(userId: string, note: Note) {
   }
 }
 
-export async function sendEmail(to: string, subject: string, text: string, name?: string) {
+export async function sendEmail(to: string, subject: string, text: string, name?: string, customHtml?: string) {
   const key = process.env.RESEND_API_KEY?.trim();
-  if (!key) { console.warn("RESEND_API_KEY not set; email skipped:", subject); return; }
+  if (!key) { console.warn("RESEND_API_KEY not set; email skipped:", subject); return false; }
   const from = process.env.EMAIL_FROM?.trim() || "Michael at DWTP <coach@straightupfitness.com>";
-  const html = `<div style="font-family:system-ui,sans-serif;font-size:16px;line-height:1.5;color:#111">${
+  const html = customHtml ?? `<div style="font-family:system-ui,sans-serif;font-size:16px;line-height:1.5;color:#111">${
     (name ? `<p>Hi ${name.split(" ")[0]},</p>` : "") + text.split("\n\n").map((para) =>
       `<p>${para.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>").replace(/(https:\/\/\S+)/g, '<a href="$1">$1</a>')}</p>`).join("")
   }</div>`;
@@ -86,7 +86,8 @@ export async function sendEmail(to: string, subject: string, text: string, name?
     method: "POST", headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({ from, to, subject, text, html }),
   });
-  if (!res.ok) console.error("email failed", res.status, (await res.text()).slice(0, 200));
+  if (!res.ok) { console.error("email failed", res.status, (await res.text()).slice(0, 200)); return false; }
+  return true;
 }
 
 export async function coachIds(): Promise<string[]> {

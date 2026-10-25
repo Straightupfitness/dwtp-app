@@ -41,7 +41,7 @@ export async function addClient(_: unknown, form: FormData) {
       `1. Open ${url}/login on your phone and enter this email address. You'll get a sign-in link by email: tap it and you're in. No password needed.`,
       "2. On iPhone: in Safari, tap the Share button, then Add to Home Screen. Open DWTP from your Home Screen from now on.",
       "3. Open the person icon (Me) and turn on notifications, so you see my replies.",
-      "Any questions, message me right in the app (the Chat tab).",
+      "Any questions, message me right in the app: tap Talk to Michael at the top.",
       "Talk to you soon,\nMichael",
     ].join("\n\n"), name);
   }
