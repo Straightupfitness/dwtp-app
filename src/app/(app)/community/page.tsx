@@ -32,8 +32,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   );
   const header = (
     <header>
-      <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Driven women</p>
-      <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Community</h1>
+      <h1 className={`${display} text-[30px] font-semibold`}>Community</h1>
     </header>
   );
 
@@ -69,8 +68,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const myRank = ranked.findIndex((r) => r.client_id === me);
-  const ahead = myRank > 0 ? ranked[myRank - 1] : null;
 
   const { data: posts } = await supabase.from("posts").select("id, author_id, body, photo_path, pinned, created_at")
     .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50);
@@ -113,23 +110,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     <section className="space-y-3.5">
       <LiveRefresh tables={["posts", "comments", "likes", "comment_likes"]} />
       {header}{Tabs}
-
-      {!coach && myRank >= 0 && (
-        <Link href="/community?tab=leaderboard" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-          <span className="flex">
-            {ranked.slice(0, 3).map((r, i) => (
-              <span key={r.client_id} className={`rounded-full border-2 border-card ${i ? "-ml-2" : ""}`}>
-                <Avatar name={r.full_name} path={members.get(r.client_id)?.avatar_path} size={30} />
-              </span>
-            ))}
-          </span>
-          <span className="flex-1">
-            <span className="block text-sm font-semibold">You&apos;re #{myRank + 1} this week</span>
-            <span className="block text-xs text-[#a8a8a8]">{ranked[myRank].cps} CPs{ahead ? ` · ${ahead.cps - ranked[myRank].cps} behind ${shortName(ahead.full_name)}` : " · top of the board"}</span>
-          </span>
-          <span className="text-[13px] text-accent">Leaderboard</span>
-        </Link>
-      )}
 
       <Composer userId={me} coach={coach} />
 

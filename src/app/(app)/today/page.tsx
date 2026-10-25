@@ -5,6 +5,7 @@ import { todayIn } from "@/lib/program";
 import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
+import DoThisFirst from "@/components/DoThisFirst";
 import { IconCheckin, IconHabits, IconPlate, IconScale } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
 import { logWeight } from "./actions";
@@ -27,11 +28,12 @@ function SectionTitle({ icon, children, as = "p" }: { icon: React.ReactNode; chi
   return <Tag className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent">{icon}</span>{children}</Tag>;
 }
 
-function Meter({ label, value, target, pct }: { label: string; value: string; target: string | null; pct: number }) {
+/** A big number like her weight, with a thin bar toward her target. */
+function Stat({ value, unit, pct }: { value: string; unit: string; pct: number | null }) {
   return (
     <span className="block">
-      <span className="flex justify-between text-[11px] text-[#a8a8a8]"><span>{label}</span><span><b className="text-text">{value}</b>{target ? ` / ${target}` : label === "Calories" ? " kcal" : ""}</span></span>
-      <span className="mt-1 block h-[5px] rounded-full bg-[#262626]"><span className="block h-[5px] rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></span>
+      <span className={`${display} block text-[26px] leading-none`}>{value} <span className="text-[13px] text-dim">{unit}</span></span>
+      {pct !== null && <span className="mt-1.5 block h-1 rounded-full bg-[#262626]"><span className="block h-1 rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></span>}
     </span>
   );
 }
@@ -54,7 +56,7 @@ export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, state] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path").eq("id", user!.id).single(),
     loadProgram(supabase, user!.id),
   ]);
   const { today, week } = state;
@@ -71,6 +73,7 @@ export default async function TodayPage() {
             ? new Date(state.programStart + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })
             : "your first Monday"}</b>. Your workouts and your first habits go live that morning.
         </p>
+        <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />
         <NotificationSettings />
         <Link href="/faq" className="flex min-h-12 items-center justify-center rounded-xl border border-border text-sm font-semibold">Browse the FAQ while you wait</Link>
       </section>
@@ -96,7 +99,7 @@ export default async function TodayPage() {
 
   // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
-  const circleGroups: { name: string; color: string; medals: { number: number; label: string; items: ItemState[] }[] }[] = [];
+  const circleGroups: { name: string; color: string; items: (ItemState & { medal: string })[] }[] = [];
   for (const c of state.circles) {
     for (const r of c.rings) {
       if (r.status !== "open") continue;
@@ -105,11 +108,11 @@ export default async function TodayPage() {
         .sort((a, b) => (a.cadence === "daily" ? 0 : 1) - (b.cadence === "daily" ? 0 : 1));
       if (!its.length) continue;
       let cg = circleGroups.find((x) => x.name === c.name);
-      if (!cg) { cg = { name: c.name, color: c.color, medals: [] }; circleGroups.push(cg); }
-      cg.medals.push({ number: r.number, label: r.name, items: its });
+      if (!cg) { cg = { name: c.name, color: c.color, items: [] }; circleGroups.push(cg); }
+      cg.items.push(...its.map((i) => ({ ...i, medal: r.name })));
     }
   }
-  const all = circleGroups.flatMap((g) => g.medals.flatMap((m) => m.items));
+  const all = circleGroups.flatMap((g) => g.items);
   const doneCount = all.filter((i) => i.doneNow).length;
 
   return (
@@ -132,7 +135,9 @@ export default async function TodayPage() {
         </Link>
       )}
 
-      <NotificationSettings compact />
+      {profile?.home_screen_at && profile.avatar_path
+        ? <NotificationSettings compact />
+        : <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />}
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
@@ -157,9 +162,9 @@ export default async function TodayPage() {
         </div>
         <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
           <SectionTitle icon={<IconPlate />}>Today&apos;s food</SectionTitle>
-          <Meter label="Calories" value={kcal.toLocaleString()} target={kcalTarget ? kcalTarget.toLocaleString() : null} pct={kcalTarget ? kcal / kcalTarget : 0} />
-          <Meter label="Protein" value={`${protein}`} target={`${proteinTarget} g`} pct={protein / proteinTarget} />
-          <Link href="/food" className="text-xs text-accent">{todayMeals.length ? `${todayMeals.length} meal${todayMeals.length > 1 ? "s" : ""}` : "Meals"} →</Link>
+          <p className="text-xs text-[#a8a8a8]">{todayMeals.length} meal{todayMeals.length === 1 ? "" : "s"} logged</p>
+          <Stat value={kcal.toLocaleString()} unit="calories" pct={kcalTarget ? kcal / kcalTarget : null} />
+          <Stat value={String(protein)} unit="g protein" pct={protein / proteinTarget} />
           <Link href="/food" className="mt-auto grid min-h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black">Add meal</Link>
         </div>
       </div>
@@ -176,35 +181,28 @@ export default async function TodayPage() {
 
       {circleGroups.length > 0 && (
         <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-          {circleGroups.map((cg) => (
-            <div key={cg.name} className="px-3.5 py-2">
-              <p className="flex items-center gap-1.5 py-1.5 text-[11px] uppercase tracking-[0.12em]" style={{ color: cg.color }}>
-                <span className="size-2 rounded-full" style={{ background: cg.color }} aria-hidden="true" />{cg.name}
-              </p>
-              {cg.medals.map((m) => {
-                const done = m.items.filter((i) => i.doneNow).length, all = m.items.length === done;
-                return (
-                  <details key={m.label} className="group">
-                    <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3">
-                      <span className="grid size-7 shrink-0 place-items-center rounded-full font-[family-name:var(--font-display)] text-[13px]"
-                        style={all ? { background: cg.color, color: "#0a0a0a" } : { border: `2px solid ${cg.color}`, color: cg.color }}>
-                        {all ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg> : m.number}
-                      </span>
-                      <span className="flex-1 text-[15px] leading-snug">{m.label}</span>
-                      <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{m.items.length}</span>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
-                    </summary>
-                    <div className="mb-2 ml-10 divide-y divide-border border-l border-border pl-3">
-                      {m.items.map((it) => (
-                        <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
-                          progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />
-                      ))}
-                    </div>
-                  </details>
-                );
-              })}
-            </div>
-          ))}
+          {circleGroups.map((cg) => {
+            const done = cg.items.filter((i) => i.doneNow).length, all = done === cg.items.length;
+            return (
+              <details key={cg.name} className="group px-3.5">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full"
+                    style={all ? { background: cg.color } : { border: `2px solid ${cg.color}` }}>
+                    {all && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
+                  </span>
+                  <span className={`${display} flex-1 text-[17px]`} style={{ color: cg.color }}>{cg.name}</span>
+                  <span className={`text-xs ${all ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{done}/{cg.items.length}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+                </summary>
+                <div className="mb-2 divide-y divide-border border-t border-border">
+                  {cg.items.map((it) => (
+                    <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
+                      progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />
+                  ))}
+                </div>
+              </details>
+            );
+          })}
         </div>
       )}
       {!circleGroups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}

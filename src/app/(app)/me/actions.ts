@@ -36,3 +36,12 @@ export async function setAvatar(path: string | null) {
   if (p?.avatar_path && p.avatar_path !== path) await supabase.storage.from("avatars").remove([p.avatar_path]);
   revalidatePath("/", "layout");
 }
+
+/** She opened the app from her Home Screen (or said she added it). */
+export async function markHomeScreen() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("profiles").update({ home_screen_at: new Date().toISOString() }).eq("id", user.id).is("home_screen_at", null);
+  revalidatePath("/today");
+}

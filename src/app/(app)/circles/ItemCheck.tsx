@@ -3,8 +3,8 @@ import { useOptimistic, useTransition } from "react";
 import { toggleHabit } from "../habits/actions";
 
 /** One habit's check-off button: today (daily), this week (weekly) or once (Get / Learn). */
-export default function ItemCheck({ itemId, done, complete, title, detail, progress, target, cadence, color, alsoIn, auto }: {
-  itemId: string; done: boolean; complete: boolean; title: string; detail?: string | null;
+export default function ItemCheck({ itemId, done, complete, title, detail, eyebrow, progress, target, cadence, color, alsoIn, auto }: {
+  itemId: string; done: boolean; complete: boolean; title: string; detail?: string | null; eyebrow?: string;
   progress: number; target: number; cadence: string; color: string; alsoIn?: string[]; auto?: string | null;
 }) {
   const [on, setOn] = useOptimistic(done);
@@ -20,6 +20,7 @@ export default function ItemCheck({ itemId, done, complete, title, detail, progr
         {on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
       </span>
       <span className="flex-1">
+        {eyebrow && <span className="block text-[11px] uppercase tracking-[0.1em]" style={{ color }}>{eyebrow}</span>}
         <span className="block text-[15px]">{title}</span>
         {detail && <span className="block text-sm text-dim">{detail}</span>}
         {cadence === "weekly" && <span className="block text-xs text-dim">Once this week</span>}
