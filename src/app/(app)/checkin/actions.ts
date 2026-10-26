@@ -41,6 +41,12 @@ export async function submitCheckin(input: { week: number; answers: Record<strin
     const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).single();
     if (hasVideo) await transcribeCheckin(db, checkinId);
     try { await generateDraft(db, checkinId); } catch (e) { console.error("auto draft failed", e); }
+    // Her next week's Habits & Homework unlocks with this check-in.
+    const { data: nextHH } = await db.from("lessons").select("id").eq("kind", "hh").eq("week_number", week + 1).maybeSingle();
+    if (nextHH) await notify(user.id, {
+      title: `Your Week ${week + 1} Habits & Homework is ready`, body: "Thanks for checking in. Here's what's next.", url: `/lessons/${nextHH.id}`,
+      email: "push-fallback", dedupeKey: `hh-ready:${week + 1}`,
+    });
     const name = me?.full_name ?? "A client";
     await notify(await coachIds(), {
       title: `${name}: Week ${week} check-in`, body: hasVideo ? "Video check-in. Transcript and draft reply are ready." : "Your draft reply is ready.",

@@ -7,8 +7,10 @@ import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
-import { IconCheckin, IconHabits, IconPlate, IconScale } from "@/components/Icons";
+import { IconCheckin, IconHabits, IconLessons, IconPlate, IconScale } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
+import LessonRow from "../lessons/LessonRow";
+import { loadLessons } from "@/lib/lessons";
 import { logWeight } from "./actions";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -108,6 +110,7 @@ export default async function TodayPage() {
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const lessonWeek = (await loadLessons(supabase, user!.id)).weeks.find((w) => w.week === week);
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
   const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
   const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
@@ -186,6 +189,18 @@ export default async function TodayPage() {
           <Link href="/food" className="mt-auto grid min-h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black">Add meal</Link>
         </div>
       </div>
+
+      {lessonWeek && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between pt-1">
+            <SectionTitle icon={<IconLessons />} as="h2">This week&apos;s lessons</SectionTitle>
+            <Link href="/lessons" className="text-[13px] text-accent">All lessons</Link>
+          </div>
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+            {lessonWeek.lessons.map((l) => <LessonRow key={l.id} l={l} />)}
+          </div>
+        </div>
+      )}
 
       {all.length > 0 && (
         <>

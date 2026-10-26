@@ -11,3 +11,4 @@ export const IconCheckin = () => <svg {...P}><rect x="5" y="4" width="14" height
 export const IconScale = () => <svg {...P} width={18} height={18}><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M8 9a5 5 0 0 1 8 0" /><path d="M12 9l1.5-2" /></svg>;
 export const IconPlate = () => <svg {...P} width={18} height={18}><circle cx="13" cy="13" r="7" /><circle cx="13" cy="13" r="3.5" /><path d="M3 3v6a2 2 0 0 0 2 2M5 3v18" /></svg>;
 export const IconHabits = () => <svg {...P} width={18} height={18}><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" /><path d="M13 7h7M13 14h7M13 21h7" /></svg>;
+export const IconLessons = () => <svg {...P}><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></svg>;

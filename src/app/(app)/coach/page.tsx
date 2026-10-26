@@ -55,9 +55,10 @@ export default async function CoachHome() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Clients</h1>
         <p className="text-sm text-dim">{toReply ? `${toReply} check-in${toReply > 1 ? "s" : ""} to reply to` : "All caught up"} · {rows.length} clients</p>
       </header>
-      <div className="grid grid-cols-2 gap-2">
-        <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Today&apos;s activity</Link>
-        <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add a client</Link>
+      <div className="grid grid-cols-3 gap-2">
+        <Link href="/coach/lessons" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Lessons</Link>
+        <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
+        <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
       </div>
       <ul className="space-y-2">
         {rows.map(({ c, week, status, lastWeight, daysSinceWeight, flags, cps }) => (
