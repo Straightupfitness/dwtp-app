@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Avatar from "./Avatar";
-import { IconChat } from "./Icons";
+import { IconCalendar, IconChat } from "./Icons";
 
 /** Top of every screen: the lion on the left, Chat (with unread badge) and her picture on the right. */
 export default function TopBar({ coach, unread, name, avatarPath }: {
@@ -13,7 +13,10 @@ export default function TopBar({ coach, unread, name, avatarPath }: {
         <Link href={coach ? "/coach" : "/today"} aria-label="Home">
           <Image src="/brand/dwtp-logo.png" alt="DWTP" width={67} height={32} className="h-8 w-auto mix-blend-lighten" priority />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Link href={coach ? "/coach/calendar" : "/calendar"} aria-label="Calendar" className="grid size-11 place-items-center rounded-full border border-[#2a2a2a] text-accent">
+            <IconCalendar />
+          </Link>
           <Link href={coach ? "/coach/inbox" : "/chat"} aria-label={unread ? `${coach ? "Inbox" : "Talk to Michael"}, ${unread} unread` : undefined}
             className="relative flex min-h-11 items-center gap-1.5 rounded-full border border-[#2a2a2a] pl-3 pr-3.5 text-[13px] font-semibold">
             <span className="text-accent"><IconChat /></span>{coach ? "Inbox" : "Talk to Michael"}
