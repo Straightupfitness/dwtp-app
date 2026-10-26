@@ -5,7 +5,8 @@ import { loadProgram } from "./circles";
 
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
-export type DayFood = { date: string; meals: number; calories: number; protein: number; fiber: number; items: string[] };
+export type MealFood = { calories: number; protein: number; items: string[] };
+export type DayFood = { date: string; meals: number; calories: number; protein: number; fiber: number; items: string[]; list: MealFood[] };
 
 export async function weekData(supabase: SupabaseClient, clientId: string, week: number) {
   const { data: p } = await supabase.from("profiles")
@@ -37,6 +38,10 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
       protein: Math.round(rows.reduce((s, r) => s + Number(r.protein_g ?? 0), 0)),
       fiber: Math.round(rows.reduce((s, r) => s + Number(r.fiber_g ?? 0), 0)),
       items: rows.flatMap((r) => ((r.items as { name: string; amount: string }[]) ?? []).map((i) => `${i.amount} ${i.name}`.trim())),
+      list: rows.map((r) => ({
+        calories: r.calories ?? 0, protein: Math.round(Number(r.protein_g ?? 0)),
+        items: ((r.items as { name: string; amount: string }[]) ?? []).map((i) => `${i.amount} ${i.name}`.trim()),
+      })),
     });
   }
 

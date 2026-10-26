@@ -1,5 +1,6 @@
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
+import ThursdayScript from "./ThursdayScript";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram } from "@/lib/circles";
@@ -32,6 +33,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <p className="text-xs text-dim">{p.email}</p>
         <div className="mt-2"><WelcomeButton clientId={id} failed={welcome === "failed"} /></div>
       </header>
+
+      <ThursdayScript clientId={id} />
 
       {toSignOff.length > 0 && (
         <div className="space-y-2">

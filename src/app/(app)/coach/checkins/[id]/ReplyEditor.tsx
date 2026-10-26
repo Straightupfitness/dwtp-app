@@ -3,7 +3,9 @@ import { useState } from "react";
 import VideoRecorder from "@/components/VideoRecorder";
 import { saveReply } from "./actions";
 
-type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[] } | null;
+type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
+
+const GOOD = /superfood|fruit|meat|vegetable|win/i, BAD = /processed|alcohol|low-|high-|fix/i;
 
 export default function ReplyEditor({ checkinId, clientId, initialText, initialDraft, initialSummary, videoUrl, sentAt }: {
   checkinId: string; clientId: string; initialText: string; initialDraft: string; initialSummary: Summary;
@@ -47,6 +49,22 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
           {!!summary.flags?.length && <p><b className="text-gold">Flags:</b> {summary.flags.join(" · ")}</p>}
         </div>
       )}
+      {!!summary?.report?.length && (
+        <details open className="rounded-xl border border-border bg-card p-3 text-sm">
+          <summary className="cursor-pointer text-xs uppercase tracking-widest text-accent">Food and weight report</summary>
+          <dl className="mt-2 divide-y divide-border">
+            {summary.report.map((r) => {
+              const empty = /^(none|not logged)\.?$/i.test(r.text);
+              return (
+                <div key={r.label} className="grid grid-cols-[8.5rem_1fr] gap-2 py-1.5">
+                  <dt className={`font-semibold ${empty ? "text-dim" : GOOD.test(r.label) ? "text-[#7ee2a8]" : BAD.test(r.label) ? "text-[#ff8a7e]" : "text-text"}`}>{r.label}</dt>
+                  <dd className={empty ? "text-dim" : ""}>{r.text}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        </details>
+      )}
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Your reply</h2>
         <button type="button" onClick={draft} disabled={busy !== ""} className="min-h-11 rounded-lg border border-accent px-3 text-sm text-accent disabled:opacity-50">
@@ -54,7 +72,7 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
         </button>
       </div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={16}
-        placeholder="Tap Draft with AI, or write your reply. Use it as your script when you record."
+        placeholder="Tap Draft with AI, or write your reply. Use it as your script when you record your Loom."
         className="w-full rounded-xl border border-border bg-bg p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
       <p className="text-xs text-dim">{text.trim().split(/\s+/).filter(Boolean).length} words · about {Math.max(1, Math.round(text.trim().split(/\s+/).length / 150))} min spoken</p>
 

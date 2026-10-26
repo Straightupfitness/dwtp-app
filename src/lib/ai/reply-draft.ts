@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { askClaude } from "./anthropic";
 import { weekData } from "../coach-data";
 import { questionLabels } from "../checkin";
+import { PROGRAM_RULES, VOICE } from "./voice";
 
 // Doc 26: how Michael replies. Kept here so the draft always follows the current program rules.
 const SYSTEM = `You draft Michael Duivis's weekly check-in reply to a client in his Driven Woman Transformation Program (DWTP),
@@ -31,21 +32,15 @@ COACHING PRIORITY for the next step:
 6. Consistent and losing → change nothing, check hunger, warn calories may need to drop later.
 7. Mindset, sleep, training questions → direct answer plus the principle behind it.
 
-VOICE: blunt but warm ("I'm giving it to you hard because you can take it"); extreme ownership paired with encouragement;
-specific praise only; conversational spoken English, short sentences, "all right", "right?", a bit of humor; teaches the why in one line;
-meets her where she is when life is hard. Use at most one or two of his phrases naturally: "lowest hanging fruit",
-"homeostasis doesn't exist", "we all have the same 24 hours", "failing to prepare is preparing to fail", "the proof is in the pudding",
-"calories in versus calories out", "success is often boring", "it's always three to one".
+${VOICE}
 
-PROGRAM RULES: 3 meals a day, no snacks, 40 g+ protein per meal, calories always tracked, never below 1,200, no fasting,
-caffeine cutoff 10 hours before bed (300 mg max), daily weigh-ins, diet breaks at maintenance in weeks 8, 16, 24.
-Medical topics (medication, pregnancy, injuries, chest pain, dizziness, snoring/apnea): answer practically and add "check with your doctor".
+${PROGRAM_RULES}
 
 HARD RULES: never invent data. If there's no weight or food log, say so plainly ("the last weight I have of you is…" or "I don't see any food logs this week")
 and make logging the next step. Use her numbers, not generic targets. 200–450 words.
 
 SPECIAL WEEKS (use only when the context says so):
-- Week 1: welcome, her baseline, "Log It" week (eat whatever she wants, log everything, weigh in daily).
+- Week 1: welcome, her baseline, "Log Your Numbers" week (eat whatever she wants, log everything, weigh in daily).
 - Week 4 Sleep Better checkpoint: if sleep is much/a bit better → celebrate the first milestone and mention the full-year upgrade
   ("you're a fast mover… it's $1,000 more today instead of $1,500 later"). If the same/worse → check Circadian Reset medals 1–3 and her
   check-ins; mention the Sleep Better Guarantee only if relevant, and say Michael will handle it personally.
@@ -53,11 +48,32 @@ SPECIAL WEEKS (use only when the context says so):
 - Week 24 last chance: next 26 weeks $1,500 or month-to-month $250, matched to her answer.
 - Diet-break weeks: maintenance calories, keep logging and 40 g protein per meal.
 
-Answer in exactly this format, with these four labels and nothing before or after:
+FOOD REPORT (for Michael, not part of the script): go through every logged meal and her weigh-ins and fill each line with the
+specific foods and days, short. Processed foods: packaged, fried, fast food, sweets, chips, sugary drinks, white bread and pastries.
+Superfoods: Michael's list (goji berries, holy basil seeds, pumpkin seeds, hemp hearts, chia, cacao nibs, moringa, microgreens,
+bone broth, kiwis, berries, sardines, eggs with yolks, Greek yogurt, sweet potatoes, cinnamon, flaxseed oil). Quality meats: steak,
+bison, lean ground beef, chicken or turkey breast, salmon and other fish. Low-protein meal: under 40 g. Low-calorie day: under 1,200
+or well under her target; high-calorie day: well over her target or maintenance (use her numbers; if no target, say so).
+Write "none" when there's nothing, and "not logged" for days with no food. Never invent foods she didn't log.
+
+Answer in exactly this format, with these labels and nothing before or after:
 WIN: (her win, one short line, for Michael)
 OBSTACLE: (her obstacle, one short line)
 QUESTIONS: (what she asked, one short line, or "none")
 FLAGS: (health or safety concerns, upsell or renewal moments, missing data; separated by " | ", or "none")
+REPORT:
+Logging: (days with food logged, of 7; weigh-ins, of 7; weight trend)
+Processed foods: …
+Alcohol: …
+Low-calorie days: …
+High-calorie days: …
+Low-protein meals: …
+Superfoods: …
+Fruit: …
+Quality meats: …
+Vegetables: …
+Biggest win: (one food habit to praise)
+Biggest fix: (one specific swap or change)
 DRAFT:
 (the reply script, plain text, as many lines as needed)`;
 
@@ -97,7 +113,7 @@ WEIGHT (last 3 weeks): ${d.weights.map((w) => `${w.log_date}: ${w.weight_lbs}`).
 Weigh-ins this week: ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
 
 FOOD THIS WEEK (${d.start} to ${d.end}):
-${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber: ${x.items.slice(0, 12).join("; ")}` : "nothing logged"}`).join("\n")}
+${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m, i) => `  meal ${i + 1}: ${m.calories} kcal, ${m.protein} g protein: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
 
 MICHAEL'S LAST REPLIES (to stay consistent with what he asked her to do):
 ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin_replies[0] : p.checkin_replies; return r?.final_text ? `Week ${p.week_number}: ${r.final_text.slice(0, 900)}` : null; }).filter(Boolean).join("\n---\n") || "none"}`;
@@ -117,5 +133,11 @@ function parseDraft(text: string) {
   if (!draft) throw new Error("The AI didn't return a draft");
   const none = (v: string) => (/^none\.?$/i.test(v) ? "" : v);
   const flags = none(line("FLAGS")).split("|").map((f) => f.trim()).filter(Boolean);
-  return { summary: { win: none(line("WIN")), obstacle: none(line("OBSTACLE")), questions: none(line("QUESTIONS")), flags }, draft };
+  // The food report: "Label: text" lines between REPORT: and DRAFT:.
+  const r0 = text.search(/^\s*REPORT:/mi);
+  const report = r0 >= 0 && i > r0
+    ? text.slice(r0, i).split("\n").slice(1).map((l) => l.match(/^\s*[-*]?\s*([^:]{2,40}):\s*(.+)$/)).filter((m): m is RegExpMatchArray => !!m)
+      .map((m) => ({ label: m[1].trim(), text: m[2].trim() }))
+    : [];
+  return { summary: { win: none(line("WIN")), obstacle: none(line("OBSTACLE")), questions: none(line("QUESTIONS")), flags, report }, draft };
 }
