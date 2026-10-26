@@ -10,7 +10,7 @@ import { adminClient } from "./supabase/admin";
  */
 export type Note = {
   title: string; body: string; url: string;
-  email?: { subject: string; text: string } | "push-fallback";  // "push-fallback": email only if she has no push devices
+  email?: { subject: string; text: string; html?: string } | "push-fallback";  // html: a finished email (lessons)  // "push-fallback": email only if she has no push devices
   dedupeKey?: string;
 };
 
@@ -69,8 +69,9 @@ async function notifyOne(userId: string, note: Note) {
 
   const wantEmail = note.email && p?.email && p.email_notifications && !(note.email === "push-fallback" && pushed > 0);
   if (wantEmail) {
-    const e = note.email === "push-fallback" ? { subject: note.title, text: note.body } : note.email!;
-    await sendEmail(p!.email!, e.subject, `${e.text}\n\nOpen the app: ${APP_URL()}${note.url}`, p?.full_name ?? undefined);
+    const e: { subject: string; text: string; html?: string } = note.email === "push-fallback" ? { subject: note.title, text: note.body } : note.email!;
+    if (e.html) await sendEmail(p!.email!, e.subject, e.text, undefined, e.html);
+    else await sendEmail(p!.email!, e.subject, `${e.text}\n\nOpen the app: ${APP_URL()}${note.url}`, p?.full_name ?? undefined);
   }
 }
 
