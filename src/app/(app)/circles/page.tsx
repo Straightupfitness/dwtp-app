@@ -53,7 +53,13 @@ export default async function CirclesPage() {
   return (
     <section className="space-y-3">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Build the foundation</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Build the foundation</p>
+          <Link href="/circles/how" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-accent px-3 text-[13px] font-semibold text-accent">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+            How this works
+          </Link>
+        </div>
         <h1 className="mt-1 font-[family-name:var(--font-display)] text-3xl uppercase">Capacity Circles</h1>
       </header>
 
