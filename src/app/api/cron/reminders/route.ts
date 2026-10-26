@@ -27,6 +27,9 @@ export async function GET(req: Request) {
   const lessonFor = (kind: string, week: number) => (lessons ?? []).find((l) => l.kind === kind && l.week_number === week);
   const checkedIn = async (id: string, week: number) =>
     !!(await db.from("checkins").select("id").eq("client_id", id).eq("week_number", week).maybeSingle()).data;
+  // Friday's email and Saturday's catch-up share one slot: if either went out this week, don't send another.
+  const alreadySent = async (id: string, keys: string[]) =>
+    !!(await db.from("notification_log").select("key").eq("user_id", id).in("key", keys).limit(1).maybeSingle()).data;
   let sent = 0;
 
   for (const c of clients ?? []) {
@@ -47,6 +50,7 @@ export async function GET(req: Request) {
     if (weekday === "Fri" || weekday === "Sat") {
       const { open } = currentWindow(c.program_start);
       const done = open ? await checkedIn(c.id, open.week) : true;
+      if (await alreadySent(c.id, [`smf:${week}`, ...(open ? [`checkin-open:${open.week}`] : [])])) continue;
       const l = unlocked ? lessonFor("smf", week) : undefined;
       if (l) {
         const email = lessonEmail({ kind: "smf", week, title: l.title, body: l.body, firstName: first,

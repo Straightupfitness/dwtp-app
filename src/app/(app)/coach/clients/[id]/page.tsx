@@ -31,7 +31,10 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : "Not started"} · {p.status}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email}</h1>
         <p className="text-xs text-dim">{p.email}</p>
-        <div className="mt-2"><WelcomeButton clientId={id} failed={welcome === "failed"} /></div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <WelcomeButton clientId={id} failed={welcome === "failed"} />
+          <a href="#details" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Edit details</a>
+        </div>
       </header>
 
       <ThursdayScript clientId={id} />
@@ -100,8 +103,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <p className="text-sm">{(weights ?? []).map((w) => `${w.log_date.slice(5)}: ${w.weight_lbs}`).join(" · ") || "None yet"}</p>
       </div>
 
-      <div className="space-y-2">
-        <h2 className="text-sm uppercase tracking-widest text-dim">Profile and targets</h2>
+      <div id="details" className="scroll-mt-20 space-y-2">
+        <h2 className="text-sm uppercase tracking-widest text-dim">Her details and targets</h2>
         <ProfileForm clientId={id} p={p} t={t} />
       </div>
     </section>

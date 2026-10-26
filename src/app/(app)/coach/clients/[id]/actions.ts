@@ -18,7 +18,17 @@ export async function updateClient(clientId: string, form: FormData) {
   const { supabase, coachId } = await coach();
   const start = str(form.get("program_start"));
   if (start && new Date(start + "T00:00:00Z").getUTCDay() !== 1) return { error: "The program always starts on a Monday." };
+  // Email: her sign-in address too, so change it in her login first.
+  const email = str(form.get("email"))?.toLowerCase() ?? null;
+  const { data: before } = await supabase.from("profiles").select("email").eq("id", clientId).single();
+  if (email && email !== before?.email) {
+    if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "That email doesn't look right." };
+    const { adminClient, safeError } = await import("@/lib/supabase/admin");
+    const { error: authErr } = await adminClient().auth.admin.updateUserById(clientId, { email, email_confirm: true });
+    if (authErr) return { error: /already|registered|exists/i.test(authErr.message) ? "Another account already uses that email." : `Couldn't change her email: ${safeError(authErr)}` };
+  }
   const { error } = await supabase.from("profiles").update({
+    ...(email ? { email } : {}), phone: str(form.get("phone")), timezone: str(form.get("timezone")) ?? "America/Los_Angeles",
     full_name: str(form.get("full_name")), program_start: start, plan: str(form.get("plan")), status: str(form.get("status")) ?? "active",
     start_weight_lbs: num(form.get("start_weight_lbs")), goal_weight_lbs: num(form.get("goal_weight_lbs")),
     strength_days_per_week: num(form.get("strength_days_per_week")),
@@ -31,7 +41,8 @@ export async function updateClient(clientId: string, form: FormData) {
   });
   if (e2) return { error: e2.message };
   revalidatePath(`/coach/clients/${clientId}`);
-  return { ok: true };
+  revalidatePath("/coach");
+  return { ok: true, emailChanged: !!email && email !== before?.email };
 }
 
 export async function setFocus(clientId: string, circleIds: string[]) {

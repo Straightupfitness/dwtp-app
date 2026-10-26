@@ -8,7 +8,9 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString
 
 type Status = { label: string; tone: "act" | "ok" | "warn" | "dim"; href?: string };
 
-export default async function CoachHome() {
+export default async function CoachHome({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
+  const { sort } = await searchParams;
+  const az = sort === "az";
   const supabase = await createClient();
   const { data: clients } = await supabase.from("profiles")
     .select("id, full_name, email, program_start, status, timezone, avatar_path")
@@ -44,7 +46,12 @@ export default async function CoachHome() {
       c, week, status, lastWeight, daysSinceWeight, flags: (ci?.flags as string[]) ?? [],
       cps: (cps ?? []).find((x) => x.client_id === c.id)?.this_week ?? 0,
     };
-  }).sort((a, b) => ({ act: 0, warn: 1, dim: 2, ok: 3 }[a.status.tone] - { act: 0, warn: 1, dim: 2, ok: 3 }[b.status.tone]));
+  }).sort((a, b) => {
+    const name = (x: typeof a) => (x.c.full_name || x.c.email || "").toLowerCase();
+    if (az) return name(a).localeCompare(name(b));
+    const rank = { act: 0, warn: 1, dim: 2, ok: 3 };
+    return rank[a.status.tone] - rank[b.status.tone] || name(a).localeCompare(name(b));
+  });
 
   const tone = { act: "border-accent text-accent", ok: "border-[var(--green)] text-[var(--green)]", warn: "border-[var(--red)] text-[var(--red)]", dim: "border-border text-dim" };
   const toReply = rows.filter((r) => r.status.tone === "act").length;
@@ -59,6 +66,11 @@ export default async function CoachHome() {
         <Link href="/coach/lessons" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Lessons</Link>
         <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
+      </div>
+      <div className="flex items-center gap-2 text-[13px]" role="group" aria-label="Sort clients">
+        <span className="text-dim">Sort:</span>
+        <Link href="/coach" aria-current={!az ? "true" : undefined} className={`min-h-9 rounded-full border px-3 py-1.5 ${!az ? "border-accent text-accent" : "border-border text-dim"}`}>Needs attention first</Link>
+        <Link href="/coach?sort=az" aria-current={az ? "true" : undefined} className={`min-h-9 rounded-full border px-3 py-1.5 ${az ? "border-accent text-accent" : "border-border text-dim"}`}>A–Z</Link>
       </div>
       <ul className="space-y-2">
         {rows.map(({ c, week, status, lastWeight, daysSinceWeight, flags, cps }) => (

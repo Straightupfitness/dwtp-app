@@ -18,9 +18,19 @@ export function ProfileForm({ clientId, p, t }: {
     </label>
   );
   return (
-    <form action={(f) => start(async () => { const r = await updateClient(clientId, f); setMsg(r?.error ?? "Saved."); })} className="space-y-3">
+    <form action={(f) => start(async () => { const r = await updateClient(clientId, f); setMsg(r?.error ?? (r?.emailChanged ? "Saved. She now signs in with the new email." : "Saved.")); })} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         {field("full_name", "Name")}
+        {field("email", "Email (she signs in with this)", "email")}
+        {field("phone", "Phone", "tel")}
+        <label className="text-sm text-dim">Time zone
+          <select name="timezone" defaultValue={String(p.timezone ?? "America/Los_Angeles")} className={input}>
+            {[["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Phoenix", "Arizona"], ["America/Chicago", "Central"],
+              ["America/New_York", "Eastern"], ["America/Anchorage", "Alaska"], ["Pacific/Honolulu", "Hawaii"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {![...["America/Los_Angeles", "America/Denver", "America/Phoenix", "America/Chicago", "America/New_York", "America/Anchorage", "Pacific/Honolulu"]].includes(String(p.timezone ?? "America/Los_Angeles")) &&
+              <option value={String(p.timezone)}>{String(p.timezone)}</option>}
+          </select>
+        </label>
         {field("program_start", "Program start (a Monday)", "date")}
         <label className="text-sm text-dim">Plan
           <select name="plan" defaultValue={String(p.plan ?? "")} className={input}>

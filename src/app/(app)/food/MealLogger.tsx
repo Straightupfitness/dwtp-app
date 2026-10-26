@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { photoTakenAt } from "@/lib/exif";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { totals, type FoodItem } from "@/lib/food";
@@ -28,6 +29,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   const [savedId, setSavedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [adder, setAdder] = useState<"type" | "search" | "scan">("type");
+  const [when, setWhen] = useState<Date | null>(null); // null = now
   const [extra, setExtra] = useState("");
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState<"" | "estimating" | "adding" | "saving">("");
@@ -38,7 +40,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   const voice = useRef(false);
 
   function reset() {
-    setMode("home"); setAdder("type"); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setMode("home"); setAdder("type"); setWhen(null); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
     setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot);
   }
   async function estimate(image: Blob | null, description: string) {
@@ -55,6 +57,9 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   }
   async function onPhoto(f?: File) {
     if (!f) return;
+    // A photo from her library: log it at the time she took it (if it's from the last week).
+    const taken = await photoTakenAt(f);
+    setWhen(taken && Date.now() - taken.getTime() > 10 * 60_000 && Date.now() - taken.getTime() < 7 * 86_400_000 ? taken : null);
     const small = await shrinkImage(f, 1024, 0.8);
     setPhoto(small); setPreview(URL.createObjectURL(small));
     estimate(small, "");
@@ -89,7 +94,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
       const { error: e } = await createClient().storage.from("food-photos").upload(photoPath, photo, { contentType: "image/jpeg" });
       if (e) photoPath = null;
     }
-    const r = await saveMeal({ items, mealSlot: slot, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
+    const r = await saveMeal({ items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
       description: text, photoPath, savedMealId: savedId, saveAs });
     setBusy("");
     if (r?.error) setError(r.error); else reset();
@@ -107,8 +112,8 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
         <div className="grid grid-cols-3 gap-2">
           <label className="flex min-h-[118px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-accent px-2 text-center text-black">
             <Cam /><span className="text-base font-semibold">Snap it</span>
-            <span className="text-[11px] leading-tight text-black/70">Take a picture of your meal.</span>
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
+            <span className="text-[11px] leading-tight text-black/70">Take a picture, or pick one from your photos.</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
           </label>
           <button type="button" onClick={() => setMode("describe")} className="flex min-h-[118px] flex-col items-center justify-center gap-1 rounded-2xl border border-accent bg-card px-2 text-center">
             <span className="text-accent"><Mic /></span><span className="text-base font-semibold">Say it</span>
@@ -184,6 +189,8 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
               className={`min-h-10 rounded-[10px] text-[13px] ${slot === s.v ? "bg-accent font-semibold text-black" : "text-dim"}`}>{s.label}</button>
           ))}
         </div>
+
+        <WhenPicker when={when} onChange={setWhen} />
 
         {busy === "estimating" && <p className="rounded-[14px] border border-border bg-card p-4 text-center text-sm text-[#a8a8a8]">Estimating your meal…</p>}
         {notes && (
@@ -280,4 +287,35 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
 
 function Pencil() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>;
+}
+
+const now = () => new Date();
+const dayLabel = (i: number) => (i === 0 ? "Today" : i === 1 ? "Yesterday" : new Date(now().getTime() - i * 86_400_000).toLocaleDateString("en-US", { weekday: "long" }));
+const daysAgo = (d: Date) => Math.round((new Date(now().toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000);
+
+/** When she ate it: now by default; any time in the last 7 days (e.g. a lunch photo logged that evening). */
+function WhenPicker({ when, onChange }: { when: Date | null; onChange: (d: Date | null) => void }) {
+  const d = when ?? now();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dayOffset = daysAgo(d);
+  const set = (offset: number, time: string) => {
+    const [h, m] = time.split(":").map(Number);
+    const x = now(); x.setHours(h, m, 0, 0); x.setDate(x.getDate() - offset);
+    onChange(x > now() ? null : x);
+  };
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return (
+    <div className="flex items-center gap-2 rounded-[14px] border border-border bg-card px-3 py-2">
+      <span className="text-[13px] text-[#a8a8a8]">Eaten</span>
+      <select aria-label="Day" value={Math.min(dayOffset, 6)} onChange={(e) => set(Number(e.target.value), time)}
+        className="min-h-10 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[15px] outline-none focus:border-accent">
+        {Array.from({ length: 7 }, (_, i) => (
+          <option key={i} value={i}>{dayLabel(i)}</option>
+        ))}
+      </select>
+      <input type="time" aria-label="Time" value={time} onChange={(e) => e.target.value && set(Math.min(dayOffset, 6), e.target.value)}
+        className="min-h-10 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[15px] outline-none focus:border-accent" />
+      {when && <button type="button" onClick={() => onChange(null)} className="min-h-10 px-1 text-xs text-accent">Now</button>}
+    </div>
+  );
 }
