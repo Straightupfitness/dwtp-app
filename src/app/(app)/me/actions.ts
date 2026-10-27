@@ -45,3 +45,12 @@ export async function markHomeScreen() {
   await supabase.from("profiles").update({ home_screen_at: new Date().toISOString() }).eq("id", user.id).is("home_screen_at", null);
   revalidatePath("/today");
 }
+
+/** A fresh sync code for her Apple Health Shortcut (the old one stops working). */
+export async function getHealthCode() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { newHealthCode } = await import("@/lib/health");
+  return { code: await newHealthCode(user.id) };
+}

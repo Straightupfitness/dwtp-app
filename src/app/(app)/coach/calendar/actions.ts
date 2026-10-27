@@ -18,7 +18,7 @@ const url = (v: FormDataEntryValue | null) => {
 
 export async function saveLinks(form: FormData) {
   const supabase = await coach();
-  for (const key of ["rtt_zoom_url", "trainerize_url"]) {
+  for (const key of ["rtt_zoom_url", "trainerize_url", "health_shortcut_url"]) {
     await supabase.from("program_settings").upsert({ key, value: url(form.get(key)) });
   }
   done();

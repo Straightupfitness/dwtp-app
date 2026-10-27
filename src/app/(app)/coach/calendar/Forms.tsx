@@ -4,7 +4,7 @@ import { saveCall, saveLinks } from "./actions";
 
 const input = "min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-[15px] outline-none focus:border-accent";
 
-export function LinksForm({ zoom, trainerize }: { zoom: string; trainerize: string }) {
+export function LinksForm({ zoom, trainerize, shortcut }: { zoom: string; trainerize: string; shortcut: string }) {
   const [msg, setMsg] = useState(""); const [pending, start] = useTransition();
   return (
     <form action={(f) => start(async () => { await saveLinks(f); setMsg("Saved."); })} className="space-y-2.5 rounded-2xl border border-border bg-card p-3.5">
@@ -12,6 +12,8 @@ export function LinksForm({ zoom, trainerize }: { zoom: string; trainerize: stri
         <input name="rtt_zoom_url" defaultValue={zoom} placeholder="https://us02web.zoom.us/j/…" className={input} /></label>
       <label className="block space-y-1"><span className="text-[13px] text-[#a8a8a8]">Trainerize link (opens from her workout days)</span>
         <input name="trainerize_url" defaultValue={trainerize} placeholder="https://…trainerize.com" className={input} /></label>
+      <label className="block space-y-1"><span className="text-[13px] text-[#a8a8a8]">Apple Health Shortcut link (iCloud link from Shortcuts → Share → Copy iCloud Link)</span>
+        <input name="health_shortcut_url" defaultValue={shortcut} placeholder="https://www.icloud.com/shortcuts/…" className={input} /></label>
       <div className="flex items-center gap-3">
         <button disabled={pending} className="min-h-11 rounded-lg bg-accent px-5 text-[15px] font-semibold text-black disabled:opacity-50">{pending ? "Saving…" : "Save links"}</button>
         {msg && <span className="text-sm text-dim">{msg}</span>}

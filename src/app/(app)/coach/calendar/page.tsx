@@ -27,7 +27,7 @@ export default async function CoachCalendar() {
         <h1 className="mt-1 font-[family-name:var(--font-display)] text-3xl uppercase">Calendar</h1>
         <p className="mt-1 text-sm text-dim">Real Talk Tuesday shows on every client&apos;s calendar at 4:30 PM Pacific with your Zoom link. After the call, paste the replay link and it replaces the Join button.</p>
       </header>
-      <LinksForm zoom={s("rtt_zoom_url")} trainerize={s("trainerize_url")} />
+      <LinksForm zoom={s("rtt_zoom_url")} trainerize={s("trainerize_url")} shortcut={s("health_shortcut_url")} />
       <h2 className="pt-1 text-[11px] uppercase tracking-[0.15em] text-accent">Real Talk Tuesdays</h2>
       <div className="space-y-2">
         {tuesdays.map((d) => {

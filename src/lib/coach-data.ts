@@ -6,7 +6,7 @@ import { loadProgram } from "./circles";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 export type MealFood = { calories: number; protein: number; items: string[] };
-export type DayFood = { date: string; meals: number; calories: number; protein: number; fiber: number; items: string[]; list: MealFood[] };
+export type DayFood = { date: string; meals: number; calories: number; protein: number; fiber: number; items: string[]; list: MealFood[]; steps: number | null; sleepMin: number | null };
 
 export async function weekData(supabase: SupabaseClient, clientId: string, week: number) {
   const { data: p } = await supabase.from("profiles")
@@ -16,7 +16,7 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
   const start = p?.program_start ? addDays(p.program_start, (week - 1) * 7) : todayIn(tz);
   const end = addDays(start, 6);
 
-  const [{ data: weights }, { data: food }, { data: target }, { data: tw }, { data: assessment }, { data: prev }, state] = await Promise.all([
+  const [{ data: weights }, { data: food }, { data: target }, { data: tw }, { data: assessment }, { data: prev }, state, { data: health }] = await Promise.all([
     supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", clientId).gte("log_date", addDays(start, -21)).order("log_date"),
     supabase.from("food_logs").select("eaten_at, items, calories, protein_g, fiber_g").eq("client_id", clientId)
       .gte("eaten_at", addDays(start, -1) + "T00:00:00Z").lte("eaten_at", addDays(end, 2) + "T00:00:00Z").order("eaten_at"),
@@ -26,6 +26,7 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
     supabase.from("checkins").select("week_number, sleep, energy, stress, hunger, checkin_replies(final_text, sent_at)")
       .eq("client_id", clientId).lt("week_number", week).order("week_number", { ascending: false }).limit(3),
     loadProgram(supabase, clientId),
+    supabase.from("health_days").select("day, steps, sleep_minutes").eq("client_id", clientId).gte("day", start).lte("day", end),
   ]);
 
   const days: DayFood[] = [];
@@ -38,6 +39,8 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
       protein: Math.round(rows.reduce((s, r) => s + Number(r.protein_g ?? 0), 0)),
       fiber: Math.round(rows.reduce((s, r) => s + Number(r.fiber_g ?? 0), 0)),
       items: rows.flatMap((r) => ((r.items as { name: string; amount: string }[]) ?? []).map((i) => `${i.amount} ${i.name}`.trim())),
+      steps: health?.find((h) => h.day === date)?.steps ?? null,
+      sleepMin: health?.find((h) => h.day === date)?.sleep_minutes ?? null,
       list: rows.map((r) => ({
         calories: r.calories ?? 0, protein: Math.round(Number(r.protein_g ?? 0)),
         items: ((r.items as { name: string; amount: string }[]) ?? []).map((i) => `${i.amount} ${i.name}`.trim()),

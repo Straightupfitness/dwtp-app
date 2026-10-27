@@ -4,14 +4,17 @@ import { programWeek, todayIn } from "@/lib/program";
 import { setEmailNotifications, signOut, updateName } from "./actions";
 import NotificationSettings from "@/components/NotificationSettings";
 import SoundToggle from "@/components/SoundToggle";
+import HealthSync from "@/components/HealthSync";
 import AvatarPicker from "./AvatarPicker";
 
 export default async function MePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: p }, { data: cps }] = await Promise.all([
+  const [{ data: p }, { data: cps }, { data: hs }, { data: lastHealth }] = await Promise.all([
     supabase.from("profiles").select("full_name, email, program_start, timezone, plan, email_notifications, avatar_path").eq("id", user!.id).single(),
     supabase.from("cp_totals").select("total").eq("client_id", user!.id).maybeSingle(),
+    supabase.from("program_settings").select("value").eq("key", "health_shortcut_url").maybeSingle(),
+    supabase.from("health_days").select("day, steps, sleep_minutes, synced_at").eq("client_id", user!.id).order("synced_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
   return (
@@ -32,6 +35,7 @@ export default async function MePage() {
         <h2 className="text-sm uppercase tracking-widest text-dim">Notifications</h2>
         <NotificationSettings />
         <SoundToggle />
+        <HealthSync shortcutUrl={hs?.value ?? null} lastSync={lastHealth?.synced_at ?? null} lastDay={lastHealth ?? null} />
         <form action={setEmailNotifications.bind(null, !(p?.email_notifications ?? true))} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
           <span className="text-sm">Email: {p?.email_notifications ?? true ? "on" : "off"}<span className="block text-xs text-dim">Replies and check-in reminders. Messages only when push is off.</span></span>
           <button className="min-h-11 rounded-lg border border-border px-3 text-sm">{p?.email_notifications ?? true ? "Turn off" : "Turn on"}</button>

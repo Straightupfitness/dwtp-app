@@ -14,12 +14,13 @@ export default async function ActivityPage() {
   const ids = (clients ?? []).map((c) => c.id);
   const since = addDays(todayIn("America/Los_Angeles"), -8);
   const none = { data: [] as never[] };
-  const [{ data: food }, { data: weights }, { data: habits }, { data: msgs }] = ids.length ? await Promise.all([
+  const [{ data: food }, { data: weights }, { data: habits }, { data: msgs }, { data: health }] = ids.length ? await Promise.all([
     supabase.from("food_logs").select("client_id, eaten_at, calories, protein_g").in("client_id", ids).gte("eaten_at", since + "T00:00:00Z"),
     supabase.from("weight_logs").select("client_id, log_date, weight_lbs").in("client_id", ids).gte("log_date", since),
     supabase.from("habit_logs").select("client_id, log_date").in("client_id", ids).eq("done", true).gte("log_date", since),
     supabase.from("messages").select("client_id, sender_id, created_at").in("client_id", ids).gte("created_at", since + "T00:00:00Z"),
-  ]) : [none, none, none, none];
+    supabase.from("health_days").select("client_id, day, steps, sleep_minutes").in("client_id", ids).gte("day", since),
+  ]) : [none, none, none, none, none];
 
   const rows = (clients ?? []).map((c) => {
     const tz = c.timezone ?? "America/Los_Angeles";
@@ -47,7 +48,9 @@ export default async function ActivityPage() {
       const kcal = myFood.filter((f) => f.day === addDays(today, -1)).reduce((s, f) => s + (f.calories ?? 0), 0);
       if (kcal > 0 && kcal < 1200) reasons.push(`Yesterday only ${kcal.toLocaleString()} kcal`);
     }
-    return { c, week, started, days, today: t, reasons,
+    const hd = (health ?? []).filter((h) => h.client_id === c.id);
+    const hToday = hd.find((h) => h.day === today), hYest = hd.find((h) => h.day === addDays(today, -1));
+    return { c, week, started, days, today: t, reasons, hToday, hYest,
       todayKcal: myFood.filter((f) => f.day === today).reduce((s, f) => s + (f.calories ?? 0), 0),
       todayProtein: Math.round(myFood.filter((f) => f.day === today).reduce((s, f) => s + Number(f.protein_g ?? 0), 0)) };
   });
@@ -62,6 +65,10 @@ export default async function ActivityPage() {
           <span className="block truncate font-semibold">{r.c.full_name || r.c.email}</span>
           <span className="block text-xs text-dim">{r.started ? `Week ${r.week}` : "Starts soon"} · today: {r.today.food} meal{r.today.food === 1 ? "" : "s"}
             {r.today.food ? ` (${r.todayKcal.toLocaleString()} kcal, ${r.todayProtein} g protein)` : ""} · {r.today.weight ? "weighed in" : "no weigh-in"} · {r.today.habits} habits</span>
+          {(r.hToday || r.hYest) && <span className="block text-xs text-[#9ec5ff]">Apple Health: {[
+            r.hYest?.steps != null && `${r.hYest.steps.toLocaleString()} steps yesterday`,
+            r.hToday?.sleep_minutes != null && `${(r.hToday.sleep_minutes / 60).toFixed(1)} h sleep last night`,
+          ].filter(Boolean).join(" · ") || "synced"}</span>}
         </span>
       </Link>
       <div className="mt-2.5 grid grid-cols-7 gap-1" aria-label="Last 7 days">

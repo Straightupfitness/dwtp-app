@@ -72,6 +72,7 @@ Superfoods: …
 Fruit: …
 Quality meats: …
 Vegetables: …
+Steps and sleep: (from Apple Health, if any: average steps, best and worst day, average sleep; or "not synced")
 Biggest win: (one food habit to praise)
 Biggest fix: (one specific swap or change)
 DRAFT:
@@ -111,6 +112,8 @@ ${d.habits.map((h) => `- ${h.circle}: ${h.title}: ${h.complete ? "complete" : `$
 
 WEIGHT (last 3 weeks): ${d.weights.map((w) => `${w.log_date}: ${w.weight_lbs}`).join(", ") || "NO WEIGHTS LOGGED"}
 Weigh-ins this week: ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
+
+STEPS AND SLEEP (Apple Health, per day): ${d.days.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
 
 FOOD THIS WEEK (${d.start} to ${d.end}):
 ${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m, i) => `  meal ${i + 1}: ${m.calories} kcal, ${m.protein} g protein: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
