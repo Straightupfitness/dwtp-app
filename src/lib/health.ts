@@ -24,9 +24,9 @@ export type HealthInput = { code: string; date?: string; steps?: unknown; sleep_
  * and checks off any open step, sleep or weigh-in habit she reached (+1 CP each, once).
  */
 export async function syncHealth(input: HealthInput) {
-  const db = adminClient();
   const code = String(input.code ?? "").replace(/[^A-Za-z0-9]/g, "");
   if (code.length < 8) return { error: "Missing your sync code. Get it in the DWTP app under Me." };
+  const db = adminClient();
   const { data: tok } = await db.from("health_tokens").select("user_id").eq("token_hash", hash(code)).maybeSingle();
   if (!tok) return { error: "That sync code doesn't match. Get a new one in the DWTP app under Me." };
   const userId = tok.user_id as string;
