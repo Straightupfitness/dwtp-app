@@ -1,7 +1,8 @@
 "use client";
 /** Ka-ching and confetti when she earns Capacity Points. Sound can be turned off under Me; confetti respects reduced motion. */
 const SOUND_KEY = "dwtp-sound";
-let audio: HTMLAudioElement | null = null;
+export type Sound = "ka-ching" | "quiz-passed" | "checkin-sent" | "wrong-answer" | "habit-done";
+const players: Partial<Record<Sound, HTMLAudioElement>> = {};
 
 export function soundOn() {
   try { return localStorage.getItem(SOUND_KEY) !== "off"; } catch { return true; }
@@ -10,15 +11,20 @@ export function setSound(on: boolean) {
   try { localStorage.setItem(SOUND_KEY, on ? "on" : "off"); } catch { /* private mode */ }
 }
 
-export function kaChing() {
+/**
+ * Michael's sounds (October 27): ka-ching for a right answer, quiz-passed for the answer that passes the quiz,
+ * wrong-answer for a wrong one, habit-done for checking off a habit, checkin-sent for sending her check-in.
+ */
+export function play(name: Sound) {
   if (!soundOn()) return;
   try {
-    audio ??= new Audio("/sounds/ka-ching.mp3");
-    audio.currentTime = 0;
-    audio.volume = 0.8;
-    void audio.play().catch(() => { /* the browser blocked sound until she taps something */ });
+    const a = (players[name] ??= new Audio(`/sounds/${name}.mp3`));
+    a.currentTime = 0;
+    a.volume = 0.85;
+    void a.play().catch(() => { /* the browser blocked sound until she taps something */ });
   } catch { /* no audio */ }
 }
+export const kaChing = () => play("ka-ching");
 
 /** A short burst of gold confetti from an element (or the middle of the screen). */
 export function confetti(from?: Element | null) {
@@ -54,7 +60,7 @@ export function confetti(from?: Element | null) {
   requestAnimationFrame(frame);
 }
 
-export function celebrate(from?: Element | null) { kaChing(); confetti(from); }
+export function celebrate(sound: Sound | null, from?: Element | null) { if (sound) play(sound); confetti(from); }
 
 /** She already celebrated these points where she earned them, so the Today counter doesn't celebrate them twice. */
 export function markSeen(points: number) {

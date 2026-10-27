@@ -69,7 +69,7 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
     setBusy(true); setError("");
     const r = await submitCheckin({ week, answers: { ...a, habits: habits.map((x) => ({ item_id: x.id, title: x.title, ...h[x.id] })) }, videoPath: video });
     setBusy(false);
-    if (r?.error) setError(r.error); else { setSent(true); celebrate(); markSeen(10); }
+    if (r?.error) setError(r.error); else { setSent(true); celebrate("checkin-sent"); markSeen(10); }
   }
 
   if (sent) {

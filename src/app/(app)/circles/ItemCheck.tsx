@@ -16,7 +16,7 @@ export default function ItemCheck({ itemId, done, complete, title, detail, eyebr
   return (
     <Tag {...(auto ? {} : { onClick: (e: React.MouseEvent<HTMLElement>) => {
         // Checking a habit off earns 1 CP: ka-ching right away.
-        if (!on) { celebrate(e.currentTarget.querySelector("span")); markSeen(1); }
+        if (!on) { celebrate("habit-done", e.currentTarget.querySelector("span")); markSeen(1); }
         start(async () => { setOn(!on); await toggleHabit(itemId, !on); });
       }, "aria-pressed": on })}
       className="flex min-h-11 w-full items-start gap-3 py-2 text-left">

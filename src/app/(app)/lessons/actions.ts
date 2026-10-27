@@ -21,6 +21,14 @@ export async function markWatched(lessonId: string) {
   revalidatePath("/lessons"); revalidatePath("/today");
 }
 
+/** One answer, checked the moment she taps it (the right answers never go to her phone). */
+export async function checkAnswer(lessonId: string, question: number, choice: number) {
+  const { l } = await openLesson(lessonId);
+  const q = ((l.quiz ?? []) as QuizQ[])[question];
+  if (l.quiz_status !== "approved" || !q) return { correct: false };
+  return { correct: q.correct === choice };
+}
+
 /** Check her answers on the server; all correct passes the quiz (+5 CPs, once). Returns which ones were wrong. */
 export async function submitQuiz(lessonId: string, answers: number[]) {
   const { supabase, user, l } = await openLesson(lessonId);

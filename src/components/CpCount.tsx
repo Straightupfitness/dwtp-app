@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { celebrate } from "@/lib/celebrate";
+import { confetti } from "@/lib/celebrate";
 
 const KEY = "dwtp-cps-seen";
 
 /**
  * Her Capacity Points total. When it has gone up since she last saw it (a habit, a quiz, a check-in, a medal),
- * it counts up from the old number, throws confetti, plays the ka-ching and shows "+N".
+ * it counts up from the old number, throws confetti and shows "+N" (the sound plays where she earned them).
  */
 export default function CpCount({ total }: { total: number }) {
   const [shown, setShown] = useState(total);
@@ -22,7 +22,7 @@ export default function CpCount({ total }: { total: number }) {
     if (seen === null || !Number.isFinite(seen) || total <= seen) { setShown(total); return; }
     const from = seen, diff = total - from, t0 = performance.now(), dur = Math.min(1200, 400 + diff * 40);
     setGain(diff);
-    celebrate(ref.current);
+    confetti(ref.current);
     let raf = 0;
     const step = (t: number) => {
       const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
