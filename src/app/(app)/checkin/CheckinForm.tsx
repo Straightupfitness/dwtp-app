@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { celebrate, markSeen } from "@/lib/celebrate";
 import type { Question } from "@/lib/checkin";
 import VideoRecorder from "@/components/VideoRecorder";
 import { submitCheckin } from "./actions";
@@ -68,7 +69,7 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
     setBusy(true); setError("");
     const r = await submitCheckin({ week, answers: { ...a, habits: habits.map((x) => ({ item_id: x.id, title: x.title, ...h[x.id] })) }, videoPath: video });
     setBusy(false);
-    if (r?.error) setError(r.error); else setSent(true);
+    if (r?.error) setError(r.error); else { setSent(true); celebrate(); markSeen(10); }
   }
 
   if (sent) {

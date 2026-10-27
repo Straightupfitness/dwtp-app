@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { programWeek, todayIn } from "@/lib/program";
 import { setEmailNotifications, signOut, updateName } from "./actions";
 import NotificationSettings from "@/components/NotificationSettings";
+import SoundToggle from "@/components/SoundToggle";
 import AvatarPicker from "./AvatarPicker";
 
 export default async function MePage() {
@@ -30,6 +31,7 @@ export default async function MePage() {
       <div className="space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Notifications</h2>
         <NotificationSettings />
+        <SoundToggle />
         <form action={setEmailNotifications.bind(null, !(p?.email_notifications ?? true))} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
           <span className="text-sm">Email: {p?.email_notifications ?? true ? "on" : "off"}<span className="block text-xs text-dim">Replies and check-in reminders. Messages only when push is off.</span></span>
           <button className="min-h-11 rounded-lg border border-border px-3 text-sm">{p?.email_notifications ?? true ? "Turn off" : "Turn on"}</button>

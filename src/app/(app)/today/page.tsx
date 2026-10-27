@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CpCount from "@/components/CpCount";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
 import { journey, todayIn } from "@/lib/program";
@@ -79,7 +80,7 @@ export default async function TodayPage() {
       <p className={`${display} text-[13px] leading-tight`}>
         {j && j.startsIn > 0
           ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
-          : <>You are in Week {jw}{jw <= JOURNEY_WEEKS ? ` of ${JOURNEY_WEEKS}` : ""} and you have <span className="text-gold">{pts.toLocaleString()} CPs</span>{" "}
+          : <>You are in Week {jw}{jw <= JOURNEY_WEEKS ? ` of ${JOURNEY_WEEKS}` : ""} and you have <span className="text-gold"><CpCount total={pts} /></span>{" "}
             <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
       </p>
       <StageBars week={jw} />

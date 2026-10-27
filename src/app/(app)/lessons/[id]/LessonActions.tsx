@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { markWatched, submitQuiz } from "../actions";
+import { celebrate, markSeen } from "@/lib/celebrate";
 
 /** "Done" for the lesson, then its quiz (if Michael approved one): all answers right = +5 CPs. */
 export default function LessonActions({ lessonId, kind, watched, quizPassed, quiz, coach }: {
@@ -44,7 +45,7 @@ export default function LessonActions({ lessonId, kind, watched, quizPassed, qui
           ))}
           <button type="button" disabled={pending || answers.includes(-1)} onClick={() => start(async () => {
             const r = await submitQuiz(lessonId, answers);
-            if (r.passed) setPassed(true); else setWrong(r.wrong);
+            if (r.passed) { setPassed(true); celebrate(); markSeen(5); } else setWrong(r.wrong);
           })} className="min-h-12 w-full rounded-xl bg-accent text-[15px] font-semibold text-black disabled:opacity-50">{pending ? "Checking…" : "Check my answers"}</button>
         </div>
       )}

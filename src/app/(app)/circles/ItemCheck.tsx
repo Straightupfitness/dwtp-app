@@ -1,6 +1,7 @@
 "use client";
 import { useOptimistic, useTransition } from "react";
 import { toggleHabit } from "../habits/actions";
+import { celebrate, markSeen } from "@/lib/celebrate";
 
 /** One habit's check-off button: today (daily), this week (weekly) or once (Get / Learn). */
 export default function ItemCheck({ itemId, done, complete, title, detail, eyebrow, progress, target, cadence, color, alsoIn, auto }: {
@@ -13,7 +14,11 @@ export default function ItemCheck({ itemId, done, complete, title, detail, eyebr
   const unit = cadence === "weekly" ? "wk" : cadence === "daily" ? "days" : "";
   const Tag = auto ? "div" : "button";
   return (
-    <Tag {...(auto ? {} : { onClick: () => start(async () => { setOn(!on); await toggleHabit(itemId, !on); }), "aria-pressed": on })}
+    <Tag {...(auto ? {} : { onClick: (e: React.MouseEvent<HTMLElement>) => {
+        // Checking a habit off earns 1 CP: ka-ching right away.
+        if (!on) { celebrate(e.currentTarget.querySelector("span")); markSeen(1); }
+        start(async () => { setOn(!on); await toggleHabit(itemId, !on); });
+      }, "aria-pressed": on })}
       className="flex min-h-11 w-full items-start gap-3 py-2 text-left">
       <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border-2"
         style={on ? { background: color, borderColor: color } : { borderColor: "#3a3a3a" }}>

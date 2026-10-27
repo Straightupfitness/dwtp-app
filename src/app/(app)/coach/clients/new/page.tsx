@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import MondayPicker from "./MondayPicker";
 import { useActionState } from "react";
 import { addClient } from "./actions";
 
@@ -23,7 +24,7 @@ export default function AddClientPage() {
         <label className="block text-sm text-dim">Name<input name="full_name" required className={input} /></label>
         <label className="block text-sm text-dim">Email<input name="email" type="email" required autoCapitalize="none" className={input} /></label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm text-dim">Program start (a Monday)<input name="program_start" type="date" defaultValue={nextMonday()} className={input} /></label>
+          <MondayPicker defaultValue={nextMonday()} className={input} />
           <label className="text-sm text-dim">Plan
             <select name="plan" defaultValue="26_weeks" className={input}>
               <option value="26_weeks">26 weeks</option><option value="52_weeks">Full year</option><option value="monthly">Monthly</option>
