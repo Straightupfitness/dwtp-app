@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Linkify from "@/components/Linkify";
 import { createClient } from "@/lib/supabase/server";
 import { shortName, timeAgo } from "@/lib/names";
 import LiveRefresh from "@/components/LiveRefresh";
@@ -94,7 +95,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         <div className="min-w-0 flex-1">
           <div className="rounded-2xl bg-[#1d1d1d] px-3 py-2">
             <p className={`text-[13px] font-semibold ${isCoach(c.author_id) ? "text-accent" : ""}`}>{who(c.author_id)}</p>
-            <p className="whitespace-pre-line text-[14px] leading-snug">{c.body}</p>
+            <p className="whitespace-pre-line text-[14px] leading-snug"><Linkify text={c.body} /></p>
           </div>
           <div className="flex items-center gap-3 pl-2">
             <span className="text-xs text-dim">{timeAgo(c.created_at)}</span>
@@ -138,7 +139,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
               {coach && <PinButton id={p.id} pinned={p.pinned} />}
               {(p.author_id === me || coach) && <DeleteButton kind="post" id={p.id} />}
             </div>
-            {p.body && <p className="whitespace-pre-line text-[15px] leading-relaxed">{p.body}</p>}
+            {p.body && <p className="whitespace-pre-line text-[15px] leading-relaxed"><Linkify text={p.body} /></p>}
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
             {p.photo_path && photos.get(p.photo_path) && <img src={photos.get(p.photo_path)} alt="" className="w-full rounded-[14px]" />}
             <div className="flex items-center gap-4 border-t border-border pt-1">

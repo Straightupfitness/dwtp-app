@@ -31,10 +31,18 @@ export async function saveCall(form: FormData) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Missing date" };
   const row = { call_date: date, title: String(form.get("title") ?? "").trim() || null, replay_url: url(form.get("replay_url")),
     cancelled: form.get("cancelled") === "on", updated_at: new Date().toISOString() };
+  const { data: before } = await supabase.from("calls").select("post_id").eq("call_date", date).maybeSingle();
   const { error } = row.title || row.replay_url || row.cancelled
     ? await supabase.from("calls").upsert(row)
     : await supabase.from("calls").delete().eq("call_date", date);
   if (error) return { error: error.message };
+  // A replay pasted by hand gets the same Community post and notification as one from Zoom.
+  if (row.replay_url && !row.cancelled && !before?.post_id) {
+    const { publishReplay } = await import("@/lib/replays");
+    const { zonedInstant } = await import("@/lib/checkin");
+    await publishReplay({ url: row.replay_url, startedAt: new Date(zonedInstant(date, 16, "America/Los_Angeles").getTime() + 30 * 60_000).toISOString() });
+  }
   done();
+  revalidatePath("/community");
   return { ok: true };
 }

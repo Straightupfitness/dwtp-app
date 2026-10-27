@@ -37,7 +37,7 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
 
   const [{ data: settings }, { data: calls }, { data: tw }, lessons, program] = await Promise.all([
     supabase.from("program_settings").select("key, value").in("key", ["rtt_zoom_url", "trainerize_url"]),
-    supabase.from("calls").select("call_date, title, replay_url, cancelled").gte("call_date", days[0]).lte("call_date", days[6]),
+    supabase.from("calls").select("call_date, title, replay_url, passcode, cancelled").gte("call_date", days[0]).lte("call_date", days[6]),
     week ? supabase.from("trajectory_weeks").select("is_diet_break, checkin_is_video").eq("week_number", Math.min(week, 52)).maybeSingle() : Promise.resolve({ data: null }),
     loadLessons(supabase, clientId),
     loadProgram(supabase, clientId),
@@ -66,7 +66,7 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
     const past = Date.now() > at.getTime() + 90 * 60_000;
     on(tue, {
       kind: "call", title: "Real Talk Tuesday", time: time(at),
-      detail: [call?.title, past ? (call?.replay_url ? "Watch the replay" : "Replay coming soon") : "Group call with Michael on Zoom"].filter(Boolean).join(" · "),
+      detail: [call?.title, past ? (call?.replay_url ? `Watch the replay${call.passcode ? ` (passcode ${call.passcode})` : ""}` : "Replay coming soon") : "Group call with Michael on Zoom"].filter(Boolean).join(" · "),
       href: past ? call?.replay_url ?? undefined : setting("rtt_zoom_url") ?? undefined, external: true,
     });
   } else on(tue, { kind: "call", title: "No Real Talk Tuesday this week", detail: call.title || undefined });
