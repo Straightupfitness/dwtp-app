@@ -17,7 +17,7 @@ export async function newHealthCode(userId: string) {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-export type HealthInput = { code: string; date?: string; steps?: unknown; sleep_hours?: unknown; sleep_minutes?: unknown; weight?: unknown; weight_unit?: string };
+export type HealthInput = { code: string; date?: string; steps?: unknown; sleep?: unknown; sleep_hours?: unknown; sleep_minutes?: unknown; weight?: unknown; weight_unit?: string };
 
 /**
  * Data from her iPhone Shortcut. Saves steps and sleep for the day, adds a weigh-in if she hasn't logged one,
@@ -35,7 +35,10 @@ export async function syncHealth(input: HealthInput) {
   const day = input.date && /^\d{4}-\d{2}-\d{2}$/.test(input.date) && input.date <= today && input.date >= addDays(today, -7) ? input.date : today;
 
   const steps = num(input.steps);
-  const sleepMin: number = (input.sleep_minutes !== undefined && input.sleep_minutes !== "" ? num(input.sleep_minutes) : (num(input.sleep_hours) ?? NaN) * 60) ?? NaN;
+  // "sleep" can arrive in hours (7.5), minutes (450) or seconds (27000), depending on how the Shortcut adds it up.
+  const raw = num(input.sleep);
+  const sleepMin: number = raw !== null ? (raw > 1440 ? raw / 60 : raw > 24 ? raw : raw * 60)
+    : (input.sleep_minutes !== undefined && input.sleep_minutes !== "" ? num(input.sleep_minutes) : (num(input.sleep_hours) ?? NaN) * 60) ?? NaN;
   let weight = num(input.weight);
   if (weight && (/kg/i.test(String(input.weight_unit ?? "")) || /kg/i.test(String(input.weight)))) weight = Math.round(weight * 2.20462 * 10) / 10;
 

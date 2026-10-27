@@ -33,7 +33,8 @@ export default function HealthSync({ shortcutUrl, lastSync, lastDay }: {
       <ol className="space-y-2 text-[14px]">
         <li className="flex gap-2"><b className="text-accent">1.</b><span>Tap <b>Show my sync code</b> and copy it.</span></li>
         <li className="flex gap-2"><b className="text-accent">2.</b><span>Tap <b>Install the Shortcut</b>, then <b>Add Shortcut</b>. Paste your code when it asks.</span></li>
-        <li className="flex gap-2"><b className="text-accent">3.</b><span>Run it once and tap <b>Allow</b> for Health. It then runs by itself every evening.</span></li>
+        <li className="flex gap-2"><b className="text-accent">3.</b><span>Run it once and tap <b>Allow</b> for Health.</span></li>
+        <li className="flex gap-2"><b className="text-accent">4.</b><span>In Shortcuts, tap <b>Automation</b> → <b>+</b> → <b>Time of Day</b>: 9:00 PM, Daily, <b>Run Immediately</b> → pick <b>DWTP Sync</b>. Now it runs by itself every evening.</span></li>
       </ol>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={show} disabled={busy} className="min-h-11 rounded-lg border border-accent px-4 text-[14px] font-semibold text-accent disabled:opacity-50">
