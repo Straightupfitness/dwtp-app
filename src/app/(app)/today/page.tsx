@@ -8,11 +8,12 @@ import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
-import { IconCheckin, IconHabits, IconLessons, IconPlate, IconScale } from "@/components/Icons";
+import { IconCheckin, IconHabits, IconLessons, IconPlate, IconScale, IconSteps } from "@/components/Icons";
+import { threshold } from "@/lib/health-parse";
 import ItemCheck from "../circles/ItemCheck";
 import LessonRow from "../lessons/LessonRow";
 import { loadLessons } from "@/lib/lessons";
-import { logWeight } from "./actions";
+import { logSteps, logWeight } from "./actions";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -112,6 +113,13 @@ export default async function TodayPage() {
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const lessonWeek = (await loadLessons(supabase, user!.id)).weeks.find((w) => w.week === week);
+  const yesterday = addDays(today, -1);
+  const { data: hdays } = await supabase.from("health_days").select("day, steps").eq("client_id", user!.id).in("day", [today, yesterday]);
+  const stepsToday = hdays?.find((h) => h.day === today)?.steps ?? null;
+  const stepsYesterday = hdays?.find((h) => h.day === yesterday)?.steps ?? null;
+  // Her step goal right now: the biggest "Walk N steps a day" habit in her open medals.
+  const stepGoal = Math.max(0, ...state.circles.flatMap((c) => c.rings.filter((r) => r.status === "open").flatMap((r) => r.items))
+    .map((i) => threshold(i.title)).filter((t) => t?.kind === "steps").map((t) => t!.min)) || null;
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
   const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
   const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
@@ -189,6 +197,28 @@ export default async function TodayPage() {
           <Stat value={String(protein)} unit="g protein" pct={protein / proteinTarget} />
           <Link href="/food" className="mt-auto grid min-h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black">Add meal</Link>
         </div>
+      </div>
+
+      <div className="space-y-2 rounded-2xl border border-border bg-card p-3">
+        <div className="flex items-center justify-between gap-2">
+          <SectionTitle icon={<IconSteps />}>Today&apos;s steps</SectionTitle>
+          {stepGoal && <span className="text-xs text-[#a8a8a8]">Goal {stepGoal.toLocaleString()}</span>}
+        </div>
+        {stepsToday !== null && (
+          <Stat value={stepsToday.toLocaleString()} unit={stepGoal && stepsToday >= stepGoal ? "steps · goal hit" : "steps"} pct={stepGoal ? stepsToday / stepGoal : null} />
+        )}
+        <form action={logSteps} className="flex gap-2">
+          <label className="sr-only" htmlFor="steps">Steps</label>
+          <input id="steps" name="steps" inputMode="numeric" pattern="[0-9,]*" placeholder={stepsToday !== null ? "Update" : "Steps from your phone or watch"} required
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent" />
+          <label className="sr-only" htmlFor="steps-day">Day</label>
+          <select id="steps-day" name="date" defaultValue={today} className="min-h-11 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[14px] outline-none focus:border-accent">
+            <option value={today}>Today</option>
+            <option value={yesterday}>Yesterday{stepsYesterday !== null ? ` (${stepsYesterday.toLocaleString()})` : ""}</option>
+          </select>
+          <button className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-black">Log</button>
+        </form>
+        <p className="text-[11px] text-dim">Open the Health app (or your watch app) and copy today&apos;s total. Hit your goal and your step habit checks itself off.</p>
       </div>
 
       {lessonWeek && (

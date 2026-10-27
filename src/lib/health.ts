@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash, randomBytes } from "node:crypto";
 import { adminClient } from "@/lib/supabase/admin";
 import { loadProgram } from "@/lib/circles";
@@ -48,11 +49,26 @@ export async function syncHealth(input: HealthInput) {
     weight: weight && weight >= 60 && weight <= 600 ? Math.round(weight * 10) / 10 : null,
   };
 
+  const r = await applyDay(db, userId, day, { steps: clean.steps, sleepMin: clean.sleep, weight: clean.weight }, "max", "apple-shortcut");
+  await db.from("health_tokens").update({ last_used_at: new Date().toISOString() }).eq("user_id", userId);
+  const { daySteps, daySleep, checked } = r;
+  const parts = [daySteps !== null && `${daySteps.toLocaleString("en-US")} steps`, daySleep !== null && `${(daySleep / 60).toFixed(1)} h sleep`,
+    clean.weight && `${clean.weight} lbs`].filter(Boolean);
+  return { ok: true, message: parts.length ? `Synced to DWTP: ${parts.join(", ")}.${checked.length ? ` ${checked.length} habit${checked.length > 1 ? "s" : ""} checked off.` : ""}` : "Connected to DWTP, but your phone sent no steps, sleep or weight." };
+}
+
+/**
+ * Save one day of steps / sleep / weight and check off the habits she reached (+1 CP each, once).
+ * "max" keeps the higher step count (a Shortcut that runs twice); "set" replaces it (she typed it in).
+ */
+export async function applyDay(db: SupabaseClient, userId: string, day: string,
+  v: { steps?: number | null; sleepMin?: number | null; weight?: number | null }, steps: "max" | "set", source: string) {
+  const clean = { steps: v.steps ?? null, sleep: v.sleepMin ?? null, weight: v.weight ?? null };
   // Keep the highest step count for the day (the Shortcut may run more than once); sleep and the latest weight replace.
   const { data: before } = await db.from("health_days").select("steps, sleep_minutes").eq("client_id", userId).eq("day", day).maybeSingle();
-  const daySteps = Math.max(before?.steps ?? 0, clean.steps ?? 0) || null;
+  const daySteps = steps === "set" && clean.steps !== null ? clean.steps : Math.max(before?.steps ?? 0, clean.steps ?? 0) || null;
   const daySleep = clean.sleep ?? before?.sleep_minutes ?? null;
-  await db.from("health_days").upsert({ client_id: userId, day, steps: daySteps, sleep_minutes: daySleep, source: "apple-shortcut", synced_at: new Date().toISOString() });
+  await db.from("health_days").upsert({ client_id: userId, day, steps: daySteps, sleep_minutes: daySleep, source, synced_at: new Date().toISOString() });
 
   let weighed = false;
   if (clean.weight) {
@@ -80,9 +96,6 @@ export async function syncHealth(input: HealthInput) {
     }
   }
   if (checked.length || weighed) await closeOutRings(db, userId);
-  await db.from("health_tokens").update({ last_used_at: new Date().toISOString() }).eq("user_id", userId);
+  return { daySteps, daySleep, checked, weighed };
 
-  const parts = [daySteps !== null && `${daySteps.toLocaleString("en-US")} steps`, daySleep !== null && `${(daySleep / 60).toFixed(1)} h sleep`,
-    clean.weight && `${clean.weight} lbs`].filter(Boolean);
-  return { ok: true, message: parts.length ? `Synced to DWTP: ${parts.join(", ")}.${checked.length ? ` ${checked.length} habit${checked.length > 1 ? "s" : ""} checked off.` : ""}` : "Connected to DWTP, but your phone sent no steps, sleep or weight." };
 }

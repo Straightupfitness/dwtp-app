@@ -144,5 +144,5 @@ export function questionLabels(): Record<string, string> {
     [13, { checkin_type: "halfway", checkin_is_video: false, is_diet_break: false, moments: [] }],
     [24, { checkin_type: "last_chance", checkin_is_video: false, is_diet_break: true, moments: [] }],
   ];
-  return Object.fromEntries(weeks.flatMap(([w, t]) => questionsFor(w, t)).map((q) => [q.id, q.label]));
+  return { ...Object.fromEntries(weeks.flatMap(([w, t]) => questionsFor(w, t)).map((q) => [q.id, q.label])), sleep_hours: "Hours of sleep a night" };
 }

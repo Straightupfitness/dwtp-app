@@ -13,3 +13,4 @@ export const IconPlate = () => <svg {...P} width={18} height={18}><circle cx="13
 export const IconHabits = () => <svg {...P} width={18} height={18}><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" /><path d="M13 7h7M13 14h7M13 21h7" /></svg>;
 export const IconLessons = () => <svg {...P}><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></svg>;
 export const IconCalendar = () => <svg {...P} width={20} height={20}><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>;
+export const IconSteps = () => <svg {...P} width={18} height={18}><path d="M7 4c1.7 0 2.5 1.8 2.5 4S8.6 13 7 13s-2.5-2.2-2.5-4.5S5.3 4 7 4zM5 15.5h4M17 9c1.7 0 2.5 1.8 2.5 4s-.9 5-2.5 5-2.5-2.2-2.5-4.5S15.3 9 17 9zM15 20.5h4" /></svg>;

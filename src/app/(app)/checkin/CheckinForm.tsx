@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import SleepBlock from "./SleepBlock";
 import { celebrate, markSeen } from "@/lib/celebrate";
 import type { Question } from "@/lib/checkin";
 import VideoRecorder from "@/components/VideoRecorder";
@@ -96,7 +97,11 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
         </div>
       </div>
 
-      {name === "How you felt" && scales.map((q) => <Scale key={q.id} q={q} value={a[q.id]} last={last?.[q.id]} onPick={(v) => set(q.id, v)} />)}
+      {name === "How you felt" && <>
+        {scales.map((q) => <Scale key={q.id} q={q} value={a[q.id]} last={last?.[q.id]} onPick={(v) => set(q.id, v)} />)}
+        <SleepBlock userId={userId} week={week} hours={a.sleep_hours as string | undefined} photos={(a.sleep_photos as string[] | undefined) ?? []}
+          onHours={(v) => set("sleep_hours", v)} onPhotos={(v) => set("sleep_photos", v)} />
+      </>}
 
       {name === "Habits" && (
         <>

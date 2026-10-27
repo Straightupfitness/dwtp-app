@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { askClaude } from "./anthropic";
+import { askClaude, type ContentBlock } from "./anthropic";
 import { weekData } from "../coach-data";
 import { questionLabels } from "../checkin";
 import { PROGRAM_RULES, VOICE } from "./voice";
@@ -72,7 +72,7 @@ Superfoods: …
 Fruit: …
 Quality meats: …
 Vegetables: …
-Steps and sleep: (from Apple Health, if any: average steps, best and worst day, average sleep; or "not synced")
+Steps and sleep: (average steps from her logged steps, best and worst day; sleep from her answer and screenshots; or "not logged")
 Biggest win: (one food habit to praise)
 Biggest fix: (one specific swap or change)
 DRAFT:
@@ -84,7 +84,7 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
   if (!c) throw new Error("Check-in not found");
   const d = await weekData(supabase, c.client_id, c.week_number);
   const labels = questionLabels();
-  const answers = Object.entries(c.answers ?? {}).filter(([k]) => k !== "habits")
+  const answers = Object.entries(c.answers ?? {}).filter(([k]) => k !== "habits" && k !== "sleep_photos")
     .map(([k, v]) => `- ${labels[k] ?? k}: ${v}`).join("\n");
   const habitAnswers = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[])
     .map((h) => `- ${h.title}: ${h.status}${h.note ? ` (${h.note})` : ""}`).join("\n");
@@ -113,7 +113,7 @@ ${d.habits.map((h) => `- ${h.circle}: ${h.title}: ${h.complete ? "complete" : `$
 WEIGHT (last 3 weeks): ${d.weights.map((w) => `${w.log_date}: ${w.weight_lbs}`).join(", ") || "NO WEIGHTS LOGGED"}
 Weigh-ins this week: ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
 
-STEPS AND SLEEP (Apple Health, per day): ${d.days.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
+STEPS (she logs them in the app) AND SLEEP (per day): ${d.days.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
 
 FOOD THIS WEEK (${d.start} to ${d.end}):
 ${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m, i) => `  meal ${i + 1}: ${m.calories} kcal, ${m.protein} g protein: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
@@ -121,7 +121,14 @@ ${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kca
 MICHAEL'S LAST REPLIES (to stay consistent with what he asked her to do):
 ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin_replies[0] : p.checkin_replies; return r?.final_text ? `Week ${p.week_number}: ${r.final_text.slice(0, 900)}` : null; }).filter(Boolean).join("\n---\n") || "none"}`;
 
-  const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context }], maxTokens: 2500 });
+  // Her sleep screenshots (from whatever she tracks sleep with), so the draft can use the real numbers.
+  const shots: ContentBlock[] = [];
+  for (const path of ((c.answers?.sleep_photos ?? []) as string[]).slice(0, 3)) {
+    const { data: file } = await supabase.storage.from("checkin-videos").download(path);
+    if (file) shots.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: Buffer.from(await file.arrayBuffer()).toString("base64") } });
+  }
+  const sleepNote = shots.length ? `\n\nHER SLEEP SCREENSHOTS (${shots.length}, attached): read her sleep from them (hours per night, sleep score, wakeups, trends) and use the real numbers in the Steps and sleep line and, where it helps, in the reply.` : "";
+  const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context + sleepNote }, ...shots], maxTokens: 2500 });
   const out = parseDraft(reply);
   await supabase.from("checkins").update({ ai_summary: out.summary }).eq("id", c.id);
   await supabase.from("checkin_replies").upsert({ checkin_id: c.id, ai_draft: out.draft, updated_at: new Date().toISOString() }, { onConflict: "checkin_id" });

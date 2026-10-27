@@ -23,14 +23,15 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
     supabase.from("checkins").select("sleep, energy, stress, hunger").eq("client_id", c.client_id).order("week_number").limit(1).maybeSingle(),
   ]);
   const last = d.previous[0] ?? null;
-  const paths = [c.video_path, reply?.video_path].filter(Boolean) as string[];
+  const sleepShots = ((c.answers?.sleep_photos ?? []) as string[]);
+  const paths = [c.video_path, reply?.video_path, ...sleepShots].filter(Boolean) as string[];
   const signed = new Map<string, string>();
   if (paths.length) {
     const { data } = await supabase.storage.from("checkin-videos").createSignedUrls(paths, 3600);
     data?.forEach((x) => x.path && x.signedUrl && signed.set(x.path, x.signedUrl));
   }
   const labels = questionLabels();
-  const answers = Object.entries((c.answers ?? {}) as Record<string, unknown>).filter(([k]) => !SCORES.includes(k as never) && k !== "habits");
+  const answers = Object.entries((c.answers ?? {}) as Record<string, unknown>).filter(([k]) => !SCORES.includes(k as never) && k !== "habits" && k !== "sleep_photos");
   const habits = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[]);
   const logged = d.days.filter((x) => x.meals > 0);
   const avg = (k: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, x) => s + x[k], 0) / logged.length) : null;
@@ -65,6 +66,18 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
         })}
       </div>
 
+      {sleepShots.length > 0 && (
+        <div className="space-y-1"><p className="text-sm text-dim">Her sleep screenshots</p>
+          <div className="flex gap-2 overflow-x-auto">
+            {sleepShots.map((p) => signed.get(p) && (
+              <a key={p} href={signed.get(p)} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed link */}
+                <img src={signed.get(p)} alt="Her sleep screenshot" className="h-56 rounded-xl border border-border object-contain" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {c.video_path && signed.get(c.video_path) && (
         <div className="space-y-1"><p className="text-sm text-dim">Her video</p>
           <video src={signed.get(c.video_path)} controls playsInline className="w-full rounded-xl bg-black" /></div>
