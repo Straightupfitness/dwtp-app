@@ -7,7 +7,7 @@ import { IconCalendar, IconChat, IconFaq } from "./Icons";
 function Btn({ href, label, icon, badge, aria }: { href: string; label: string; icon: React.ReactNode; badge?: number; aria?: string }) {
   return (
     <Link href={href} aria-label={aria} className="relative flex min-h-11 min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-accent">
-      <span className="[&_svg]:size-[20px]">{icon}</span>
+      <span className="grid h-[22px] place-items-center [&>svg]:size-[20px]">{icon}</span>
       <span className="text-[10px] font-semibold leading-none text-text">{label}</span>
       {badge ? (
         <span className="absolute -top-0.5 right-0 grid min-w-[17px] place-items-center rounded-full bg-accent px-1 text-[10px] font-bold leading-[17px] text-black">{badge > 9 ? "9+" : badge}</span>
@@ -16,7 +16,7 @@ function Btn({ href, label, icon, badge, aria }: { href: string; label: string; 
   );
 }
 
-/** Top of every screen: the lion (home) on the left; Calendar, FAQ, Chat and her picture on the right. */
+/** Top of every screen: the lion (home) on the left; Calendar, FAQ, Chat and Account (her picture) on the right. */
 export default function TopBar({ coach, unread, name, avatarPath }: {
   coach: boolean; unread: number; name: string | null; avatarPath: string | null;
 }) {
@@ -31,9 +31,7 @@ export default function TopBar({ coach, unread, name, avatarPath }: {
           <Btn href="/faq" label="FAQ" icon={<IconFaq />} />
           <Btn href={coach ? "/coach/inbox" : "/chat"} label={coach ? "Inbox" : "Chat"} icon={<IconChat />} badge={unread}
             aria={unread ? `${coach ? "Inbox" : "Chat with Michael"}, ${unread} unread` : coach ? "Inbox" : "Chat with Michael"} />
-          <Link href="/me" aria-label="Me" className="ml-1 grid size-11 place-items-center rounded-full">
-            <Avatar name={name} path={avatarPath} size={34} coach={coach} />
-          </Link>
+          <Btn href="/me" label="Account" icon={<Avatar name={name} path={avatarPath} size={22} coach={coach} />} />
         </div>
       </div>
     </header>

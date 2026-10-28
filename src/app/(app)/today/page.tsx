@@ -55,16 +55,19 @@ export default async function TodayPage() {
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{date}</p>
         <h1 className={`${display} mt-0.5 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
       </div>
-      <div className="space-y-3 rounded-[18px] border border-border bg-card px-4 pb-3 pt-3">
-        <div className="flex items-baseline justify-between gap-3 text-[13px]">
+      <div className="space-y-1 rounded-[18px] border border-border bg-card px-4 pb-3 pt-3">
+        {/* Her points in the date's style; her week right above the end of the track, so it reads as part of it. */}
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">
           {j && j.startsIn > 0
-            ? <p>Your program starts <b>{j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</b></p>
-            : <p>You have <b className="text-gold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></p>}
-          <p className="shrink-0 font-semibold tabular-nums">
+            ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
+            : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
+        </p>
+        <div>
+          <p className="mb-1.5 text-right text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
             {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
           </p>
+          <StageBars week={jw} />
         </div>
-        <StageBars week={jw} />
       </div>
     </header>
   );

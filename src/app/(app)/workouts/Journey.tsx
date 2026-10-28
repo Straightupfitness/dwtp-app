@@ -17,9 +17,9 @@ export default function Journey({ phases, pweek, total, programName }: { phases:
   const finished = pweek > total;
   return (
     <div className="rounded-[18px] border border-border bg-card px-4 pb-3 pt-3.5">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim">Your journey</p>
-        <p className="text-[13px] font-semibold tabular-nums">
+        <p className="text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
           {finished ? "Program complete" : pweek < 1 ? `${total} weeks ahead` : <>Week {pweek} <span className="text-dim">of {total}</span></>}
         </p>
       </div>
