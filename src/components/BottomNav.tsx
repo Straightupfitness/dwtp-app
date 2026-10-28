@@ -2,22 +2,23 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { IconCircles, IconClients, IconCommunity, IconFaq, IconFood, IconLessons, IconToday } from "./Icons";
+import { IconCircles, IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts } from "./Icons";
 
+// Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
   { href: "/today", label: "Today", Icon: IconToday },
-  { href: "/circles", label: "Circles", Icon: IconCircles },
-  { href: "/lessons", label: "Lessons", Icon: IconLessons },
+  { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
   { href: "/food", label: "Food", Icon: IconFood },
+  { href: "/lessons", label: "Lessons", Icon: IconLessons },
+  { href: "/circles", label: "Circles", Icon: IconCircles },
   { href: "/community", label: "Community", Icon: IconCommunity },
-  { href: "/faq", label: "FAQ", Icon: IconFaq },
 ];
 const COACH = [
   { href: "/coach", label: "Clients", Icon: IconClients },
   { href: "/today", label: "Today", Icon: IconToday },
+  { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
   { href: "/lessons", label: "Lessons", Icon: IconLessons },
   { href: "/community", label: "Community", Icon: IconCommunity },
-  { href: "/faq", label: "FAQ", Icon: IconFaq },
 ];
 
 export default function BottomNav({ coach = false }: { coach?: boolean }) {

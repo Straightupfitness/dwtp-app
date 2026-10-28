@@ -32,6 +32,7 @@ export async function updateClient(clientId: string, form: FormData) {
     full_name: str(form.get("full_name")), program_start: start, plan: str(form.get("plan")), status: str(form.get("status")) ?? "active",
     start_weight_lbs: num(form.get("start_weight_lbs")), goal_weight_lbs: num(form.get("goal_weight_lbs")),
     strength_days_per_week: num(form.get("strength_days_per_week")),
+    ...(str(form.get("workout_program")) ? { workout_program: str(form.get("workout_program")), workout_start_week: Math.max(1, Math.round(num(form.get("workout_start_week")) ?? 1)) } : {}),
     wake_time: str(form.get("wake_time")), bedtime: str(form.get("bedtime")), coach_notes: str(form.get("coach_notes")),
   }).eq("id", clientId);
   if (error) return { error: error.message };

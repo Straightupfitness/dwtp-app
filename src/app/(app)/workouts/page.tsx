@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, STAGES, type WorkoutCard } from "@/lib/workouts";
+import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
 import BackButton from "@/components/BackButton";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -43,7 +43,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const preview = !asked && first.week < 1;
   const data = asked || preview ? await loadWorkoutWeek(supabase, user!.id, asked ?? 1) : first;
   const { phase } = data;
-  const stage = phase ? STAGES[phase.stage] ?? STAGES.DWTP : STAGES.DWTP;
+  const stage = stageOf(phase?.stage ?? "DWTP", data.program.name);
   const done = data.strength.filter((s) => s.done).length;
 
   return (
@@ -70,8 +70,8 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
               <span className="rounded-full px-2.5 py-1 text-[11px] font-bold tracking-[0.12em] text-black" style={{ background: stage.color }}>{stage.label}</span>
               <span className="text-[12px] uppercase tracking-[0.12em] text-[#bdbdbd]">{KIND_LABEL[phase.kind]}</span>
             </div>
-            <p className={`${display} mt-2 text-[28px] leading-none`}>{phase.name.replace(/^\w+\s+/, "")}</p>
-            <p className="mt-1 text-[13px] text-[#bdbdbd]">Week {data.week} of {data.totalWeeks} · week {data.weekOfPhase} of {phase.weeks} in this phase</p>
+            <p className={`${display} mt-2 text-[28px] leading-none`}>{phaseLabel(phase.name, phase.stage)}</p>
+            <p className="mt-1 text-[13px] text-[#bdbdbd]">Week {data.pweek} of {data.totalWeeks} · week {data.weekOfPhase} of {phase.weeks} in this phase</p>
             <div className="mt-3 flex gap-1.5" aria-hidden="true">
               {Array.from({ length: phase.weeks }, (_, i) => (
                 <span key={i} className="h-1.5 flex-1 rounded-full" style={{ background: i < data.weekOfPhase ? stage.color : "#2a2a2a", opacity: i === data.weekOfPhase - 1 ? 1 : i < data.weekOfPhase ? 0.55 : 1 }} />

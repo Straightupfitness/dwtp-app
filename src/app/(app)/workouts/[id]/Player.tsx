@@ -147,7 +147,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
           {phase && (
             <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.12em] text-[#bdbdbd]">
               <span className="rounded-full px-2 py-0.5 font-bold text-black" style={{ background: phase.color }}>{phase.label}</span>
-              {phase.name.replace(/^\w+\s+/, "")} · week {phase.week} of {phase.weeks}
+              {phase.name} · week {phase.week} of {phase.weeks}
             </div>
           )}
           <div>
@@ -209,7 +209,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
             <path d="M40 61l13 13 27-29" fill="none" stroke="var(--accent,#f5a623)" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <h1 className={`${display} text-[36px] leading-none`}>{preview ? "That's the workout" : "Workout done"}</h1>
-          <p className="text-[15px] text-[#bdbdbd]">{workout.title}{phase ? ` · ${phase.name.replace(/^\w+\s+/, "")}` : ""}</p>
+          <p className="text-[15px] text-[#bdbdbd]">{workout.title}{phase ? ` · ${phase.name}` : ""}</p>
           {!preview && (
             <div className="grid w-full grid-cols-2 gap-2.5">
               <div className="rounded-[16px] border border-border bg-card p-3"><p className={`${display} text-[28px] leading-none`}>{doneSets}</p><p className="mt-1 text-[12px] text-dim">{doneSets === 1 ? "set" : "sets"} logged</p></div>

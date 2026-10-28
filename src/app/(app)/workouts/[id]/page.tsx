@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { clipUrl, lastNumbers, loadWorkoutWeek, posterUrl, STAGES, workoutTitle, type Item } from "@/lib/workouts";
+import { clipUrl, lastNumbers, loadWorkoutWeek, phaseLabel, posterUrl, stageOf, workoutTitle, type Item } from "@/lib/workouts";
 import Player, { type PlayerItem } from "./Player";
 
 export default async function WorkoutPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ w?: string }> }) {
@@ -34,12 +34,12 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
     logged: (logs ?? []).filter((l) => l.position === i.position).map((l) => ({ set_no: l.set_no, weight: l.weight, reps: l.reps, seconds: l.seconds, note: l.note })),
   }));
   const phase = wk.phase && wk.strength.some((s) => s.id === w.id) ? wk.phase : null;
-  const stage = phase ? STAGES[phase.stage] : null;
+  const stage = phase ? stageOf(phase.stage, wk.program.name) : null;
 
   return (
     <Player
       workout={{ id: w.id, name: w.name, title: workoutTitle(w.name), kind: w.kind as "strength" | "cardio", circuit: w.circuit, rounds: w.rounds, minutes: w.minutes, notes: w.notes }}
-      phase={phase ? { name: phase.name, week: wk.weekOfPhase, weeks: phase.weeks, color: stage?.color ?? "#f5a623", label: stage?.label ?? phase.stage } : null}
+      phase={phase ? { name: phaseLabel(phase.name, phase.stage), week: wk.weekOfPhase, weeks: phase.weeks, color: stage?.color ?? "#f5a623", label: stage?.label ?? phase.stage } : null}
       overview={overview ? { youtube: overview.exercise.youtube_id!, notes: overview.exercise.notes } : null}
       steps={steps}
       session={session ? { id: session.id as string, completed: !!session.completed_at } : null}

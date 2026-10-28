@@ -164,7 +164,7 @@ export default async function HowItWorks() {
         ))}
       </div>
 
-      <p className="rounded-2xl border border-border bg-card p-4 text-[15px]">Stuck or confused? Tap <b>Talk to Michael</b> at the top. He&apos;s got you.</p>
+      <p className="rounded-2xl border border-border bg-card p-4 text-[15px]">Stuck or confused? Tap <b>Chat</b> at the top. He&apos;s got you.</p>
     </section>
   );
 }

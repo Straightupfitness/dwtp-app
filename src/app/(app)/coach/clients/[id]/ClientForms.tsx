@@ -4,10 +4,11 @@ import { updateClient, setFocus, openNextRing, signOff } from "./actions";
 
 const input = "mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent";
 
-export function ProfileForm({ clientId, p, t }: {
+export function ProfileForm({ clientId, p, t, programs = [] }: {
   clientId: string;
   p: Record<string, string | number | null>;
   t: { maintenance_calories: number | null; calorie_target: number | null; protein_g: number | null } | null;
+  programs?: { id: string; name: string; weeks: number }[];
 }) {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
@@ -45,6 +46,12 @@ export function ProfileForm({ clientId, p, t }: {
         {field("start_weight_lbs", "Start weight (lbs)", "number")}
         {field("goal_weight_lbs", "Goal weight (lbs)", "number")}
         {field("strength_days_per_week", "Strength days / week", "number")}
+        <label className="col-span-2 text-sm text-dim">Workout program
+          <select name="workout_program" defaultValue={String(p.workout_program ?? "sltp")} className={input}>
+            {programs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.weeks} weeks)</option>)}
+          </select>
+        </label>
+        {field("workout_start_week", "Start her at program week", "number", p.workout_start_week ?? 1)}
         {field("wake_time", "Wake time", "time")}
         {field("bedtime", "Bedtime", "time")}
         {field("maintenance_calories", "Maintenance kcal", "number", t?.maintenance_calories)}

@@ -1,5 +1,6 @@
 /**
- * Workouts (decided October 28): the Strong Life Transformation Program from Trainerize, 63 weeks in 30 phases.
+ * Workouts (decided October 28): the Strong Life Transformation Program from Trainerize, 63 weeks in 30 phases,
+ * is everyone's program ('sltp'). Michael can put a client on one of his other Trainerize programs (Edit details).
  * - Her program week (Week 1 = her start Monday) picks the phase. Every client runs the whole program.
  * - Strength: 1x clients get Day 1, 2x get Days 1–2, everyone else every day of the phase (3 or 4).
  * - Cardio: every phase offers the full menu (the song-named circuits and Hill Sprints).
@@ -24,6 +25,14 @@ export const STAGES: Record<string, { label: string; color: string; tint: string
   PSR: { label: "Photo Shoot Ready", color: "#38bdf8", tint: "#0b2230" },
   SLF: { label: "Strong Life Forever", color: "#a3e635", tint: "#1b260a" },
 };
+/** The chip on a phase: the four stages of the main program, or the program's own name. */
+export function stageOf(stage: string, programName: string) {
+  return STAGES[stage] ?? { label: programName, color: "#f5a623", tint: "#2a1d07" };
+}
+/** "DWTP Phase 2" → "Phase 2"; other programs' phase names stay as they are ("Week 1 - 4"). */
+export function phaseLabel(name: string, stage: string) {
+  return STAGES[stage] && name.startsWith(stage + " ") ? name.slice(stage.length + 1) : name;
+}
 export const KIND_LABEL: Record<Phase["kind"], string> = { build: "Build week", deload: "Deload week", pivot: "Pivot week", max: "Max out week" };
 export const KIND_NOTE: Record<Phase["kind"], string> = {
   build: "Same workouts all phase. Beat last week's numbers.",
@@ -39,7 +48,7 @@ export const posterUrl = (e: Pick<Exercise, "clip_path" | "youtube_id">) =>
 
 /** "DWTP Phase 2 Day 3" → "Day 3"; "KB Cardio - Iron Man" → "Iron Man". */
 export function workoutTitle(name: string) {
-  const day = name.match(/Day\s*(\d+)$/i);
+  const day = name.match(/Day\s*0*(\d+[a-d]?)$/i);
   if (day) return `Day ${day[1]}`;
   return name.replace(/^.*?Cardio\s*-\s*/i, "").replace(/^Cardio\s*-\s*/i, "");
 }
@@ -56,20 +65,30 @@ export function daysFor(perWeek: number | null, available: number[]) {
 
 /** Her week: the phase, this week's strength days (with done/started), and the cardio menu. */
 export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string, weekOverride?: number) {
-  const { data: p } = await supabase.from("profiles").select("program_start, timezone, strength_days_per_week").eq("id", clientId).single();
+  const { data: p } = await supabase.from("profiles").select("program_start, timezone, strength_days_per_week, workout_program, workout_start_week").eq("id", clientId).single();
   const today = todayIn(p?.timezone ?? "America/Los_Angeles");
   const current = programWeek(p?.program_start ?? null, today);
-  const week = weekOverride ?? current;
-  const { data: phases } = await supabase.from("program_phases").select("id, name, stage, kind, weeks, first_week").eq("program", "sltp").order("position");
+  const week = weekOverride ?? current;                         // her program week (sessions are saved by this)
+  const programId = (p?.workout_program as string | null) ?? "sltp";
+  const offset = Math.max(0, ((p?.workout_start_week as number | null) ?? 1) - 1); // "start her at week N" of her workout program
+  const pweek = week >= 1 ? week + offset : week;               // the week of her workout program
+  const [{ data: phases }, { data: prog }] = await Promise.all([
+    supabase.from("program_phases").select("id, name, stage, kind, weeks, first_week").eq("program", programId).order("position"),
+    supabase.from("programs").select("id, name").eq("id", programId).maybeSingle(),
+  ]);
   const all = (phases ?? []) as Phase[];
   const totalWeeks = all.reduce((n, x) => n + x.weeks, 0);
-  const phase = week >= 1 ? all.find((x) => week >= x.first_week && week < x.first_week + x.weeks) ?? null : null;
-  if (!phase) return { today, week, current, totalWeeks, phase: null, weekOfPhase: 0, strength: [] as WorkoutCard[], cardio: [] as WorkoutCard[], nextUp: null as WorkoutCard | null, start: p?.program_start ?? null };
+  const program = { id: programId, name: (prog?.name as string | undefined) ?? "Your program" };
+  const phase = pweek >= 1 ? all.find((x) => pweek >= x.first_week && pweek < x.first_week + x.weeks) ?? null : null;
+  if (!phase) return { today, week, pweek, current, totalWeeks, program, phase: null, weekOfPhase: 0, strength: [] as WorkoutCard[], cardio: [] as WorkoutCard[], nextUp: null as WorkoutCard | null, start: p?.program_start ?? null };
 
   const { data: links } = await supabase.from("phase_workouts")
-    .select("day, workouts(id, name, kind, circuit, minutes, workout_items(position, exercises(clip_path, youtube_id, name)))").eq("phase_id", phase.id);
+    .select("day, from_week, to_week, workouts(id, name, kind, circuit, minutes, workout_items(position, exercises(clip_path, youtube_id, name)))").eq("phase_id", phase.id);
   type W = { id: number; name: string; kind: "strength" | "cardio"; circuit: boolean; minutes: number | null; workout_items: { position: number; exercises: { clip_path: string | null; youtube_id: string | null; name: string } | null }[] };
-  const rows = ((links ?? []) as unknown as { day: number | null; workouts: W | null }[]).filter((l) => l.workouts);
+  const wop = pweek - phase.first_week + 1;
+  // Some programs run different workouts in different weeks of a phase (13 Hard & Resilient, "Day 1a / 1b").
+  const rows = ((links ?? []) as unknown as { day: number | null; from_week: number | null; to_week: number | null; workouts: W | null }[])
+    .filter((l) => l.workouts && (l.from_week ?? 1) <= wop && wop <= (l.to_week ?? 99));
   const ids = rows.map((r) => r.workouts!.id);
   const { data: sessions } = ids.length
     ? await supabase.from("workout_sessions").select("workout_id, completed_at").eq("client_id", clientId).eq("program_week", week).in("workout_id", ids)
@@ -93,7 +112,7 @@ export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string
   const cardio = rows.filter((r) => r.workouts!.kind === "cardio").map(card)
     .sort((a, b) => (a.name.startsWith("Cardio - Hill") ? -1 : b.name.startsWith("Cardio - Hill") ? 1 : a.name.localeCompare(b.name)));
   return {
-    today, week, current, totalWeeks, phase, weekOfPhase: week - phase.first_week + 1, strength, cardio,
+    today, week, pweek, current, totalWeeks, program, phase, weekOfPhase: wop, strength, cardio,
     nextUp: strength.find((s) => !s.done) ?? null, start: p?.program_start ?? null,
   };
 }

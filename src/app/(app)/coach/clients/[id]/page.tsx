@@ -12,6 +12,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const { id } = await params;
   const supabase = await createClient();
   const { data: p } = await supabase.from("profiles").select("*").eq("id", id).single();
+  const { data: progRows } = await supabase.from("programs").select("id, name, weeks").eq("active", true).order("sort").order("name");
+  const programs = (progRows ?? []) as { id: string; name: string; weeks: number }[];
   if (!p) notFound();
   const [state, { data: t }, { data: checkins }, { data: weights }, { data: focusRows }] = await Promise.all([
     loadProgram(supabase, id),
@@ -105,7 +107,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
       <div id="details" className="scroll-mt-20 space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Her details and targets</h2>
-        <ProfileForm clientId={id} p={p} t={t} />
+        <ProfileForm clientId={id} p={p} t={t} programs={programs} />
       </div>
     </section>
   );
