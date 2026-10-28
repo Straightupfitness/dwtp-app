@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Avatar from "@/components/Avatar";
 import ChatThread from "@/components/chat/ChatThread";
+import BackButton from "@/components/BackButton";
 
 export default async function ChatPage() {
   const supabase = await createClient();
@@ -8,6 +9,7 @@ export default async function ChatPage() {
   const { data: coach } = await supabase.from("member_names").select("full_name, avatar_path").eq("role", "coach").limit(1).maybeSingle();
   return (
     <section className="space-y-3">
+      <BackButton fallback="/today" />
       <header className="flex items-center gap-3 border-b border-border pb-3">
         <Avatar name={coach?.full_name ?? "Michael"} path={coach?.avatar_path} size={44} coach />
         <div>

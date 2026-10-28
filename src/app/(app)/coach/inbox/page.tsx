@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { timeAgo } from "@/lib/names";
 import LiveRefresh from "@/components/LiveRefresh";
 import Avatar from "@/components/Avatar";
+import BackButton from "@/components/BackButton";
 
 export default async function Inbox() {
   const supabase = await createClient();
@@ -23,6 +24,7 @@ export default async function Inbox() {
 
   return (
     <section className="space-y-4">
+      <BackButton fallback="/coach" />
       <LiveRefresh tables={["messages"]} />
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">Coach</p>

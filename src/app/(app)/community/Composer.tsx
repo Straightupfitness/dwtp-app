@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { createPost } from "./actions";
@@ -11,6 +11,8 @@ export default function Composer({ userId, coach }: { userId: string; coach: boo
   const [pinned, setPinned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
+  const grow = (t: HTMLTextAreaElement) => { t.style.height = "auto"; t.style.height = `${t.scrollHeight + 2}px`; };
 
   async function post() {
     setBusy(true); setError("");
@@ -24,12 +26,15 @@ export default function Composer({ userId, coach }: { userId: string; coach: boo
     setBusy(false);
     if (r?.error) { setError(r.error); return; }
     setBody(""); setPhoto(null); setPreview(null); setPinned(false);
+    if (box.current) box.current.style.height = "";
   }
 
   return (
     <div className="space-y-2 rounded-[18px] border border-border bg-card p-3">
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Share a win, a meal, a question…" aria-label="Write a post"
-        className="w-full resize-none rounded-lg bg-transparent p-1 text-base outline-none" />
+      {/* Grows as she types (up to about half the screen); on a computer it starts bigger and can be dragged taller. */}
+      <textarea value={body} rows={3} placeholder="Share a win, a meal, a question…" aria-label="Write a post"
+        onChange={(e) => { setBody(e.target.value); grow(e.currentTarget); }} ref={box}
+        className="max-h-[60vh] min-h-[84px] w-full resize-none rounded-lg bg-transparent p-1 text-base leading-relaxed outline-none md:min-h-[220px] md:resize-y" />
       {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
       {preview && <img src={preview} alt="" className="max-h-64 rounded-lg" />}
       <div className="flex items-center gap-2">

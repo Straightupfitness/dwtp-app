@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { currentWindow, questionsFor, DEADLINE_TZ } from "@/lib/checkin";
 import { loadProgram } from "@/lib/circles";
 import CheckinForm, { type NewHabit } from "./CheckinForm";
+import BackButton from "@/components/BackButton";
 
 export const maxDuration = 120;
 
@@ -66,6 +67,7 @@ export default async function CheckinPage() {
 
   return (
     <section className="space-y-6">
+      <BackButton fallback="/today" />
       <header>
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Weekly check-in{form ? " · +10 CPs" : ""}</p>
         {!form && <h1 className="mt-1 font-[family-name:var(--font-display)] text-[30px] font-semibold uppercase">{open ? `Week ${open.week} check-in` : "Check-in"}</h1>}

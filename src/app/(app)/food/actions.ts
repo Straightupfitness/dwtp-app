@@ -47,6 +47,35 @@ export async function saveMeal(input: {
   return { ok: true };
 }
 
+/** Change a meal she already saved: its foods, which meal it was, and when she ate it. The photo stays. */
+export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt?: string | null; saveAs?: string | null }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const items = input.items.filter((i) => i.name.trim());
+  if (!items.length) return { error: "Add at least one food, or delete the meal instead." };
+  const t = totals(items);
+  const at = input.eatenAt ? new Date(input.eatenAt) : null;
+  const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= 8 * 86_400_000 ? at.toISOString() : undefined;
+  const { error } = await supabase.from("food_logs").update({
+    ...(eatenAt ? { eaten_at: eatenAt } : {}),
+    meal_slot: input.mealSlot,
+    items,
+    calories: Math.round(t.calories),
+    protein_g: Math.round(t.protein_g * 10) / 10,
+    fiber_g: Math.round(t.fiber_g * 10) / 10,
+    potassium_mg: Math.round(t.potassium_mg),
+  }).eq("id", id).eq("client_id", user.id);
+  if (error) return { error: error.message };
+  if (input.saveAs?.trim()) await saveGoTo(input.saveAs, items);
+  if (eatenAt) {
+    const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+    await awardAutoHabit(supabase, user.id, "log-food", todayIn(profile?.timezone ?? "America/Los_Angeles", new Date(eatenAt)));
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function deleteMeal(id: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { IconCircles, IconClients, IconCommunity, IconFaq, IconFood, IconLessons, IconToday } from "./Icons";
 
@@ -21,6 +22,10 @@ const COACH = [
 
 export default function BottomNav({ coach = false }: { coach?: boolean }) {
   const path = usePathname();
+  // Count screens she has opened in this session, so Back knows there's somewhere in the app to go back to.
+  useEffect(() => {
+    try { sessionStorage.setItem("dwtp:screens", String(Number(sessionStorage.getItem("dwtp:screens") ?? 0) + 1)); } catch {}
+  }, [path]);
   const tabs = coach ? COACH : CLIENT;
   const active = tabs.filter((t) => path.startsWith(t.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (

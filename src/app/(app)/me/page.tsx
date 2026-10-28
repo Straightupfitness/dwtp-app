@@ -5,6 +5,7 @@ import { setEmailNotifications, signOut, updateName } from "./actions";
 import NotificationSettings from "@/components/NotificationSettings";
 import SoundToggle from "@/components/SoundToggle";
 import AvatarPicker from "./AvatarPicker";
+import BackButton from "@/components/BackButton";
 
 export default async function MePage() {
   const supabase = await createClient();
@@ -16,6 +17,7 @@ export default async function MePage() {
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
   return (
     <section className="space-y-5">
+      <BackButton fallback="/today" />
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{week ? `Week ${week}` : "Starting soon"}{p?.plan === "52_weeks" ? " · Full year" : ""}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p?.full_name || "Me"}</h1>

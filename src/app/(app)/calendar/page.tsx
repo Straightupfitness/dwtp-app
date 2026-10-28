@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadWeek, type CalEvent } from "@/lib/calendar";
 import WorkoutDays from "./WorkoutDays";
+import BackButton from "@/components/BackButton";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const COLOR: Record<CalEvent["kind"], string> = {
@@ -19,6 +20,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <section className="space-y-3.5">
+      <BackButton fallback="/today" />
       <header>
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your week at a glance</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Calendar</h1>

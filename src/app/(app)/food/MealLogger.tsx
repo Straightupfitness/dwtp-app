@@ -1,10 +1,11 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { photoTakenAt } from "@/lib/exif";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { totals, type FoodItem } from "@/lib/food";
-import { saveMeal, deleteGoTo } from "./actions";
+import { saveMeal, updateMeal, deleteGoTo } from "./actions";
+import { EDIT_EVENT, type MealToEdit } from "./EditMeal";
 import FoodSearch from "./FoodSearch";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -36,12 +37,24 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   const [error, setError] = useState("");
   const [listening, setListening] = useState(false);
   const [manage, setManage] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null); // set when she's changing a meal she already saved
   const rec = useRef<SpeechRec | null>(null);
   const voice = useRef(false);
 
+  // "Edit" on a saved meal opens it here, with its foods, meal, time and photo.
+  useEffect(() => {
+    const open = (e: Event) => {
+      const m = (e as CustomEvent<MealToEdit>).detail;
+      setEditId(m.id); setItems(m.items); setSlot(m.slot); setWhen(new Date(m.eatenAt)); setPreview(m.photoUrl); setPhoto(null);
+      setSavedId(null); setText(""); setNotes(""); setSaveAs(null); setEditing(null); setExtra(""); setError(""); setAdder("type"); setMode("review");
+    };
+    window.addEventListener(EDIT_EVENT, open);
+    return () => window.removeEventListener(EDIT_EVENT, open);
+  }, []);
+
   function reset() {
     setMode("home"); setAdder("type"); setWhen(null); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
-    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot);
+    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null);
   }
   async function estimate(image: Blob | null, description: string) {
     setMode("review"); setBusy("estimating"); setError("");
@@ -88,6 +101,12 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   }
   async function save() {
     setBusy("saving"); setError("");
+    if (editId) {
+      const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs });
+      setBusy("");
+      if (r?.error) setError(r.error); else reset();
+      return;
+    }
     let photoPath: string | null = null;
     if (photo) {
       photoPath = `${userId}/${crypto.randomUUID()}.jpg`;
@@ -175,7 +194,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
         <button type="button" onClick={reset} className="flex min-h-11 items-center gap-1 px-2 text-[15px] text-[#a8a8a8]">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back
         </button>
-        <p className="font-[family-name:var(--font-display)] text-lg uppercase">Check your meal</p>
+        <p className="font-[family-name:var(--font-display)] text-lg uppercase">{editId ? "Edit your meal" : "Check your meal"}</p>
         <span className="w-16" />
       </div>
 
@@ -277,7 +296,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
           </div>
           <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim())} onClick={save}
             className="min-h-[54px] w-full rounded-[14px] bg-accent text-[17px] font-semibold text-black disabled:opacity-40">
-            {busy === "saving" ? "Saving…" : `Save ${slotLabel}`}
+            {busy === "saving" ? "Saving…" : editId ? "Save changes" : `Save ${slotLabel}`}
           </button>
         </div>
       </div>

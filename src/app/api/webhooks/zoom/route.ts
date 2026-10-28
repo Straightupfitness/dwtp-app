@@ -45,8 +45,12 @@ export async function POST(req: Request) {
   if (!isRtt) return NextResponse.json({ ok: true, ignored: "not Real Talk Tuesday" });
 
   const video = o.recording_files?.find((f) => f.file_type === "MP4" && /speaker|gallery|shared_screen/i.test(f.recording_type ?? ""));
-  const url = o.share_url || video?.play_url;
-  if (!url || !o.start_time) return NextResponse.json({ ok: true, ignored: "no share link" });
-  const r = await publishReplay({ url, passcode: o.password || null, startedAt: o.start_time, durationMin: o.duration ?? null, zoomUuid: o.uuid ?? null, topic: o.topic ?? null });
+  const base = o.share_url || video?.play_url;
+  if (!base || !o.start_time) return NextResponse.json({ ok: true, ignored: "no share link" });
+  // Zoom's encoded passcode goes in the link itself (?pwd=…), so clients tap and watch without typing one.
+  const url = o.recording_play_passcode && !/[?&]pwd=/.test(base)
+    ? `${base}${base.includes("?") ? "&" : "?"}pwd=${encodeURIComponent(o.recording_play_passcode)}` : base;
+  const passcode = o.recording_play_passcode ? null : o.password || null;
+  const r = await publishReplay({ url, passcode, startedAt: o.start_time, durationMin: o.duration ?? null, zoomUuid: o.uuid ?? null, topic: o.topic ?? null });
   return NextResponse.json({ ok: true, ...r });
 }

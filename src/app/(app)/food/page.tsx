@@ -3,6 +3,7 @@ import { todayIn } from "@/lib/program";
 import { DAILY_TARGETS, type FoodItem } from "@/lib/food";
 import MealLogger, { type GoTo } from "./MealLogger";
 import DeleteMeal from "./DeleteMeal";
+import EditMeal from "./EditMeal";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const SLOT_LABEL: Record<string, string> = { meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3", other: "Other" };
@@ -97,7 +98,10 @@ export default async function FoodPage() {
               <p className="mt-1 text-sm leading-snug">{(m.items as FoodItem[]).map((i) => i.name).join(", ")}</p>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-[#a8a8a8]">{Math.round(Number(m.protein_g))} g protein · {Math.round(Number(m.fiber_g))} g fiber</p>
-                <DeleteMeal id={m.id} />
+                <span className="flex items-center gap-2">
+                  <EditMeal meal={{ id: m.id, items: m.items as FoodItem[], slot: (m.meal_slot ?? "other") as "meal_1" | "meal_2" | "meal_3" | "other", eatenAt: m.eaten_at, photoUrl: m.photo_path ? photoUrls.get(m.photo_path) ?? null : null }} />
+                  <DeleteMeal id={m.id} />
+                </span>
               </div>
             </div>
           </article>
