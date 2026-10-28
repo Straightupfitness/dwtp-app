@@ -62,9 +62,10 @@ export default async function CoachHome({ searchParams }: { searchParams: Promis
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Clients</h1>
         <p className="text-sm text-dim">{toReply ? `${toReply} check-in${toReply > 1 ? "s" : ""} to reply to` : "All caught up"} · {rows.length} clients</p>
       </header>
-      <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2">
         <Link href="/coach/calendar" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Calendar</Link>
         <Link href="/coach/lessons" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Lessons</Link>
+        <Link href="/coach/clips" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Exercise clips</Link>
         <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
       </div>

@@ -8,6 +8,7 @@ import { loadProgram } from "./circles";
 import { loadLessons } from "./lessons";
 import { DEADLINE_TZ, zonedInstant } from "./checkin";
 import { programWeek, todayIn } from "./program";
+import { loadWorkoutWeek } from "./workouts";
 
 export type CalEvent = {
   kind: "week" | "workout" | "call" | "sbw" | "smf" | "checkin" | "medal" | "break";
@@ -55,9 +56,15 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
     if (tw?.is_diet_break) on(days[0], { kind: "break", title: "Diet break week", detail: "Eat at maintenance. Keep logging and 40 g+ protein per meal." });
   }
   if (start && days[6] >= start) {
-    for (const d of days) if (d >= start && workoutDays.includes(weekday(d))) {
-      on(d, { kind: "workout", title: "Workout", detail: "In Trainerize", href: setting("trainerize_url") ?? undefined, external: true });
-    }
+    // Her strength days for this program week, one per chosen workout day, in order (Day 1, Day 2…).
+    const plan = week >= 1 ? await loadWorkoutWeek(supabase, clientId, week) : null;
+    const queue = [...(plan?.strength ?? [])];
+    const slots = days.filter((d) => d >= start && workoutDays.includes(weekday(d)));
+    slots.forEach((d, i) => {
+      const extra = i === slots.length - 1 ? queue.splice(0) : queue.splice(0, 1);
+      if (!extra.length) { on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
+      for (const w of extra) on(d, { kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${week !== plan?.current ? `?w=${week}` : ""}` });
+    });
   }
   // Real Talk Tuesday, every week.
   const tue = days[1], call = calls?.find((c) => c.call_date === tue);

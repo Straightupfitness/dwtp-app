@@ -8,7 +8,8 @@ import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
-import { IconCheckin, IconHabits, IconLessons, IconPlate, IconScale, IconSteps } from "@/components/Icons";
+import { IconCheckin, IconDumbbell, IconHabits, IconLessons, IconPlate, IconScale, IconSteps } from "@/components/Icons";
+import { loadWorkoutWeek } from "@/lib/workouts";
 import { threshold } from "@/lib/health-parse";
 import ItemCheck from "../circles/ItemCheck";
 import LessonRow from "../lessons/LessonRow";
@@ -114,6 +115,7 @@ export default async function TodayPage() {
   ]);
   const lessonWeek = (await loadLessons(supabase, user!.id)).weeks.find((w) => w.week === week);
   const yesterday = addDays(today, -1);
+  const workouts = await loadWorkoutWeek(supabase, user!.id);
   const { data: hdays } = await supabase.from("health_days").select("day, steps").eq("client_id", user!.id).in("day", [today, yesterday]);
   const stepsToday = hdays?.find((h) => h.day === today)?.steps ?? null;
   const stepsYesterday = hdays?.find((h) => h.day === yesterday)?.steps ?? null;
@@ -168,6 +170,24 @@ export default async function TodayPage() {
       {profile?.home_screen_at && profile.avatar_path
         ? <NotificationSettings compact />
         : <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />}
+
+      {workouts.phase && (
+        <Link href={workouts.nextUp ? `/workouts/${workouts.nextUp.id}` : "/workouts"} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5">
+          <span className="relative block size-[68px] shrink-0 overflow-hidden rounded-xl bg-[#1b1b1b]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- storage poster */}
+            {(workouts.nextUp ?? workouts.strength[0])?.poster && <img src={(workouts.nextUp ?? workouts.strength[0])!.poster!} alt="" className={`size-full object-cover ${workouts.nextUp ? "" : "opacity-40"}`} />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent"><IconDumbbell /></span>{workouts.nextUp ? "Your next workout" : "Workouts"}</span>
+            <span className="block text-[13px] text-[#a8a8a8]">
+              {workouts.nextUp
+                ? `${workouts.nextUp.title}${workouts.nextUp.minutes ? ` · about ${workouts.nextUp.minutes} min` : ""} · ${workouts.strength.filter((x) => x.done).length} of ${workouts.strength.length} done this week`
+                : `All ${workouts.strength.length} done this week. Cardio menu is open.`}
+            </span>
+          </span>
+          <span className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold ${workouts.nextUp ? "bg-accent text-black" : "border border-[#2f2f2f]"}`}>{workouts.nextUp?.started ? "Continue" : workouts.nextUp ? "Start" : "Open"}</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
