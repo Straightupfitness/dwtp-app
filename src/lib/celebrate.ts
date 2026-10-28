@@ -1,7 +1,7 @@
 "use client";
 /** Ka-ching and confetti when she earns Capacity Points. Sound can be turned off under Me; confetti respects reduced motion. */
 const SOUND_KEY = "dwtp-sound";
-export type Sound = "ka-ching" | "quiz-passed" | "checkin-sent" | "wrong-answer" | "habit-done";
+export type Sound = "ka-ching" | "quiz-passed" | "checkin-sent" | "wrong-answer" | "habit-done" | "set-done" | "rest-over";
 const players: Partial<Record<Sound, HTMLAudioElement>> = {};
 
 export function soundOn() {
@@ -14,6 +14,7 @@ export function setSound(on: boolean) {
 /**
  * Michael's sounds (October 27): ka-ching for a right answer, quiz-passed for the answer that passes the quiz,
  * wrong-answer for a wrong one, habit-done for checking off a habit, checkin-sent for sending her check-in.
+ * Workouts (October 28): set-done (a plate clink) when she checks off a set, rest-over (a timer double beep) when rest ends.
  */
 export function play(name: Sound) {
   if (!soundOn()) return;

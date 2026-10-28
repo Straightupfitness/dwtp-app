@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
 import BackButton from "@/components/BackButton";
+import Journey from "./Journey";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const fmtDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -24,7 +25,6 @@ function DayCard({ w, next, week, preview }: { w: WorkoutCard; next: boolean; we
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
         {next && !preview && !w.done && <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Up next</span>}
         <span className={`${display} text-[22px] leading-none`}>{w.title}</span>
-        <span className="text-[13px] text-[#a8a8a8]">{w.minutes ? `About ${w.minutes} min · ` : ""}{w.exercises} exercises</span>
       </span>
       <span className="flex items-center pr-1">
         <span className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${w.done ? "text-dim" : next && !preview ? "bg-accent text-black" : "border border-[#2f2f2f] text-text"}`}>{status}</span>
@@ -53,6 +53,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Proper Strength Training</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Workouts</h1>
       </header>
+      <Journey phases={first.phases} pweek={first.pweek} total={first.totalWeeks} programName={first.program.name} />
 
       {!phase ? (
         <div className="rounded-[18px] border border-border bg-card p-4 text-[15px]">
@@ -106,7 +107,6 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
                 </span>
                 <span className="block px-2.5 py-2">
                   <span className="block truncate text-[14px] font-semibold">{w.title}</span>
-                  <span className="block text-[12px] text-dim">{w.minutes ? `${w.minutes} min · ` : ""}{w.exercises} {w.exercises === 1 ? "exercise" : "exercises"}</span>
                 </span>
               </Link>
             ))}

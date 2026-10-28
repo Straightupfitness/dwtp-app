@@ -80,7 +80,7 @@ export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string
   const totalWeeks = all.reduce((n, x) => n + x.weeks, 0);
   const program = { id: programId, name: (prog?.name as string | undefined) ?? "Your program" };
   const phase = pweek >= 1 ? all.find((x) => pweek >= x.first_week && pweek < x.first_week + x.weeks) ?? null : null;
-  if (!phase) return { today, week, pweek, current, totalWeeks, program, phase: null, weekOfPhase: 0, strength: [] as WorkoutCard[], cardio: [] as WorkoutCard[], nextUp: null as WorkoutCard | null, start: p?.program_start ?? null };
+  if (!phase) return { today, week, pweek, current, totalWeeks, program, phases: all, phase: null, weekOfPhase: 0, strength: [] as WorkoutCard[], cardio: [] as WorkoutCard[], nextUp: null as WorkoutCard | null, start: p?.program_start ?? null };
 
   const { data: links } = await supabase.from("phase_workouts")
     .select("day, from_week, to_week, workouts(id, name, kind, circuit, minutes, workout_items(position, exercises(clip_path, youtube_id, name)))").eq("phase_id", phase.id);
@@ -109,10 +109,12 @@ export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string
   const allDays = rows.filter((r) => r.workouts!.kind === "strength" && r.day).map((r) => r.day!) ;
   const mine = new Set(daysFor(p?.strength_days_per_week ?? null, [...new Set(allDays)]));
   const strength = rows.filter((r) => r.workouts!.kind === "strength" && r.day && mine.has(r.day)).map(card).sort((a, b) => (a.day ?? 0) - (b.day ?? 0));
-  const cardio = rows.filter((r) => r.workouts!.kind === "cardio").map(card)
+  // Trainerize had a copy of Hill Sprints in every phase: show each cardio workout once (by name, always the same copy).
+  const seen = new Set<string>();
+  const cardio = [...rows].sort((a, b) => a.workouts!.id - b.workouts!.id).filter((r) => r.workouts!.kind === "cardio" && !seen.has(r.workouts!.name.trim().toLowerCase()) && !!seen.add(r.workouts!.name.trim().toLowerCase())).map(card)
     .sort((a, b) => (a.name.startsWith("Cardio - Hill") ? -1 : b.name.startsWith("Cardio - Hill") ? 1 : a.name.localeCompare(b.name)));
   return {
-    today, week, pweek, current, totalWeeks, program, phase, weekOfPhase: wop, strength, cardio,
+    today, week, pweek, current, totalWeeks, program, phases: all, phase, weekOfPhase: wop, strength, cardio,
     nextUp: strength.find((s) => !s.done) ?? null, start: p?.program_start ?? null,
   };
 }

@@ -61,7 +61,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
     if (!rest) return;
     const t = setInterval(() => {
       const n = nowMs(); setNow(n);
-      if (n >= rest.ends) { clearInterval(t); setRest(null); play("habit-done"); try { navigator.vibrate?.([120, 60, 120]); } catch {} }
+      if (n >= rest.ends) { clearInterval(t); setRest(null); play("rest-over"); try { navigator.vibrate?.([120, 60, 120]); } catch {} }
     }, 250);
     return () => clearInterval(t);
   }, [rest]);
@@ -93,7 +93,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
     for (const f of fieldsFor(s.logType)) if (filled[f] == null || filled[f] === "") filled[f] = (lastSet?.[f] as never) ?? (f === "reps" && s.target && /^\d+$/.test(s.target) ? Number(s.target) : null);
     setVals((v) => ({ ...v, [k]: { ...filled, done } }));
     if (done) {
-      play("ka-ching");
+      play("set-done");
       if (s.rest && setNo < s.sets) setRest({ ends: nowMs() + s.rest * 1000, total: s.rest });
     }
     if (!sessionId || preview) return;
@@ -152,9 +152,6 @@ export default function Player({ workout, phase, overview, steps, session, previ
           )}
           <div>
             <h1 className={`${display} text-[40px] leading-none`}>{workout.kind === "cardio" ? workout.title : workout.title}</h1>
-            <p className="mt-2 text-[14px] text-[#a8a8a8]">
-              {workout.minutes ? `About ${workout.minutes} min · ` : ""}{steps.length} exercises{workout.circuit && workout.rounds ? ` · ${workout.rounds} rounds` : ""}
-            </p>
           </div>
           {preview && <p className="rounded-[14px] border border-[#2b2418] bg-[#161310] p-3 text-[13px] text-[#d9c9a8]">Preview. You can look through it, but sets are saved once this week of your program starts.</p>}
           {overview && (

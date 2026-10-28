@@ -4,14 +4,14 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { IconCircles, IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts } from "./Icons";
 
-// Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
+// Order set by Michael (October 28). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
   { href: "/today", label: "Today", Icon: IconToday },
-  { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
-  { href: "/food", label: "Food", Icon: IconFood },
-  { href: "/lessons", label: "Lessons", Icon: IconLessons },
   { href: "/circles", label: "Circles", Icon: IconCircles },
+  { href: "/food", label: "Food", Icon: IconFood },
+  { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
   { href: "/community", label: "Community", Icon: IconCommunity },
+  { href: "/lessons", label: "Lessons", Icon: IconLessons },
 ];
 const COACH = [
   { href: "/coach", label: "Clients", Icon: IconClients },
