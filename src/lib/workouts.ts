@@ -19,10 +19,10 @@ export type Item = { position: number; sets: number; target: string | null; seco
 
 /** The four stages, as Michael's Trainerize phases are named (labels can be renamed here). */
 export const STAGES: Record<string, { label: string; color: string; tint: string }> = {
-  DWTP: { label: "DWTP", color: "#f5a623", tint: "#2a1d07" },
-  SLTP: { label: "SLTP", color: "#fb7185", tint: "#2b1218" },
-  PSR: { label: "PSR", color: "#38bdf8", tint: "#0b2230" },
-  SLF: { label: "SLF", color: "#a3e635", tint: "#1b260a" },
+  DWTP: { label: "Driven Woman", color: "#f5a623", tint: "#2a1d07" },
+  SLTP: { label: "Strong Life", color: "#fb7185", tint: "#2b1218" },
+  PSR: { label: "Photo Shoot Ready", color: "#38bdf8", tint: "#0b2230" },
+  SLF: { label: "Strong Life Forever", color: "#a3e635", tint: "#1b260a" },
 };
 export const KIND_LABEL: Record<Phase["kind"], string> = { build: "Build week", deload: "Deload week", pivot: "Pivot week", max: "Max out week" };
 export const KIND_NOTE: Record<Phase["kind"], string> = {

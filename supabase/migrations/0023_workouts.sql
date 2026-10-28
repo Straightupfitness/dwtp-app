@@ -92,6 +92,8 @@ end $$;
 -- Exercise clips: public to play (no client data in them), only the coach uploads.
 insert into storage.buckets (id, name, public) values ('exercise-clips', 'exercise-clips', true)
   on conflict (id) do update set public = true;
+drop policy if exists "clips readable" on storage.objects;
+create policy "clips readable" on storage.objects for select using (bucket_id = 'exercise-clips');
 drop policy if exists "coach uploads clips" on storage.objects;
 create policy "coach uploads clips" on storage.objects for insert with check (bucket_id = 'exercise-clips' and public.is_coach());
 drop policy if exists "coach updates clips" on storage.objects;
