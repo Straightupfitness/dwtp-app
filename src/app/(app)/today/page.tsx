@@ -8,13 +8,13 @@ import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
-import { IconCheckin, IconDumbbell, IconHabits, IconLessons, IconPlate, IconScale, IconSteps } from "@/components/Icons";
+import { IconCheckin, IconDumbbell, IconHabits, IconLessons } from "@/components/Icons";
 import { loadWorkoutWeek } from "@/lib/workouts";
 import { threshold } from "@/lib/health-parse";
 import ItemCheck from "../circles/ItemCheck";
 import LessonRow from "../lessons/LessonRow";
 import { loadLessons } from "@/lib/lessons";
-import { logSteps, logWeight } from "./actions";
+import QuickStats from "./QuickStats";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -32,30 +32,6 @@ function timeLeft(until: Date) {
 function SectionTitle({ icon, children, as = "p" }: { icon: React.ReactNode; children: React.ReactNode; as?: "p" | "h2" }) {
   const Tag = as;
   return <Tag className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent">{icon}</span>{children}</Tag>;
-}
-
-/** A big number like her weight, with a thin bar toward her target. */
-function Stat({ value, unit, pct }: { value: string; unit: string; pct: number | null }) {
-  return (
-    <span className="block">
-      <span className={`${display} block text-[26px] leading-none`}>{value} <span className="text-[13px] text-dim">{unit}</span></span>
-      {pct !== null && <span className="mt-1.5 block h-1 rounded-full bg-[#262626]"><span className="block h-1 rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></span>}
-    </span>
-  );
-}
-
-/** A small trend line of her last 14 days of weigh-ins. */
-function Spark({ points }: { points: number[] }) {
-  if (points.length < 2) return <div className="h-[26px]" />;
-  const min = Math.min(...points), max = Math.max(...points), span = max - min || 1;
-  const xy = points.map((p, i) => `${(2 + (i * 136) / (points.length - 1)).toFixed(1)},${(4 + ((max - p) / span) * 18).toFixed(1)}`);
-  const last = xy[xy.length - 1].split(",");
-  return (
-    <svg width="140" height="26" viewBox="0 0 140 26" aria-hidden="true">
-      <polyline points={xy.join(" ")} fill="none" stroke="#f5a623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last[0]} cy={last[1]} r="3" fill="#f5a623" />
-    </svg>
-  );
 }
 
 export default async function TodayPage() {
@@ -79,13 +55,17 @@ export default async function TodayPage() {
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{date}</p>
         <h1 className={`${display} mt-0.5 text-[30px] font-semibold leading-tight`}>{greeting(tz)}{first ? ` ${first}` : ""}</h1>
       </div>
-      <p className={`${display} text-[13px] leading-tight`}>
-        {j && j.startsIn > 0
-          ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
-          : <>You are in Week {jw}{jw <= JOURNEY_WEEKS ? ` of ${JOURNEY_WEEKS}` : ""} and you have <span className="text-gold"><CpCount total={pts} /></span>{" "}
-            <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
-      </p>
-      <StageBars week={jw} />
+      <div className="space-y-3 rounded-[18px] border border-border bg-card px-4 pb-3 pt-3">
+        <div className="flex items-baseline justify-between gap-3 text-[13px]">
+          {j && j.startsIn > 0
+            ? <p>Your program starts <b>{j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</b></p>
+            : <p>You have <b className="text-gold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></p>}
+          <p className="shrink-0 font-semibold tabular-nums">
+            {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
+          </p>
+        </div>
+        <StageBars week={jw} />
+      </div>
     </header>
   );
 
@@ -189,69 +169,10 @@ export default async function TodayPage() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <SectionTitle icon={<IconScale />}>Today&apos;s weight</SectionTitle>
-          {weightToday ? (
-            <>
-              <p className={`${display} text-[26px] leading-none`}>{Number(weightToday.weight_lbs).toFixed(1)} <span className="text-[13px] text-dim">lbs</span></p>
-              <Spark points={w.map((x) => Number(x.weight_lbs))} />
-              <p className={`text-xs ${change !== null && change <= 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>
-                {change === null ? "Logged today" : `${change > 0 ? "+" : "−"}${Math.abs(change).toFixed(1)} lbs in 2 weeks`}
-              </p>
-            </>
-          ) : (
-            <form action={logWeight} className="flex flex-1 flex-col gap-1.5">
-              <input type="hidden" name="date" value={today} />
-              <label className="sr-only" htmlFor="weight">Today&apos;s weight in lbs</label>
-              <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder="lbs" required
-                className="min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent" />
-              <button className="mt-auto min-h-10 rounded-lg bg-accent text-sm font-semibold text-black">Log</button>
-            </form>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card p-3">
-          <SectionTitle icon={<IconPlate />}>Today&apos;s food</SectionTitle>
-          <p className="text-xs text-[#a8a8a8]">{todayMeals.length} meal{todayMeals.length === 1 ? "" : "s"} logged</p>
-          <Stat value={kcal.toLocaleString()} unit="calories" pct={kcalTarget ? kcal / kcalTarget : null} />
-          <Stat value={String(protein)} unit="g protein" pct={protein / proteinTarget} />
-          <Link href="/food" className="mt-auto grid min-h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black">Add meal</Link>
-        </div>
-      </div>
-
-      <div className="space-y-2 rounded-2xl border border-border bg-card p-3">
-        <div className="flex items-center justify-between gap-2">
-          <SectionTitle icon={<IconSteps />}>Today&apos;s steps</SectionTitle>
-          {stepGoal && <span className="text-xs text-[#a8a8a8]">Goal {stepGoal.toLocaleString()}</span>}
-        </div>
-        {stepsToday !== null && (
-          <Stat value={stepsToday.toLocaleString()} unit={stepGoal && stepsToday >= stepGoal ? "steps · goal hit" : "steps"} pct={stepGoal ? stepsToday / stepGoal : null} />
-        )}
-        <form action={logSteps} className="flex gap-2">
-          <label className="sr-only" htmlFor="steps">Steps</label>
-          <input id="steps" name="steps" inputMode="numeric" pattern="[0-9,]*" placeholder={stepsToday !== null ? "Update" : "Steps from your phone or watch"} required
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent" />
-          <label className="sr-only" htmlFor="steps-day">Day</label>
-          <select id="steps-day" name="date" defaultValue={today} className="min-h-11 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[14px] outline-none focus:border-accent">
-            <option value={today}>Today</option>
-            <option value={yesterday}>Yesterday{stepsYesterday !== null ? ` (${stepsYesterday.toLocaleString()})` : ""}</option>
-          </select>
-          <button className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-black">Log</button>
-        </form>
-        <p className="text-[11px] text-dim">Open the Health app (or your watch app) and copy today&apos;s total. Hit your goal and your step habit checks itself off.</p>
-      </div>
-
-      {lessonWeek && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between pt-1">
-            <SectionTitle icon={<IconLessons />} as="h2">This week&apos;s lessons</SectionTitle>
-            <Link href="/lessons" className="text-[13px] text-accent">All lessons</Link>
-          </div>
-          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-            {lessonWeek.lessons.map((l) => <LessonRow key={l.id} l={l} />)}
-          </div>
-        </div>
-      )}
+      <QuickStats today={today} yesterday={yesterday}
+        weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
+        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget}
+        steps={stepsToday} stepsYesterday={stepsYesterday} stepGoal={stepGoal} />
 
       {all.length > 0 && (
         <>
@@ -291,6 +212,18 @@ export default async function TodayPage() {
         </div>
       )}
       {!circleGroups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
+
+      {lessonWeek && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between pt-1">
+            <SectionTitle icon={<IconLessons />} as="h2">This week&apos;s lessons</SectionTitle>
+            <Link href="/lessons" className="text-[13px] text-accent">All lessons</Link>
+          </div>
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+            {lessonWeek.lessons.map((l) => <LessonRow key={l.id} l={l} />)}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

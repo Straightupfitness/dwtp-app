@@ -8,41 +8,41 @@ const PHASES = [
   { label: "Driven", from: 17, to: 26, color: STAGE_COLORS[3] },
 ];
 
-const Arrow = () => (
-  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="#6b6b6b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mx-1 mt-px shrink-0">
-    <path d="M1.5 4h8M7 1.5L9.5 4 7 6.5" />
-  </svg>
-);
-
 export const journeyWeek = (day: number, startsIn: number) => (startsIn > 0 ? 0 : Math.ceil(day / 7));
 
-/** Drained → Rested → Fueled → Driven, with a mark per week. On the Today tab. */
+/**
+ * Rested → Fueled → Driven as one track, in the same style as the Workouts journey (October 28): each stage in its
+ * color (faint until she gets there), filled up to her week, a white dot where she is, every stage named underneath.
+ */
 export default function StageBars({ week }: { week: number }) {
   const current = PHASES.find((p) => week >= p.from && week <= p.to);
+  const at = Math.min(Math.max(week, 0), JOURNEY_WEEKS);
+  const pos = week < 1 ? 0 : Math.min(100, ((at - 0.5) / JOURNEY_WEEKS) * 100);
   return (
-      <div className="flex items-start" role="img"
-        aria-label={week ? `Week ${week} of ${JOURNEY_WEEKS}, in the ${current?.label ?? "Driven"} phase` : "Drained: your program hasn't started yet"}>
-        <span className="text-[10px] font-semibold uppercase leading-[8px] tracking-[0.1em]" style={{ color: STAGE_COLORS[0] }}>Drained</span>
-        {PHASES.map((p) => {
-          const n = p.to - p.from + 1;
-          const here = current === p;
-          return (
-            <div key={p.label} className="flex items-start" style={{ flex: `${n} 1 0` }}>
-              <Arrow />
-              <div className="flex-1">
-                <div className="flex gap-[2px]">
-                  {Array.from({ length: n }, (_, i) => {
-                    const w = p.from + i;
-                    return <span key={w} className="h-2 flex-1 first:rounded-l-full last:rounded-r-full"
-                      style={{ background: p.color, opacity: w <= week ? 1 : week >= p.from ? 0.3 : 0.18 }} />;
-                  })}
-                </div>
-                <span className={`mt-1 block text-[10px] uppercase tracking-[0.1em] ${here ? "font-semibold" : ""}`}
-                  style={{ color: p.color, opacity: week >= p.from ? 1 : 0.45 }}>{p.label}</span>
-              </div>
-            </div>
-          );
-        })}
+    <div role="img" aria-label={week ? `Week ${week} of ${JOURNEY_WEEKS}, in the ${current?.label ?? "Driven"} stage` : "Drained: your program hasn't started yet"}>
+      <div className="relative pt-[5px]">
+        {week <= JOURNEY_WEEKS && (
+          <span className="absolute -top-1 z-10 -translate-x-1/2" style={{ left: `${pos}%` }} aria-hidden="true">
+            <span className="block size-[18px] rounded-full border-[3px] border-[#121212] bg-white shadow-[0_0_0_2px_rgba(255,255,255,0.25)]" />
+          </span>
+        )}
+        <div className="flex h-2 gap-[2px]">
+          {PHASES.map((p) => {
+            const n = p.to - p.from + 1;
+            const fill = Math.max(0, Math.min(1, (at - p.from + 1) / n));
+            return (
+              <span key={p.label} className="relative overflow-hidden rounded-full" style={{ flexGrow: n, flexBasis: 0, background: `color-mix(in srgb, ${p.color} 22%, #1c1c1c)` }}>
+                <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fill * 100}%`, background: p.color }} />
+              </span>
+            );
+          })}
+        </div>
       </div>
+      <div className="mt-2 flex gap-[2px]">
+        {PHASES.map((p) => (
+          <span key={p.label} className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.1em]" style={{ flexGrow: p.to - p.from + 1, flexBasis: 0, color: p.color }}>{p.label}</span>
+        ))}
+      </div>
+    </div>
   );
 }
