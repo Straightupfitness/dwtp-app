@@ -8,12 +8,8 @@ import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
-import { IconCheckin, IconDumbbell, IconHabits, IconLessons } from "@/components/Icons";
-import { loadWorkoutWeek } from "@/lib/workouts";
-import { threshold } from "@/lib/health-parse";
+import { IconCheckin, IconHabits } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
-import LessonRow from "../lessons/LessonRow";
-import { loadLessons } from "@/lib/lessons";
 import QuickStats from "./QuickStats";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -57,7 +53,7 @@ export default async function TodayPage() {
       </div>
       <div className="space-y-1 rounded-[18px] border border-border bg-card px-4 pb-3 pt-3">
         {/* Her points in the date's style; her week right above the end of the track, so it reads as part of it. */}
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">
+        <p className="text-[14px] uppercase tracking-[0.08em] text-accent">
           {j && j.startsIn > 0
             ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
             : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
@@ -96,15 +92,6 @@ export default async function TodayPage() {
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  const lessonWeek = (await loadLessons(supabase, user!.id)).weeks.find((w) => w.week === week);
-  const yesterday = addDays(today, -1);
-  const workouts = await loadWorkoutWeek(supabase, user!.id);
-  const { data: hdays } = await supabase.from("health_days").select("day, steps").eq("client_id", user!.id).in("day", [today, yesterday]);
-  const stepsToday = hdays?.find((h) => h.day === today)?.steps ?? null;
-  const stepsYesterday = hdays?.find((h) => h.day === yesterday)?.steps ?? null;
-  // Her step goal right now: the biggest "Walk N steps a day" habit in her open medals.
-  const stepGoal = Math.max(0, ...state.circles.flatMap((c) => c.rings.filter((r) => r.status === "open").flatMap((r) => r.items))
-    .map((i) => threshold(i.title)).filter((t) => t?.kind === "steps").map((t) => t!.min)) || null;
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
   const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
   const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
@@ -154,28 +141,9 @@ export default async function TodayPage() {
         ? <NotificationSettings compact />
         : <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />}
 
-      {workouts.phase && (
-        <Link href={workouts.nextUp ? `/workouts/${workouts.nextUp.id}` : "/workouts"} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5">
-          <span className="relative block size-[68px] shrink-0 overflow-hidden rounded-xl bg-[#1b1b1b]">
-            {/* eslint-disable-next-line @next/next/no-img-element -- storage poster */}
-            {(workouts.nextUp ?? workouts.strength[0])?.poster && <img src={(workouts.nextUp ?? workouts.strength[0])!.poster!} alt="" className={`size-full object-cover ${workouts.nextUp ? "" : "opacity-40"}`} />}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent"><IconDumbbell /></span>{workouts.nextUp ? "Your next workout" : "Workouts"}</span>
-            <span className="block text-[13px] text-[#a8a8a8]">
-              {workouts.nextUp
-                ? `${workouts.nextUp.title}${workouts.nextUp.minutes ? ` · about ${workouts.nextUp.minutes} min` : ""} · ${workouts.strength.filter((x) => x.done).length} of ${workouts.strength.length} done this week`
-                : `All ${workouts.strength.length} done this week. Cardio menu is open.`}
-            </span>
-          </span>
-          <span className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold ${workouts.nextUp ? "bg-accent text-black" : "border border-[#2f2f2f]"}`}>{workouts.nextUp?.started ? "Continue" : workouts.nextUp ? "Start" : "Open"}</span>
-        </Link>
-      )}
-
-      <QuickStats today={today} yesterday={yesterday}
+      <QuickStats today={today}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
-        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget}
-        steps={stepsToday} stepsYesterday={stepsYesterday} stepGoal={stepGoal} />
+        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} />
 
       {all.length > 0 && (
         <>
@@ -216,17 +184,6 @@ export default async function TodayPage() {
       )}
       {!circleGroups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
 
-      {lessonWeek && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between pt-1">
-            <SectionTitle icon={<IconLessons />} as="h2">This week&apos;s lessons</SectionTitle>
-            <Link href="/lessons" className="text-[13px] text-accent">All lessons</Link>
-          </div>
-          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-            {lessonWeek.lessons.map((l) => <LessonRow key={l.id} l={l} />)}
-          </div>
-        </div>
-      )}
     </section>
   );
 }

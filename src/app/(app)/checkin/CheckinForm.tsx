@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import SleepBlock from "./SleepBlock";
+import StepsBlock from "./StepsBlock";
 import { celebrate, markSeen } from "@/lib/celebrate";
 import type { Question } from "@/lib/checkin";
 import VideoRecorder from "@/components/VideoRecorder";
@@ -63,6 +64,7 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
   function next() {
     setError("");
     if (name === "How you felt" && missingIn(scales).length) { setError("Tap a number for each one."); return; }
+    if (name === "How you felt" && !a.steps_avg) { setError("Add your average steps a day (or tap I don't track)."); return; }
     if (name === "Your week" && (missingIn(shownWeekQs).length || videoMissing)) { setError(videoMissing ? "Record your video, or type your answers instead." : "Answer each question (the last one is optional)."); return; }
     setStep((s) => s + 1); window.scrollTo({ top: 0 });
   }
@@ -101,6 +103,7 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
         {scales.map((q) => <Scale key={q.id} q={q} value={a[q.id]} last={last?.[q.id]} onPick={(v) => set(q.id, v)} />)}
         <SleepBlock userId={userId} week={week} hours={a.sleep_hours as string | undefined} photos={(a.sleep_photos as string[] | undefined) ?? []}
           onHours={(v) => set("sleep_hours", v)} onPhotos={(v) => set("sleep_photos", v)} />
+        <StepsBlock value={a.steps_avg as string | undefined} onChange={(v) => set("steps_avg", v)} />
       </>}
 
       {name === "Habits" && (

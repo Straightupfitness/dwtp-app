@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { IconDumbbell } from "@/components/Icons";
 import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
 import BackButton from "@/components/BackButton";
-import Journey from "./Journey";
+import PhaseCard from "./PhaseCard";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const fmtDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -46,6 +47,19 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const stage = stageOf(phase?.stage ?? "DWTP", data.program.name);
   const done = data.strength.filter((s) => s.done).length;
 
+  // Strength workouts she finished in each week of this phase (her program weeks map onto the phase's weeks).
+  const perWeek = data.strength.length;
+  const doneByWeek: number[] = phase ? Array(phase.weeks).fill(0) : [];
+  if (phase && !preview && data.weekOfPhase > 1) {
+    const firstHer = data.week - (data.weekOfPhase - 1);
+    const { data: past } = await supabase.from("workout_sessions").select("program_week, workouts!inner(kind)")
+      .eq("client_id", user!.id).gte("program_week", firstHer).lt("program_week", data.week).not("completed_at", "is", null).eq("workouts.kind", "strength");
+    for (const r of past ?? []) { const i = (r.program_week as number) - firstHer; if (i >= 0 && i < doneByWeek.length) doneByWeek[i] = Math.min(perWeek, doneByWeek[i] + 1); }
+  }
+  if (phase) doneByWeek[data.weekOfPhase - 1] = done;
+  const nextIdx = data.nextUp ? data.strength.findIndex((s) => s.id === data.nextUp!.id) : -1;
+  const nextUp = !preview && !asked ? data.nextUp : null;
+
   return (
     <section className="space-y-4">
       <BackButton fallback="/today" />
@@ -53,33 +67,31 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Proper Strength Training</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Workouts</h1>
       </header>
-      <Journey phases={first.phases} pweek={first.pweek} total={first.totalWeeks} programName={first.program.name} />
 
       {!phase ? (
         <div className="rounded-[18px] border border-border bg-card p-4 text-[15px]">
-          {data.week > data.totalWeeks ? "You've finished all of the program's weeks. Michael will set up what's next with you." : "Your workouts show up here once your program starts."}
+          {data.pweek > data.totalWeeks ? "You've finished all of the program's weeks. Michael will set up what's next with you." : "Your workouts show up here once your program starts."}
         </div>
       ) : (
         <>
-          {/* The phase: where she is in the program, drawn as this phase's weeks. */}
-          <div className="relative overflow-hidden rounded-[20px] border border-border p-4" style={{ background: `linear-gradient(135deg, ${stage.tint} 0%, #121212 70%)` }}>
-            <svg className="pointer-events-none absolute -right-6 -top-6 opacity-[0.12]" width="150" height="150" viewBox="0 0 24 24" fill="none" stroke={stage.color} strokeWidth="1.4" aria-hidden="true">
-              <path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11" strokeLinecap="round" />
-            </svg>
-            {preview && data.start && <p className="mb-2 text-[13px] text-[#d9c9a8]">Your program starts {fmtDate(data.start)}. Here&apos;s a look at Week 1.</p>}
-            <div className="flex items-center gap-2">
-              <span className="rounded-full px-2.5 py-1 text-[11px] font-bold tracking-[0.12em] text-black" style={{ background: stage.color }}>{stage.label}</span>
-              <span className="text-[12px] uppercase tracking-[0.12em] text-[#bdbdbd]">{KIND_LABEL[phase.kind]}</span>
-            </div>
-            <p className={`${display} mt-2 text-[28px] leading-none`}>{phaseLabel(phase.name, phase.stage)}</p>
-            <p className="mt-1 text-[13px] text-[#bdbdbd]">Week {data.pweek} of {data.totalWeeks} · week {data.weekOfPhase} of {phase.weeks} in this phase</p>
-            <div className="mt-3 flex gap-1.5" aria-hidden="true">
-              {Array.from({ length: phase.weeks }, (_, i) => (
-                <span key={i} className="h-1.5 flex-1 rounded-full" style={{ background: i < data.weekOfPhase ? stage.color : "#2a2a2a", opacity: i === data.weekOfPhase - 1 ? 1 : i < data.weekOfPhase ? 0.55 : 1 }} />
-              ))}
-            </div>
-            <p className="mt-3 text-[13px] leading-snug text-[#d4d4d4]">{KIND_NOTE[phase.kind]}</p>
-          </div>
+          <PhaseCard stage={stage} kindLabel={KIND_LABEL[phase.kind]} kindNote={KIND_NOTE[phase.kind]} name={phaseLabel(phase.name, phase.stage)}
+            weeks={phase.weeks} weekOfPhase={data.weekOfPhase} perWeek={perWeek} doneByWeek={doneByWeek} next={nextIdx >= 0 ? nextIdx : null}
+            intro={preview && data.start ? <p className="mb-2 text-[13px] text-[#d9c9a8]">Your program starts {fmtDate(data.start)}. Here&apos;s a look at Week 1.</p> : null} />
+
+          {/* Her next workout (moved here from Today, October 28). */}
+          {nextUp && (
+            <Link href={`/workouts/${nextUp.id}`} className="flex items-center gap-3 rounded-2xl border border-accent bg-card p-2.5">
+              <span className="relative block size-[68px] shrink-0 overflow-hidden rounded-xl bg-[#1b1b1b]">
+                {/* eslint-disable-next-line @next/next/no-img-element -- storage poster */}
+                {nextUp.poster && <img src={nextUp.poster} alt="" className="size-full object-cover" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent"><IconDumbbell /></span>Your next workout</span>
+                <span className="block text-[13px] text-[#a8a8a8]">{nextUp.title} · {done} of {perWeek} done this week</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-accent px-3.5 py-2 text-[13px] font-semibold text-black">{nextUp.started ? "Continue" : "Start"}</span>
+            </Link>
+          )}
 
           <div className="flex items-baseline justify-between">
             <h2 className={`${display} text-lg`}>This week</h2>
