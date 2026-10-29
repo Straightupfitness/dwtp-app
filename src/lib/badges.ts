@@ -26,7 +26,7 @@ export const BADGES: BadgeDef[] = [
     day: { kind: "range", test: (d, g) => d.meals > 0 && Math.abs(d.protein - g.protein) <= 10 } },
   { key: "fiber", name: "Gut Guardian", rule: "Fiber within 5 g of your target, 21 days in a row", color: "#22c55e",
     day: { kind: "range", test: (d, g) => d.meals > 0 && Math.abs(d.fiber - g.fiber) <= 5 } },
-  { key: "potassium", name: "Electrolyte Elite", rule: "Potassium within 500 mg of your target, 21 days in a row", color: "#c084fc",
+  { key: "potassium", name: "Electric", rule: "Potassium within 500 mg of your target, 21 days in a row", color: "#c084fc",
     day: { kind: "range", test: (d, g) => d.meals > 0 && Math.abs(d.potassium - g.potassium) <= 500 } },
 ];
 export const BADGE = Object.fromEntries(BADGES.map((b) => [b.key, b])) as Record<BadgeKey, BadgeDef>;
