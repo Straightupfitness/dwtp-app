@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { shortName, timeAgo } from "@/lib/names";
 import LiveRefresh from "@/components/LiveRefresh";
 import Avatar from "@/components/Avatar";
+import { BadgeRow } from "@/components/BadgeIcon";
 import Composer from "./Composer";
 import { CommentBox, CommentLike, DeleteButton, LikeButton, PinButton } from "./PostActions";
 
@@ -18,6 +19,10 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   const { data: { user } } = await supabase.auth.getUser();
   const me = user!.id;
   const { data: names } = await supabase.from("member_names").select("id, full_name, role, avatar_path");
+  // Badges show next to her name (October 29).
+  const { data: badgeRows } = await supabase.from("badges_earned").select("client_id, badge, earned_at").order("earned_at");
+  const badgesOf = new Map<string, string[]>();
+  for (const b of badgeRows ?? []) badgesOf.set(b.client_id, [...(badgesOf.get(b.client_id) ?? []), b.badge]);
   const members = new Map((names as Member[] ?? []).map((n) => [n.id, n]));
   const coach = members.get(me)?.role === "coach";
   const who = (id: string) => (members.get(id)?.role === "coach" ? "Michael" : shortName(members.get(id)?.full_name));
@@ -59,7 +64,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
               <span className={`grid size-7 shrink-0 place-items-center rounded-full ${display} text-sm`}
                 style={i < 3 ? { background: MEDAL[i], color: "#0a0a0a" } : { color: "#8a8a8a" }}>{i + 1}</span>
               <Avatar name={r.full_name} path={members.get(r.client_id)?.avatar_path} size={36} />
-              <span className="flex-1 text-[15px]">{shortName(r.full_name)}{r.client_id === me ? <span className="text-dim"> (you)</span> : ""}</span>
+              <span className="flex-1 text-[15px]">{shortName(r.full_name)}{r.client_id === me ? <span className="text-dim"> (you)</span> : ""} <BadgeRow badges={badgesOf.get(r.client_id) ?? []} size={14} /></span>
               <span className={`${display} text-lg`}>{r.cps} <span className="text-xs text-dim">CPs</span></span>
             </li>
           ))}
@@ -94,7 +99,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         <Avatar name={who(c.author_id)} path={members.get(c.author_id)?.avatar_path} size={reply ? 26 : 30} coach={isCoach(c.author_id)} />
         <div className="min-w-0 flex-1">
           <div className="rounded-2xl bg-[#1d1d1d] px-3 py-2">
-            <p className={`text-[13px] font-semibold ${isCoach(c.author_id) ? "text-accent" : ""}`}>{who(c.author_id)}</p>
+            <p className={`text-[13px] font-semibold ${isCoach(c.author_id) ? "text-accent" : ""}`}>{who(c.author_id)} <BadgeRow badges={badgesOf.get(c.author_id) ?? []} size={14} /></p>
             <p className="whitespace-pre-line text-[14px] leading-snug"><Linkify text={c.body} /></p>
           </div>
           <div className="flex items-center gap-3 pl-2">
@@ -133,7 +138,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
             <div className="flex items-center gap-2.5">
               <Avatar name={who(p.author_id)} path={members.get(p.author_id)?.avatar_path} size={38} coach={isCoach(p.author_id)} />
               <div className="min-w-0 flex-1">
-                <p className={`text-sm font-semibold ${isCoach(p.author_id) ? "text-accent" : ""}`}>{who(p.author_id)}{isCoach(p.author_id) ? " · Coach" : ""}</p>
+                <p className={`text-sm font-semibold ${isCoach(p.author_id) ? "text-accent" : ""}`}>{who(p.author_id)}{isCoach(p.author_id) ? " · Coach" : ""} <BadgeRow badges={badgesOf.get(p.author_id) ?? []} size={16} /></p>
                 <p className="text-xs text-[#a8a8a8]">{p.pinned ? "Pinned · " : ""}{timeAgo(p.created_at)}</p>
               </div>
               {coach && <PinButton id={p.id} pinned={p.pinned} />}

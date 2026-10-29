@@ -11,6 +11,10 @@ import DoThisFirst from "@/components/DoThisFirst";
 import { IconCheckin, IconHabits } from "@/components/Icons";
 import ItemCheck from "../circles/ItemCheck";
 import QuickStats from "./QuickStats";
+import { after } from "next/server";
+import { adminClient } from "@/lib/supabase/admin";
+import { progressFor } from "@/lib/badges-server";
+import WaterCard from "./WaterCard";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -34,7 +38,7 @@ export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, state] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path, water_goal_oz").eq("id", user!.id).single(),
     loadProgram(supabase, user!.id),
   ]);
   const { today, week } = state;
@@ -58,12 +62,12 @@ export default async function TodayPage() {
             ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
             : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
         </p>
-        <div>
+        <Link href="/progress" className="block" aria-label="See your progress">
           <p className="mb-1.5 text-right text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
             {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
           </p>
           <StageBars week={jw} />
-        </div>
+        </Link>
       </div>
     </header>
   );
@@ -84,12 +88,17 @@ export default async function TodayPage() {
     );
   }
 
+  // Award any badge she has just earned (so it shows in Community even if she never opens Progress).
+  const uid = user!.id;
+  after(async () => { try { await progressFor(adminClient(), uid); } catch (e) { console.error("badges", e); } });
+
   const { open } = currentWindow(state.programStart);
-  const [{ data: tw }, { data: weights }, { data: meals }, { data: target }, { data: done }] = await Promise.all([
+  const [{ data: tw }, { data: weights }, { data: meals }, { data: target }, { data: water }, { data: done }] = await Promise.all([
     supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(week, 52)).maybeSingle(),
     supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", user!.id).gte("log_date", addDays(today, -14)).order("log_date"),
     supabase.from("food_logs").select("eaten_at, calories, protein_g").eq("client_id", user!.id).gte("eaten_at", addDays(today, -1) + "T00:00:00Z"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
+    supabase.from("water_days").select("oz").eq("client_id", user!.id).eq("day", today).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
@@ -144,6 +153,7 @@ export default async function TodayPage() {
       <QuickStats today={today}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} />
+      <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
 
       {all.length > 0 && (
         <>

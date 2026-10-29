@@ -5,6 +5,9 @@ import { totals, type FoodItem } from "@/lib/food";
 import { todayIn } from "@/lib/program";
 import { awardAutoHabit, closeOutRings } from "@/lib/progress";
 
+/** She can log, edit and copy meals on any of the last 62 days (October 29: browse and fix previous days). */
+const MAX_BACK_MS = 62 * 86_400_000;
+
 export async function saveMeal(input: {
   items: FoodItem[];
   mealSlot: "meal_1" | "meal_2" | "meal_3" | "other";
@@ -13,7 +16,7 @@ export async function saveMeal(input: {
   photoPath: string | null;
   savedMealId?: string | null;
   saveAs?: string | null;  // also save this meal as a go-to meal with this name
-  eatenAt?: string | null; // when she ate it, if not now (last 7 days only)
+  eatenAt?: string | null; // when she ate it, if not now (last 62 days)
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -21,7 +24,7 @@ export async function saveMeal(input: {
   const items = input.items.filter((i) => i.name.trim());
   const t = totals(items);
   const at = input.eatenAt ? new Date(input.eatenAt) : null;
-  const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= 8 * 86_400_000 ? at.toISOString() : undefined;
+  const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= MAX_BACK_MS ? at.toISOString() : undefined;
   const { error } = await supabase.from("food_logs").insert({
     client_id: user.id,
     ...(eatenAt ? { eaten_at: eatenAt } : {}),
@@ -56,7 +59,7 @@ export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlo
   if (!items.length) return { error: "Add at least one food, or delete the meal instead." };
   const t = totals(items);
   const at = input.eatenAt ? new Date(input.eatenAt) : null;
-  const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= 8 * 86_400_000 ? at.toISOString() : undefined;
+  const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= MAX_BACK_MS ? at.toISOString() : undefined;
   const { error } = await supabase.from("food_logs").update({
     ...(eatenAt ? { eaten_at: eatenAt } : {}),
     meal_slot: input.mealSlot,
@@ -86,7 +89,7 @@ export async function deleteMeal(id: string) {
   revalidatePath("/food");
 }
 
-/** Save a go-to meal (her Favorite Three, Backup Three…) to log again with one tap. */
+/** Save a favorite meal (her Favorite Three, Backup Three, a daily breakfast…) to log again with one tap. */
 export async function saveGoTo(name: string, items: FoodItem[]) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -106,4 +109,45 @@ export async function deleteGoTo(id: string) {
   if (!user) return;
   await supabase.from("saved_meals").delete().eq("id", id).eq("client_id", user.id);
   revalidatePath("/food");
+}
+
+/**
+ * Copy a meal she logged onto another day (October 29: "copy meals from the previous day"), at the same time of day.
+ * The copy has no photo, so deleting one never takes the other's picture with it.
+ */
+export async function copyMeal(id: string, toDay: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !/^\d{4}-\d{2}-\d{2}$/.test(toDay)) return { error: "Not signed in" };
+  const { data: m } = await supabase.from("food_logs").select("eaten_at, meal_slot, source, description, items, calories, protein_g, fiber_g, potassium_mg")
+    .eq("id", id).eq("client_id", user.id).maybeSingle();
+  if (!m) return { error: "Meal not found" };
+  const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+  const tz = profile?.timezone ?? "America/Los_Angeles";
+  const fromDay = todayIn(tz, new Date(m.eaten_at));
+  const shift = Math.round((Date.parse(toDay) - Date.parse(fromDay)) / 86_400_000);
+  let at = new Date(new Date(m.eaten_at).getTime() + shift * 86_400_000);
+  if (at.getTime() > Date.now()) at = new Date();
+  if (Date.now() - at.getTime() > MAX_BACK_MS) return { error: "That day is too far back." };
+  const { error } = await supabase.from("food_logs").insert({
+    client_id: user.id, eaten_at: at.toISOString(), meal_slot: m.meal_slot, source: m.source === "photo" ? "text" : m.source,
+    description: m.description, photo_path: null, items: m.items, calories: m.calories, protein_g: m.protein_g, fiber_g: m.fiber_g,
+    potassium_mg: m.potassium_mg, confirmed: true,
+  });
+  if (error) return { error: error.message };
+  await awardAutoHabit(supabase, user.id, "log-food", todayIn(tz, at));
+  await closeOutRings(supabase, user.id);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Star a meal she already logged as a favorite, to log it again with one tap. */
+export async function favoriteMeal(id: string, name: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !name.trim()) return { error: "Give it a name" };
+  const { data: m } = await supabase.from("food_logs").select("items").eq("id", id).eq("client_id", user.id).maybeSingle();
+  if (!m) return { error: "Meal not found" };
+  await saveGoTo(name, m.items as FoodItem[]);
+  return { ok: true };
 }

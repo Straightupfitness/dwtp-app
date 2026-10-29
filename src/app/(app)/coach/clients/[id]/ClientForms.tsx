@@ -1,13 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import { updateClient, setFocus, openNextRing, signOff } from "./actions";
+import { updateClient, setFocus, openNextRing, signOff, addPurchase, deletePurchase } from "./actions";
 
 const input = "mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent";
 
 export function ProfileForm({ clientId, p, t, programs = [] }: {
   clientId: string;
   p: Record<string, string | number | null>;
-  t: { maintenance_calories: number | null; calorie_target: number | null; protein_g: number | null } | null;
+  t: { maintenance_calories: number | null; calorie_target: number | null; protein_g: number | null; fiber_g?: number | null; potassium_mg?: number | null } | null;
   programs?: { id: string; name: string; weeks: number }[];
 }) {
   const [msg, setMsg] = useState("");
@@ -57,6 +57,10 @@ export function ProfileForm({ clientId, p, t, programs = [] }: {
         {field("maintenance_calories", "Maintenance kcal", "number", t?.maintenance_calories)}
         {field("calorie_target", "Calorie target", "number", t?.calorie_target)}
         {field("protein_g", "Protein target (g)", "number", t?.protein_g)}
+        {field("fiber_g", "Fiber target (g, blank = 30)", "number", t?.fiber_g)}
+        {field("potassium_mg", "Potassium target (mg, blank = 4,700)", "number", t?.potassium_mg)}
+        {field("water_goal_oz", "Water goal (oz a day)", "number", p.water_goal_oz ?? 128)}
+        {field("step_goal", "Step goal (a day)", "number", p.step_goal ?? 10000)}
       </div>
       <label className="block text-sm text-dim">Your notes on her (onboarding call, what works). The AI reads these.
         <textarea name="coach_notes" rows={4} defaultValue={String(p.coach_notes ?? "")} className={input} />
@@ -110,4 +114,34 @@ export function SignOffButton({ clientId, itemId }: { clientId: string; itemId: 
     <button type="button" disabled={pending} onClick={() => start(() => signOff(clientId, itemId))}
       className="min-h-9 shrink-0 rounded-lg border border-accent px-2.5 text-xs text-accent disabled:opacity-50">{pending ? "…" : "Sign off"}</button>
   );
+}
+
+/** What she bought (October 29): Michael types it in. */
+export function PurchaseForm({ clientId }: { clientId: string }) {
+  const [msg, setMsg] = useState("");
+  const [pending, start] = useTransition();
+  const field = (name: string, label: string, type = "text", placeholder = "") => (
+    <label className="text-sm text-dim">{label}<input name={name} type={type} placeholder={placeholder} className={input}
+      step={type === "number" ? "0.01" : undefined} inputMode={type === "number" ? "decimal" : undefined} /></label>
+  );
+  return (
+    <form action={(f) => start(async () => { const r = await addPurchase(clientId, f); setMsg(r?.error ?? "Added."); })} className="space-y-3 rounded-xl border border-border p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">{field("offer", "What she bought", "text", "e.g. DWTP, 26 weeks, paid in full")}</div>
+        {field("amount_paid", "Amount paid ($)", "number")}
+        {field("purchased_on", "Purchase date", "date")}
+        {field("starts_on", "Starts", "date")}
+        {field("expires_on", "Expires", "date")}
+        <div className="col-span-2">{field("notes", "Notes", "text", "Payment plan, coupon, upsells…")}</div>
+      </div>
+      <button disabled={pending} className="min-h-11 rounded-lg bg-accent px-5 font-semibold text-black disabled:opacity-50">{pending ? "Saving…" : "Add purchase"}</button>
+      {msg && <span className="ml-3 text-sm">{msg}</span>}
+    </form>
+  );
+}
+
+export function DeletePurchase({ clientId, id }: { clientId: string; id: string }) {
+  const [ask, setAsk] = useState(false);
+  const [pending, start] = useTransition();
+  return <button type="button" disabled={pending} onClick={() => (ask ? start(() => deletePurchase(clientId, id)) : setAsk(true))} className="min-h-9 text-xs text-dim">{ask ? "Tap to delete" : "Delete"}</button>;
 }

@@ -34,11 +34,13 @@ export async function updateClient(clientId: string, form: FormData) {
     strength_days_per_week: num(form.get("strength_days_per_week")),
     ...(str(form.get("workout_program")) ? { workout_program: str(form.get("workout_program")), workout_start_week: Math.max(1, Math.round(num(form.get("workout_start_week")) ?? 1)) } : {}),
     wake_time: str(form.get("wake_time")), bedtime: str(form.get("bedtime")), coach_notes: str(form.get("coach_notes")),
+    water_goal_oz: Math.round(num(form.get("water_goal_oz")) ?? 128), step_goal: Math.round(num(form.get("step_goal")) ?? 10000),
   }).eq("id", clientId);
   if (error) return { error: error.message };
   const { error: e2 } = await supabase.from("nutrition_targets").upsert({
     client_id: clientId, maintenance_calories: num(form.get("maintenance_calories")), calorie_target: num(form.get("calorie_target")),
-    protein_g: num(form.get("protein_g")), set_by: coachId, updated_at: new Date().toISOString(),
+    protein_g: num(form.get("protein_g")), fiber_g: num(form.get("fiber_g")), potassium_mg: num(form.get("potassium_mg")),
+    set_by: coachId, updated_at: new Date().toISOString(),
   });
   if (e2) return { error: e2.message };
   revalidatePath(`/coach/clients/${clientId}`);
@@ -84,4 +86,24 @@ export async function resendWelcome(clientId: string) {
   const { data: p } = await adminClient().from("profiles").select("email, full_name").eq("id", clientId).single();
   if (!p?.email) return { ok: false };
   return { ok: await sendWelcome(clientId, p.email, p.full_name) };
+}
+
+/** What she bought, how much she paid, and when it starts and expires (typed in by Michael). */
+export async function addPurchase(clientId: string, form: FormData) {
+  const { supabase } = await coach();
+  const offer = str(form.get("offer"));
+  if (!offer) return { error: "Say what she bought." };
+  const { error } = await supabase.from("client_purchases").insert({
+    client_id: clientId, offer, amount_paid: num(form.get("amount_paid")), purchased_on: str(form.get("purchased_on")),
+    starts_on: str(form.get("starts_on")), expires_on: str(form.get("expires_on")), notes: str(form.get("notes")),
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/coach/clients/${clientId}`);
+  return { ok: true };
+}
+
+export async function deletePurchase(clientId: string, id: string) {
+  const { supabase } = await coach();
+  await supabase.from("client_purchases").delete().eq("id", id).eq("client_id", clientId);
+  revalidatePath(`/coach/clients/${clientId}`);
 }

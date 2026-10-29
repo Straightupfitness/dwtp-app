@@ -43,3 +43,11 @@ export function scaleFood(f: DbFood, grams: number, label?: string): FoodItem {
     potassium_mg: Math.round(f.per100.potassium_mg * k),
   };
 }
+
+/** "6 oz" → 6 and "oz"; "1 1/2 cups" → 1.5 and "cups"; "1/2 avocado" → 0.5 and "avocado". */
+export function parseQty(s: string): { n: number; unit: string; rest: string } | null {
+  const m = s.match(/^\s*(?:(\d+(?:\.\d+)?)\s+)?(?:(\d+)\/(\d+)|(\d+(?:\.\d+)?))/);
+  if (!m) return null;
+  const n = (m[1] ? Number(m[1]) : 0) + (m[2] ? Number(m[2]) / Number(m[3]) : Number(m[4] ?? 0));
+  return n > 0 ? { n, unit: s.slice(m[0].length).trim().toLowerCase(), rest: s.slice(m[0].length).trim() } : null;
+}

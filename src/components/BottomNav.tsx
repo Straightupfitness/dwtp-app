@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { IconCircles, IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts } from "./Icons";
+import { IconCircles, IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
 
 // Order set by Michael (October 28). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
@@ -10,6 +10,7 @@ const CLIENT = [
   { href: "/circles", label: "Circles", Icon: IconCircles },
   { href: "/food", label: "Food", Icon: IconFood },
   { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
+  { href: "/progress", label: "Progress", Icon: IconProgress },
   { href: "/community", label: "Community", Icon: IconCommunity },
   { href: "/lessons", label: "Lessons", Icon: IconLessons },
 ];

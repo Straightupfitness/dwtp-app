@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { photoTakenAt } from "@/lib/exif";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
-import { totals, type FoodItem } from "@/lib/food";
+import { parseQty, totals, type FoodItem } from "@/lib/food";
 import { saveMeal, updateMeal, deleteGoTo } from "./actions";
 import { EDIT_EVENT, type MealToEdit } from "./EditMeal";
 import FoodSearch from "./FoodSearch";
@@ -19,7 +19,16 @@ const Cam = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
 const Mic = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const Spark = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z" /><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></svg>;
 
-export default function MealLogger({ userId, defaultSlot, goTos }: { userId: string; defaultSlot: Slot; goTos: GoTo[] }) {
+const fmtQty = (n: number) => (Math.abs(n - Math.round(n)) < 0.01 ? String(Math.round(n)) : String(Math.round(n * 100) / 100));
+/** The same food, k times as much: every number scales together. */
+function scaleItem(base: FoodItem, k: number, amount: string): FoodItem {
+  const r1 = (x: number) => Math.round(x * k * 10) / 10;
+  return { ...base, amount, calories: Math.round(base.calories * k), protein_g: r1(base.protein_g), fiber_g: r1(base.fiber_g), potassium_mg: Math.round(base.potassium_mg * k) };
+}
+
+export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }: { userId: string; defaultSlot: Slot; goTos: GoTo[]; day: string; isToday: boolean }) {
+  // Logging on a past day she's looking at: start at noon that day (she can change the time).
+  const defaultWhen = () => (isToday ? null : new Date(`${day}T12:00:00`));
   const [mode, setMode] = useState<"home" | "describe" | "review">("home");
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -30,7 +39,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   const [savedId, setSavedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [adder, setAdder] = useState<"type" | "search" | "scan">("type");
-  const [when, setWhen] = useState<Date | null>(null); // null = now
+  const [when, setWhen] = useState<Date | null>(defaultWhen); // null = now
   const [extra, setExtra] = useState("");
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState<"" | "estimating" | "adding" | "saving">("");
@@ -53,7 +62,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
   }, []);
 
   function reset() {
-    setMode("home"); setAdder("type"); setWhen(null); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
     setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null);
   }
   async function estimate(image: Blob | null, description: string) {
@@ -72,7 +81,7 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
     if (!f) return;
     // A photo from her library: log it at the time she took it (if it's from the last week).
     const taken = await photoTakenAt(f);
-    setWhen(taken && Date.now() - taken.getTime() > 10 * 60_000 && Date.now() - taken.getTime() < 7 * 86_400_000 ? taken : null);
+    setWhen(taken && Date.now() - taken.getTime() > 10 * 60_000 && Date.now() - taken.getTime() < 7 * 86_400_000 ? taken : defaultWhen());
     const small = await shrinkImage(f, 1024, 0.8);
     setPhoto(small); setPreview(URL.createObjectURL(small));
     estimate(small, "");
@@ -118,8 +127,26 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
     setBusy("");
     if (r?.error) setError(r.error); else reset();
   }
-  const edit = (i: number, k: keyof FoodItem, v: string) =>
+  // The food as it was when she opened it to edit: amount changes scale from this, so numbers never drift.
+  const base = useRef<FoodItem | null>(null);
+  const openItem = (i: number | null) => { base.current = i === null ? null : items[i]; setEditing(i); };
+  const edit = (i: number, k: keyof FoodItem, v: string) => {
+    if (k === "amount" && base.current) {
+      // "6 oz" → "8 oz": calories, protein, fiber and potassium follow (October 29 feedback).
+      const was = parseQty(base.current.amount), now = parseQty(v);
+      if (was && now && was.unit === now.unit) { const b = base.current; setItems((l) => l.map((it, j) => (j === i ? scaleItem(b, now.n / was.n, v) : it))); return; }
+    }
+    if (k !== "amount" && k !== "name") base.current = null; // she typed her own numbers: those win
     setItems((l) => l.map((it, j) => (j === i ? { ...it, [k]: k === "name" || k === "amount" ? v : Number(v) } : it)));
+  };
+  /** Servings buttons: ½×, 1×, 1½×, 2× of the amount she opened it with. */
+  const times = (i: number, k: number) => {
+    const b = base.current ?? items[i];
+    base.current = b;
+    const q = parseQty(b.amount);
+    const amount = q ? `${fmtQty(q.n * k)} ${q.rest}`.trim() : k === 1 ? b.amount : `${fmtQty(k)} × ${b.amount}`;
+    setItems((l) => l.map((it, j) => (j === i ? scaleItem(b, k, amount) : it)));
+  };
 
   const slotLabel = SLOTS.find((s) => s.v === slot)!.label;
   const input = "min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-bg px-3 text-base text-text outline-none focus:border-accent";
@@ -145,13 +172,14 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
           </button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+          {goTos.length > 0 && <span className="flex shrink-0 items-center text-[12px] font-semibold uppercase tracking-[0.1em] text-accent">★ Favorites</span>}
           {goTos.map((g) => (
             <button key={g.id} type="button" onClick={() => { setItems(g.items); setSavedId(g.id); setText(g.name); setNotes(""); setMode("review"); }}
               className="min-h-10 shrink-0 rounded-full border border-[#2a2a2a] px-3.5 text-[13px]">+ {g.name}</button>
           ))}
           {goTos.length > 0
             ? <button type="button" onClick={() => setManage(!manage)} className="min-h-10 shrink-0 rounded-full px-2 text-[13px] text-dim">{manage ? "Done" : "Edit"}</button>
-            : <span className="py-2 text-xs text-dim">Save a meal as a go-to to log it again with one tap.</span>}
+            : <span className="py-2 text-xs text-dim">★ Save a meal as a favorite (like your daily breakfast) to log it again with one tap.</span>}
         </div>
         {manage && (
           <ul className="divide-y divide-border rounded-xl border border-border">
@@ -230,6 +258,13 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
                   <input value={it.name} onChange={(e) => edit(i, "name", e.target.value)} aria-label="Food" className={input} />
                   <input value={it.amount} onChange={(e) => edit(i, "amount", e.target.value)} aria-label="Amount" className={`${input} w-28`} />
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-dim">Servings</span>
+                  {([[0.5, "½×"], [1, "1×"], [1.5, "1½×"], [2, "2×"], [3, "3×"]] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => times(i, k)} className="min-h-9 flex-1 rounded-lg border border-[#2a2a2a] text-[13px]">{l}</button>
+                  ))}
+                </div>
+                <p className="-mt-0.5 text-[11px] text-dim">Change the amount (6 oz → 8 oz) and every number below changes with it.</p>
                 <div className="grid grid-cols-4 gap-2">
                   {([["calories", "kcal"], ["protein_g", "protein g"], ["fiber_g", "fiber g"], ["potassium_mg", "K mg"]] as const).map(([k, l]) => (
                     <label key={k} className="text-[11px] text-dim">{l}
@@ -238,12 +273,12 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
                   ))}
                 </div>
                 <div className="flex justify-between">
-                  <button type="button" onClick={() => { setItems(items.filter((_, j) => j !== i)); setEditing(null); }} className="min-h-10 text-sm text-[var(--red)]">Remove</button>
-                  <button type="button" onClick={() => setEditing(null)} className="min-h-10 text-sm font-semibold text-accent">Done</button>
+                  <button type="button" onClick={() => { setItems(items.filter((_, j) => j !== i)); openItem(null); }} className="min-h-10 text-sm text-[var(--red)]">Remove</button>
+                  <button type="button" onClick={() => openItem(null)} className="min-h-10 text-sm font-semibold text-accent">Done</button>
                 </div>
               </div>
             ) : (
-              <button key={i} type="button" onClick={() => setEditing(i)} className="flex min-h-[58px] w-full items-center gap-2.5 text-left">
+              <button key={i} type="button" onClick={() => openItem(i)} className="flex min-h-[58px] w-full items-center gap-2.5 text-left">
                 <span className="flex-1"><span className="block text-[15px] font-medium">{it.name}</span><span className="block text-xs text-dim">{it.amount}</span></span>
                 <span className="text-right"><span className="block text-sm font-semibold">{Math.round(it.calories)}</span><span className="block text-xs text-[#a8a8a8]">{it.protein_g} g protein</span></span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
@@ -276,11 +311,11 @@ export default function MealLogger({ userId, defaultSlot, goTos }: { userId: str
         {items.length > 0 && !savedId && (
           <label className="flex items-center gap-2.5 text-sm">
             <input type="checkbox" checked={saveAs !== null} onChange={(e) => setSaveAs(e.target.checked ? "" : null)} className="size-5 accent-[var(--accent)]" />
-            Save as a go-to meal
+            ★ Save as a favorite (log it again with one tap)
           </label>
         )}
         {saveAs !== null && (
-          <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder="Name it, e.g. MVP bowl" aria-label="Go-to meal name"
+          <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder="Name it, e.g. Daily breakfast" aria-label="Favorite meal name"
             className="min-h-11 w-full rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
         )}
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
@@ -312,7 +347,7 @@ const now = () => new Date();
 const dayLabel = (i: number) => (i === 0 ? "Today" : i === 1 ? "Yesterday" : new Date(now().getTime() - i * 86_400_000).toLocaleDateString("en-US", { weekday: "long" }));
 const daysAgo = (d: Date) => Math.round((new Date(now().toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000);
 
-/** When she ate it: now by default; any time in the last 7 days (e.g. a lunch photo logged that evening). */
+/** When she ate it: now by default (or the past day she's looking at); any day in the last week, or the older day she's on. */
 function WhenPicker({ when, onChange }: { when: Date | null; onChange: (d: Date | null) => void }) {
   const d = when ?? now();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -326,13 +361,14 @@ function WhenPicker({ when, onChange }: { when: Date | null; onChange: (d: Date 
   return (
     <div className="flex items-center gap-2 rounded-[14px] border border-border bg-card px-3 py-2">
       <span className="text-[13px] text-[#a8a8a8]">Eaten</span>
-      <select aria-label="Day" value={Math.min(dayOffset, 6)} onChange={(e) => set(Number(e.target.value), time)}
+      <select aria-label="Day" value={dayOffset} onChange={(e) => set(Number(e.target.value), time)}
         className="min-h-10 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[15px] outline-none focus:border-accent">
         {Array.from({ length: 7 }, (_, i) => (
           <option key={i} value={i}>{dayLabel(i)}</option>
         ))}
+        {dayOffset > 6 && <option value={dayOffset}>{d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</option>}
       </select>
-      <input type="time" aria-label="Time" value={time} onChange={(e) => e.target.value && set(Math.min(dayOffset, 6), e.target.value)}
+      <input type="time" aria-label="Time" value={time} onChange={(e) => e.target.value && set(dayOffset, e.target.value)}
         className="min-h-10 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[15px] outline-none focus:border-accent" />
       {when && <button type="button" onClick={() => onChange(null)} className="min-h-10 px-1 text-xs text-accent">Now</button>}
     </div>

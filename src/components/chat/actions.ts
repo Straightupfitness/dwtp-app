@@ -30,3 +30,14 @@ export async function markRead(clientId: string) {
     .eq("client_id", clientId).neq("sender_id", user.id).is("read_at", null);
   if (count) revalidatePath("/", "layout");
 }
+
+/** Like (♥) a message from the other person, or take the like back (October 29). */
+export async function toggleHeart(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const { data: m } = await supabase.from("messages").select("sender_id, hearted_at").eq("id", id).maybeSingle();
+  if (!m || m.sender_id === user.id) return;
+  await supabase.from("messages").update({ hearted_at: m.hearted_at ? null : new Date().toISOString() }).eq("id", id);
+  revalidatePath("/", "layout");
+}
