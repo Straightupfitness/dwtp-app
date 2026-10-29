@@ -15,6 +15,7 @@ import { after } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { progressFor } from "@/lib/badges-server";
 import WaterCard from "./WaterCard";
+import CirclesGlance from "@/components/CirclesGlance";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -154,6 +155,7 @@ export default async function TodayPage() {
         weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
+      <CirclesGlance state={state} />
 
       {all.length > 0 && (
         <>

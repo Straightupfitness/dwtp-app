@@ -77,9 +77,9 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
 
   return (
     <section className="space-y-4">
-      <Link href="/circles" className="inline-flex min-h-11 items-center gap-1 text-sm text-dim">
+      <Link href="/progress#circles" className="inline-flex min-h-11 items-center gap-1 text-sm text-dim">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-        Circles
+        Progress
       </Link>
       <header>
         {c.focus && <p className="text-xs uppercase tracking-[0.15em] text-accent">Focus circle</p>}

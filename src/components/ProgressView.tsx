@@ -27,8 +27,8 @@ function Goal({ label, value, unit, sub }: { label: string; value: string; unit?
  * Everything she's done, on one screen (October 29): her goals, weight, food (calories, protein, fiber, potassium),
  * steps and water day by day, and her badges. Michael sees the same view on each client's page.
  */
-export default function ProgressView({ data, badges, range, base, coach = false }: {
-  data: Daily; badges: BadgeStatus[]; range: number; base: string; coach?: boolean;
+export default function ProgressView({ data, badges, range, base, coach = false, hideBadges = false }: {
+  data: Daily; badges: BadgeStatus[]; range: number; base: string; coach?: boolean; hideBadges?: boolean;
 }) {
   const g = data.goals;
   const days = data.days.slice(-range);
@@ -36,7 +36,6 @@ export default function ProgressView({ data, badges, range, base, coach = false 
   const lost = g.startWeight && last ? Math.round((g.startWeight - last.lbs) * 10) / 10 : null;
   const series = (f: (d: (typeof days)[number]) => number | null) => days.map((d) => ({ date: d.date, value: f(d) }));
   const hasSteps = days.some((d) => d.steps);
-  const she = coach ? "She" : "You";
 
   return (
     <div className="space-y-4">
@@ -105,24 +104,7 @@ export default function ProgressView({ data, badges, range, base, coach = false 
             : <p className="text-[13px] text-dim">{coach ? "Her steps show here once her iPhone syncs them (Shortcut under Account)." : "Your steps show here once your iPhone syncs them. Set it up under Account → Apple Health. You also report your weekly average in your check-in."}</p>}</div></div>
       </section>
 
-      <section className={`${card} space-y-3`}>
-        <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>
-        <ul className="grid grid-cols-1 gap-2">
-          {badges.map((b) => (
-            <li key={b.def.key} className="flex items-center gap-3 rounded-[14px] border border-border bg-[#141414] p-2.5">
-              <BadgeIcon badge={b.def.key} size={48} earned={b.earned} progress={b.current / b.goal} />
-              <span className="min-w-0 flex-1">
-                <span className={`${display} block text-[16px] leading-tight`} style={{ color: b.earned ? b.def.color : undefined }}>{b.def.name}</span>
-                <span className="block text-[12px] leading-snug text-[#a8a8a8]">{b.def.rule}</span>
-              </span>
-              <span className="shrink-0 text-right text-[12px]">
-                {b.earned ? <span className="font-semibold text-[#7ee2a8]">Earned</span> : <><b className="text-text">{Math.min(b.current, b.goal)}</b><span className="text-dim">/{b.goal} {b.unit}</span></>}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p className="text-[11px] text-dim">{she} keep{coach ? "s" : ""} a badge for good once it&apos;s earned. Earned badges show next to {coach ? "her" : "your"} name in Community.</p>
-      </section>
+      {!hideBadges && <BadgesCard badges={badges} coach={coach} />}
 
       <details className={`${card} group`}>
         <summary className={`${display} cursor-pointer list-none text-lg`}>Every day, in numbers <span className="inline-block text-dim transition group-open:rotate-180">⌄</span></summary>
@@ -142,5 +124,30 @@ export default function ProgressView({ data, badges, range, base, coach = false 
         </div>
       </details>
     </div>
+  );
+}
+
+/** Her badges: earned ones in color, the rest with how far along she is. */
+export function BadgesCard({ badges, coach = false }: { badges: BadgeStatus[]; coach?: boolean }) {
+  const she = coach ? "She" : "You";
+  return (
+      <section className={`${card} space-y-3`}>
+        <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>
+        <ul className="grid grid-cols-1 gap-2">
+          {badges.map((b) => (
+            <li key={b.def.key} className="flex items-center gap-3 rounded-[14px] border border-border bg-[#141414] p-2.5">
+              <BadgeIcon badge={b.def.key} size={48} earned={b.earned} progress={b.current / b.goal} />
+              <span className="min-w-0 flex-1">
+                <span className={`${display} block text-[16px] leading-tight`} style={{ color: b.earned ? b.def.color : undefined }}>{b.def.name}</span>
+                <span className="block text-[12px] leading-snug text-[#a8a8a8]">{b.def.rule}</span>
+              </span>
+              <span className="shrink-0 text-right text-[12px]">
+                {b.earned ? <span className="font-semibold text-[#7ee2a8]">Earned</span> : <><b className="text-text">{Math.min(b.current, b.goal)}</b><span className="text-dim">/{b.goal} {b.unit}</span></>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] text-dim">{she} keep{coach ? "s" : ""} a badge for good once it&apos;s earned. Earned badges show next to {coach ? "her" : "your"} name in Community.</p>
+      </section>
   );
 }

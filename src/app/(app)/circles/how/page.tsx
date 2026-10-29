@@ -43,7 +43,7 @@ export default async function HowItWorks() {
 
   return (
     <section className="space-y-7 pb-6">
-      <Link href="/circles" className="inline-flex min-h-11 items-center text-sm text-dim">← Circles</Link>
+      <Link href="/progress#circles" className="inline-flex min-h-11 items-center text-sm text-dim">← Progress</Link>
       <header className="space-y-2">
         <p className={label}>How this works</p>
         <h1 className={`${display} text-[30px] font-semibold leading-tight`}>Your 26 weeks</h1>

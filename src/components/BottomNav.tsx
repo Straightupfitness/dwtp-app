@@ -2,12 +2,11 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { IconCircles, IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
+import { IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
 
-// Order set by Michael (October 28). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
+// Order set by Michael (October 28); Circles moved into Progress (October 29). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
   { href: "/today", label: "Today", Icon: IconToday },
-  { href: "/circles", label: "Circles", Icon: IconCircles },
   { href: "/food", label: "Food", Icon: IconFood },
   { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
   { href: "/progress", label: "Progress", Icon: IconProgress },
@@ -29,7 +28,9 @@ export default function BottomNav({ coach = false }: { coach?: boolean }) {
     try { sessionStorage.setItem("dwtp:screens", String(Number(sessionStorage.getItem("dwtp:screens") ?? 0) + 1)); } catch {}
   }, [path]);
   const tabs = coach ? COACH : CLIENT;
-  const active = tabs.filter((t) => path.startsWith(t.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  // The circles live inside Progress (October 29), so a circle page lights up Progress.
+  const here = path.startsWith("/circles") ? "/progress" : path;
+  const active = tabs.filter((t) => here.startsWith(t.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
