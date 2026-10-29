@@ -12,6 +12,7 @@ Return ONLY a JSON object, no other text:
 Rules:
 - One entry per food you can identify. Use USDA-style typical values.
 - "amount" in everyday units (e.g. "6 oz", "1 medium", "1 cup", "2 tbsp").
+- Spoken descriptions often repeat words or whole phrases (speech-to-text glitches): list each food ONCE, unless she clearly says she had it more than once ("two of", "another"). Never return the same food twice.
 - If the description gives amounts or brands, use them over what the photo suggests.
 - Include sauces, oils, butter, dressings and drinks: the "tiny calories" count.
 - When unsure of portion size, assume a typical home portion and say so in "notes" (one short sentence).
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
   try {
     const reply = await askClaude({ system: SYSTEM, content });
     const estimate = parseJson<FoodEstimate>(reply);
-    estimate.items = (estimate.items ?? []).slice(0, 20);
+    // Belt and braces: the same food with the same amount listed twice in a row is a dictation repeat.
+    estimate.items = (estimate.items ?? []).filter((it, i, a) => !a.slice(0, i).some((x) => x.name.trim().toLowerCase() === it.name.trim().toLowerCase() && x.amount.trim().toLowerCase() === it.amount.trim().toLowerCase())).slice(0, 20);
     return NextResponse.json(estimate);
   } catch (e) {
     console.error("food analyze failed", e);

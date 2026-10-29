@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { photoTakenAt } from "@/lib/exif";
+import { useDictation } from "@/lib/useDictation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { parseQty, totals, type FoodItem } from "@/lib/food";
@@ -12,7 +13,6 @@ import BarcodeScanner from "./BarcodeScanner";
 type Slot = "meal_1" | "meal_2" | "meal_3" | "other";
 const SLOTS: { v: Slot; label: string }[] = [{ v: "meal_1", label: "Meal 1" }, { v: "meal_2", label: "Meal 2" }, { v: "meal_3", label: "Meal 3" }, { v: "other", label: "Other" }];
 export type GoTo = { id: string; name: string; items: FoodItem[] };
-type SpeechRec = { lang: string; interimResults: boolean; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; onend: () => void; start: () => void; stop: () => void };
 
 const toDataUrl = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsDataURL(b); });
 const Cam = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>;
@@ -38,16 +38,14 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
   const [notes, setNotes] = useState("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
-  const [adder, setAdder] = useState<"type" | "search" | "scan">("type");
+  const [adder, setAdder] = useState<"type" | "search" | "scan" | "own">("type");
   const [when, setWhen] = useState<Date | null>(defaultWhen); // null = now
   const [extra, setExtra] = useState("");
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState<"" | "estimating" | "adding" | "saving">("");
   const [error, setError] = useState("");
-  const [listening, setListening] = useState(false);
   const [manage, setManage] = useState(false);
   const [editId, setEditId] = useState<string | null>(null); // set when she's changing a meal she already saved
-  const rec = useRef<SpeechRec | null>(null);
   const voice = useRef(false);
 
   // "Edit" on a saved meal opens it here, with its foods, meal, time and photo.
@@ -86,16 +84,9 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
     setPhoto(small); setPreview(URL.createObjectURL(small));
     estimate(small, "");
   }
-  function toggleVoice() {
-    const W = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const Rec = W.SpeechRecognition ?? W.webkitSpeechRecognition;
-    if (!Rec) { setError("Tap the microphone on your keyboard to speak instead."); return; }
-    if (listening) { rec.current?.stop(); return; }
-    const r = new Rec(); r.lang = "en-US"; r.interimResults = false;
-    r.onresult = (e) => { voice.current = true; setText((t) => (t ? t + " " : "") + e.results[0][0].transcript); };
-    r.onend = () => setListening(false);
-    rec.current = r; setListening(true); r.start();
-  }
+  const dictation = useDictation((t) => { voice.current = true; setText(t); });
+  const listening = dictation.listening;
+  function toggleVoice() { dictation.toggle(text); }
   async function addTyped() {
     if (!extra.trim()) return;
     setBusy("adding"); setError("");
@@ -208,9 +199,9 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={reset} className="min-h-12 flex-1 rounded-xl border border-border">Cancel</button>
-          <button type="button" disabled={!text.trim()} onClick={() => estimate(null, text)} className="min-h-12 flex-1 rounded-xl bg-accent font-semibold text-black disabled:opacity-40">Estimate</button>
+          <button type="button" disabled={!text.trim()} onClick={() => { if (listening) toggleVoice(); estimate(null, text); }} className="min-h-12 flex-1 rounded-xl bg-accent font-semibold text-black disabled:opacity-40">Estimate</button>
         </div>
-        {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+        {(error || dictation.error) && <p className="text-sm text-[var(--red)]">{error || dictation.error}</p>}
       </div>
     );
   }
@@ -289,8 +280,8 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
 
         {busy !== "estimating" && (
           <div className="space-y-2.5">
-            <div className="grid grid-cols-3 gap-1 rounded-[14px] border border-border bg-card p-1">
-              {([["type", "Type it"], ["search", "Search foods"], ["scan", "Scan barcode"]] as const).map(([v, l]) => (
+            <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-border bg-card p-1">
+              {([["type", "Type it"], ["search", "Search"], ["scan", "Barcode"], ["own", "From label"]] as const).map(([v, l]) => (
                 <button key={v} type="button" onClick={() => setAdder(v)} aria-pressed={adder === v}
                   className={`min-h-10 rounded-[10px] text-[13px] ${adder === v ? "bg-[#2a2a2a] font-semibold text-text" : "text-dim"}`}>{l}</button>
               ))}
@@ -300,9 +291,11 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
                 <input value={extra} onChange={(e) => setExtra(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTyped(); }}
                   placeholder={items.length ? "Missed something? e.g. 1 tbsp butter" : "e.g. 6 oz salmon"} aria-label="Add a food by typing it"
                   className="min-h-12 flex-1 rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
-                <button type="button" disabled={busy !== "" || !extra.trim()} onClick={addTyped} className="min-h-12 rounded-xl border border-accent px-4 font-semibold text-accent disabled:opacity-40">{busy === "adding" ? "…" : "Add"}</button>
+                <button type="button" disabled={busy !== "" || !extra.trim()} onClick={addTyped} className="min-h-12 rounded-xl border border-accent px-4 font-semibold text-accent disabled:opacity-40">{busy === "adding" ? "…" : "Calculate"}</button>
               </div>
             )}
+            {adder === "type" && <p className="-mt-1 text-[11px] text-dim">Type a food and how much, then tap Calculate. The numbers fill in for you.</p>}
+            {adder === "own" && <OwnNumbers onAdd={(it) => setItems((l) => [...l, it])} />}
             {adder === "search" && <FoodSearch onAdd={(it) => setItems((l) => [...l, it])} />}
             {adder === "scan" && <BarcodeScanner onAdd={(it) => setItems((l) => [...l, it])} onClose={() => setAdder("type")} />}
           </div>
@@ -371,6 +364,34 @@ function WhenPicker({ when, onChange }: { when: Date | null; onChange: (d: Date 
       <input type="time" aria-label="Time" value={time} onChange={(e) => e.target.value && set(dayOffset, e.target.value)}
         className="min-h-10 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[15px] outline-none focus:border-accent" />
       {when && <button type="button" onClick={() => onChange(null)} className="min-h-10 px-1 text-xs text-accent">Now</button>}
+    </div>
+  );
+}
+
+/** "From label": she types the food and its numbers herself (a nutrition label, a recipe, her coach's plan). */
+function OwnNumbers({ onAdd }: { onAdd: (it: FoodItem) => void }) {
+  const blank = { name: "", amount: "", calories: "", protein_g: "", fiber_g: "", potassium_mg: "" };
+  const [f, setF] = useState(blank);
+  const cls = "min-h-11 w-full rounded-lg border border-[#2a2a2a] bg-card px-3 text-base text-text outline-none focus:border-accent";
+  const ok = f.name.trim() && f.calories !== "";
+  return (
+    <div className="space-y-2 rounded-2xl border border-border bg-bg p-3">
+      <div className="flex gap-2">
+        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Food, e.g. Protein bar" aria-label="Food" className={cls} />
+        <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="1 bar" aria-label="Amount" className={`${cls} w-28`} />
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {([["calories", "kcal"], ["protein_g", "protein g"], ["fiber_g", "fiber g"], ["potassium_mg", "K mg"]] as const).map(([k, l]) => (
+          <label key={k} className="text-[11px] text-dim">{l}
+            <input type="number" inputMode="decimal" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} className={`${cls} mt-1 px-2 text-sm`} />
+          </label>
+        ))}
+      </div>
+      <button type="button" disabled={!ok} onClick={() => {
+        onAdd({ name: f.name.trim(), amount: f.amount.trim() || "1 serving", calories: Number(f.calories) || 0, protein_g: Number(f.protein_g) || 0, fiber_g: Number(f.fiber_g) || 0, potassium_mg: Number(f.potassium_mg) || 0 });
+        setF(blank);
+      }} className="min-h-11 w-full rounded-lg border border-accent text-sm font-semibold text-accent disabled:opacity-40">Add to meal</button>
+      <p className="text-[11px] text-dim">Leave fiber or potassium blank if the label doesn&apos;t say.</p>
     </div>
   );
 }
