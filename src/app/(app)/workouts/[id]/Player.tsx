@@ -23,8 +23,15 @@ const display = "font-[family-name:var(--font-display)] uppercase";
 const key = (pos: number, set: number) => `${pos}:${set}`;
 const yt = (id: string, loop = false) =>
   `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1${loop ? `&autoplay=1&mute=1&loop=1&playlist=${id}&controls=0` : ""}`;
-/** What she types into a time box: "90", "1:30" → seconds. */
-const toSeconds = (s: string) => { const m = s.trim().match(/^(\d+):(\d{1,2})$/); return m ? +m[1] * 60 + +m[2] : s.trim() ? Math.round(Number(s)) : null; };
+/** What she types into a time box: "90" or "90s" → 90 s, "1:30" → 90 s, "2m" or "2 min" → 120 s. */
+const toSeconds = (s: string) => {
+  const t = s.trim().toLowerCase();
+  if (!t) return null;
+  let m = t.match(/^(\d+):(\d{1,2})$/); if (m) return +m[1] * 60 + +m[2];
+  m = t.match(/^(\d+(?:\.\d+)?)\s*(m|min|mins|minutes?)$/); if (m) return Math.round(+m[1] * 60);
+  m = t.match(/^(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?)?$/); if (m) return Math.round(+m[1]);
+  return null;
+};
 const nowMs = () => Date.now();
 const mmss = (n: number) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}`;
 
@@ -44,6 +51,8 @@ function describe(s: SetVals) {
 export default function Player({ workout, phase, overview, steps, session, preview }: Props) {
   const [step, setStep] = useState<number>(-1); // -1 = start screen, steps.length = finished
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
+  // A time box keeps exactly what she types ("1:3" on the way to "1:30") until she leaves it (October 30 fix).
+  const [timeText, setTimeText] = useState<Record<string, string>>({});
   const [vals, setVals] = useState<Record<string, SetVals & { done?: boolean }>>(() => {
     const v: Record<string, SetVals & { done?: boolean }> = {};
     for (const s of steps) for (const l of s.logged) v[key(s.position, l.set_no)] = { ...l, done: true };
@@ -267,10 +276,12 @@ export default function Player({ workout, phase, overview, steps, session, previ
                   {fields.map((f) => (
                     <label key={f} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-[10px] border border-[#2a2a2a] bg-bg px-2.5">
                       <input aria-label={`Set ${n} ${LABEL[f]}`} disabled={v.done} inputMode={f === "note" || f === "seconds" ? "text" : f === "weight" ? "decimal" : "numeric"}
-                        value={f === "seconds" ? (v.seconds != null ? mmss(v.seconds) : "") : (v[f] ?? "") as string | number}
-                        placeholder={f === "seconds" ? (lastSet?.seconds != null ? mmss(lastSet.seconds) : s.seconds ? mmss(s.seconds) : "0:00") : String(lastSet?.[f] ?? (f === "reps" && s.target && /^\d+$/.test(s.target) ? s.target : "–"))}
+                        value={f === "seconds" ? (timeText[k] ?? (v.seconds != null ? mmss(v.seconds) : "")) : (v[f] ?? "") as string | number}
+                        onBlur={() => { if (f === "seconds") setTimeText((t) => { const n = { ...t }; delete n[k]; return n; }); }}
+                        placeholder={f === "seconds" ? (lastSet?.seconds != null ? mmss(lastSet.seconds) : s.seconds ? mmss(s.seconds) : "m:ss") : String(lastSet?.[f] ?? (f === "reps" && s.target && /^\d+$/.test(s.target) ? s.target : "–"))}
                         onChange={(e) => {
                           const raw = e.target.value;
+                          if (f === "seconds") setTimeText((t) => ({ ...t, [k]: raw }));
                           setVals((x) => ({ ...x, [k]: { ...x[k], [f]: f === "note" ? raw : f === "seconds" ? toSeconds(raw) : raw === "" ? null : Number(raw.replace(",", ".")) } }));
                         }}
                         className="min-h-11 w-full min-w-0 bg-transparent text-[17px] font-semibold tabular-nums outline-none placeholder:font-normal placeholder:text-[#5a5a5a] disabled:text-[#b7e4c0]" />

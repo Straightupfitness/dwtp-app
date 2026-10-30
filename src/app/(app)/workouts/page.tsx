@@ -4,6 +4,7 @@ import { IconDumbbell } from "@/components/Icons";
 import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
 import BackButton from "@/components/BackButton";
 import PhaseCard from "./PhaseCard";
+import WorkoutPicker from "./WorkoutPicker";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const fmtDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -57,6 +58,14 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
     for (const r of past ?? []) { const i = (r.program_week as number) - firstHer; if (i >= 0 && i < doneByWeek.length) doneByWeek[i] = Math.min(perWeek, doneByWeek[i] + 1); }
   }
   if (phase) doneByWeek[data.weekOfPhase - 1] = done;
+  // Every workout in her program, by phase, for "Pick any workout" (October 30).
+  const { data: allPhases } = await supabase.from("program_phases").select("name, stage, position, phase_workouts(day, workouts(id, name, kind))").eq("program", data.program.id).order("position");
+  type PW = { day: number | null; workouts: { id: number; name: string; kind: string } | null };
+  const pickGroups = (allPhases ?? []).map((ph) => ({
+    label: phaseLabel(ph.name, ph.stage),
+    workouts: ((ph.phase_workouts ?? []) as unknown as PW[]).filter((l) => l.workouts?.kind === "strength").sort((x, y) => (x.day ?? 99) - (y.day ?? 99))
+      .map((l) => ({ id: l.workouts!.id, name: l.workouts!.name })),
+  })).filter((g) => g.workouts.length);
   const nextIdx = data.nextUp ? data.strength.findIndex((s) => s.id === data.nextUp!.id) : -1;
   const nextUp = !preview && !asked ? data.nextUp : null;
 
@@ -103,6 +112,14 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           {data.strength.length > 0 && done === data.strength.length && (
             <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.</p>
           )}
+
+          {/* Any workout, any time (October 30): a drop-down of her whole program, and freestyle by equipment. */}
+          <div className="space-y-2.5 rounded-[18px] border border-border bg-card p-3.5">
+            {pickGroups.length > 0 && <WorkoutPicker groups={pickGroups} />}
+            <Link href="/workouts/freestyle" className="flex min-h-12 items-center justify-between rounded-[14px] border border-accent px-3.5 text-[14px] font-semibold text-accent">
+              Freestyle: workouts for the gear you have<span aria-hidden="true">›</span>
+            </Link>
+          </div>
 
           <Link href="/workouts/history" className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-card px-3.5 text-[14px] font-semibold">
             Your workout history<span className="text-dim">Every set you&apos;ve logged ›</span>

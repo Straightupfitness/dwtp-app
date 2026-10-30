@@ -28,6 +28,8 @@ export type DbFood = {
   id: string; name: string; brand?: string | null; source: "usda" | "off";
   per100: { calories: number; protein_g: number; fiber_g: number; potassium_mg: number };
   servingGrams?: number | null; servingLabel?: string | null;
+  /** Household portions with their weight: [{label: "1 egg", grams: 50}, {label: "1 cup", grams: 245}]. */
+  portions?: { label: string; grams: number }[];
 };
 
 const r1 = (n: number) => Math.round(n * 10) / 10;

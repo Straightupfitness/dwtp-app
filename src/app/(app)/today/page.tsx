@@ -155,6 +155,9 @@ export default async function TodayPage() {
         weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
+      <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
+        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, food, water and habits</span></span><span className="text-accent">›</span>
+      </Link>
       <CirclesGlance state={state} />
 
       {all.length > 0 && (
