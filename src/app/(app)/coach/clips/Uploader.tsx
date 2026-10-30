@@ -2,8 +2,11 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-/** Pick the "DWTP Exercise Clips" folder once: every <id>.mp4 and <id>.jpg goes to exercise-clips/sltp/. */
-export default function Uploader() {
+/**
+ * Pick a folder once: every <id>.mp4 and <id>.jpg in it goes to exercise-clips/<prefix>/.
+ * "DWTP Exercise Clips" → sltp/ (October 28), "DWTP Recipe Media" → recipes/ (October 29).
+ */
+export default function Uploader({ prefix = "sltp", folder = "DWTP Exercise Clips", what = "clips" }: { prefix?: string; folder?: string; what?: string }) {
   const [files, setFiles] = useState<File[]>([]);
   const [done, setDone] = useState(0);
   const [failed, setFailed] = useState<string[]>([]);
@@ -16,7 +19,7 @@ export default function Uploader() {
     const queue = [...files];
     const worker = async () => {
       for (let f = queue.shift(); f; f = queue.shift()) {
-        const { error } = await sb.storage.from("exercise-clips").upload(`sltp/${f.name}`, f, {
+        const { error } = await sb.storage.from("exercise-clips").upload(`${prefix}/${f.name}`, f, {
           upsert: true, contentType: f.name.endsWith(".mp4") ? "video/mp4" : "image/jpeg", cacheControl: "31536000",
         });
         if (error) setFailed((x) => [...x, `${f.name}: ${error.message}`]);
@@ -32,7 +35,7 @@ export default function Uploader() {
   return (
     <div className="space-y-3">
       <label className="flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[16px] border-2 border-dashed border-[#3a3a3a] bg-card p-4 text-center">
-        <span className="text-[15px] font-semibold">Choose the &ldquo;DWTP Exercise Clips&rdquo; folder</span>
+        <span className="text-[15px] font-semibold">Choose the &ldquo;{folder}&rdquo; folder</span>
         <span className="text-[13px] text-dim">In Downloads. Pick the folder itself.</span>
         <input type="file" multiple className="hidden" disabled={running}
           {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
@@ -40,7 +43,7 @@ export default function Uploader() {
       </label>
       {files.length > 0 && (
         <div className="space-y-2.5 rounded-[16px] border border-border bg-card p-3.5">
-          <p className="text-[14px]">{files.filter((f) => f.name.endsWith(".mp4")).length} clips and {files.filter((f) => f.name.endsWith(".jpg")).length} pictures · {mb} MB</p>
+          <p className="text-[14px]">{files.filter((f) => f.name.endsWith(".mp4")).length} {what === "clips" ? "clips" : "videos"} and {files.filter((f) => f.name.endsWith(".jpg")).length} pictures · {mb} MB</p>
           <div className="h-2 rounded-full bg-[#262626]"><div className="h-2 rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} /></div>
           <p className="text-[13px] text-dim">{running ? `Uploading… ${done} of ${files.length}. Keep this page open.` : finished ? `Done: ${done - failed.length} uploaded${failed.length ? `, ${failed.length} failed` : ""}.` : "Ready."}</p>
           {!running && !finished && <button type="button" onClick={upload} className="min-h-12 w-full rounded-[12px] bg-accent font-semibold text-black">Upload all</button>}

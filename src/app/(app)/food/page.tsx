@@ -99,6 +99,15 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
 
       <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[] })) as GoTo[]} />
 
+      {/* Recipes (October 29): Michael's and the library, to cook and log in a tap. */}
+      <Link href="/food/recipes" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 8h7M9 11.5h5" /></svg>
+        </span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Recipes</span><span className="block text-[12px] text-dim">Michael&apos;s recipes and 2,000+ more. Cook one, log it in a tap.</span></span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </Link>
+
       <div className="space-y-2.5">
         {meals.map((m) => (
           <article key={m.id} className="flex gap-3 rounded-2xl border border-border bg-card p-2.5">

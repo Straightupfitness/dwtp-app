@@ -151,3 +151,30 @@ export async function favoriteMeal(id: string, name: string) {
   await saveGoTo(name, m.items as FoodItem[]);
   return { ok: true };
 }
+
+/** Log a recipe (October 29): one food with the recipe's numbers for the servings she ate. */
+export async function logRecipe(id: number, servings: number, mealSlot: "meal_1" | "meal_2" | "meal_3" | "other", favorite = false) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const k = Math.max(0.25, Math.min(6, Number(servings) || 1));
+  const { data: r } = await supabase.from("recipes").select("name, calories, protein_g, fiber_g, potassium_mg").eq("id", id).maybeSingle();
+  if (!r) return { error: "Recipe not found" };
+  const name = String(r.name).replace(/\s*\((\d+)\s*calories?[^)]*\)\s*$/i, "").trim();
+  const item: FoodItem = {
+    name, amount: `${k} serving${k === 1 ? "" : "s"}`,
+    calories: Math.round(Number(r.calories ?? 0) * k), protein_g: Math.round(Number(r.protein_g ?? 0) * k * 10) / 10,
+    fiber_g: Math.round(Number(r.fiber_g ?? 0) * k * 10) / 10, potassium_mg: Math.round(Number(r.potassium_mg ?? 0) * k),
+  };
+  const { error } = await supabase.from("food_logs").insert({
+    client_id: user.id, meal_slot: mealSlot, source: "recipe", recipe_id: id, description: name, photo_path: null, items: [item],
+    calories: item.calories, protein_g: item.protein_g, fiber_g: item.fiber_g, potassium_mg: item.potassium_mg, confirmed: true,
+  });
+  if (error) return { error: error.message };
+  if (favorite) await saveGoTo(name, [item]);
+  const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+  await awardAutoHabit(supabase, user.id, "log-food", todayIn(profile?.timezone ?? "America/Los_Angeles"));
+  await closeOutRings(supabase, user.id);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
