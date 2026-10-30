@@ -104,6 +104,10 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
             <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.</p>
           )}
 
+          <Link href="/workouts/history" className="flex min-h-12 items-center justify-between rounded-[14px] border border-border bg-card px-3.5 text-[14px] font-semibold">
+            Your workout history<span className="text-dim">Every set you&apos;ve logged ›</span>
+          </Link>
+
           <div className="pt-2">
             <h2 className={`${display} text-lg`}>Cardio menu</h2>
             <p className="mt-1 text-[13px] leading-snug text-dim">Pick one or two hard sessions a week, on their own day. Keep walking every day.</p>

@@ -134,6 +134,19 @@ export async function lastNumbers(supabase: SupabaseClient, clientId: string, ex
     const row = out.get(ex)!;
     if (row.session === r.session_id) row.sets.push({ set_no: r.set_no as number, weight: r.weight as number | null, reps: r.reps as number | null, seconds: r.seconds as number | null, note: r.note as string | null });
   }
+  // Nothing logged here yet for an exercise: use her Trainerize history (imported October 29).
+  const missing = exerciseIds.filter((id) => !out.has(id));
+  if (missing.length) {
+    const { data: hist } = await supabase.from("history_sets").select("history_id, exercise_id, set_no, weight, reps, seconds, performed_on")
+      .eq("client_id", clientId).in("exercise_id", missing).order("performed_on", { ascending: false }).limit(600);
+    for (const r of hist ?? []) {
+      const ex = r.exercise_id as number, sid = `h${r.history_id}`;
+      if (!out.has(ex)) out.set(ex, { session: sid, when: `${r.performed_on}T12:00:00Z`, sets: [] });
+      const row = out.get(ex)!;
+      if (row.session === sid && (r.weight !== null || r.reps !== null || r.seconds !== null)) row.sets.push({ set_no: r.set_no as number, weight: r.weight as number | null, reps: r.reps as number | null, seconds: r.seconds as number | null, note: null });
+    }
+    for (const [k, v] of out) if (!v.sets.length) out.delete(k);
+  }
   for (const v of out.values()) v.sets.sort((a, b) => a.set_no - b.set_no);
   return out as Map<number, { when: string; sets: { set_no: number; weight: number | null; reps: number | null; seconds: number | null; note: string | null }[] }>;
 }

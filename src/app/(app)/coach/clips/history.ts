@@ -102,3 +102,38 @@ export async function importHistory(part: HistoryPart) {
   }
   return { ok: true, ...out };
 }
+
+export type WorkoutPart = {
+  email: string;
+  workouts: { id: number; date: string; name: string; type: string; start: string | null; end: string | null; kcal: number | null;
+    exercises: { ex: number | null; name: string; rec: string | null; note: string | null; sets: (number | null)[][] }[] }[];
+};
+
+/** Import a batch of one client's Trainerize workouts with every set (October 29). Importing again replaces the same workouts. */
+export async function importWorkouts(part: WorkoutPart) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: me } = await supabase.from("profiles").select("role").eq("id", user?.id ?? "").single();
+  if (me?.role !== "coach") return { error: "Coach only" };
+  const db = adminClient();
+  const { data: p } = await db.from("profiles").select("id").ilike("email", part.email.trim()).maybeSingle();
+  if (!p) return { skipped: `${part.email} isn't in the app` };
+  const mins = (a: string | null, b: string | null) => { if (!a || !b) return null; const m = (Date.parse(b.replace(" ", "T")) - Date.parse(a.replace(" ", "T"))) / 60000; return m > 0 && m < 600 ? Math.round(m) : null; };
+  const rows = part.workouts.filter((w) => w.date).map((w) => ({
+    id: w.id, client_id: p.id, performed_on: w.date, name: w.name || "Workout", kind: w.type, minutes: mins(w.start, w.end),
+    calories: w.kcal ? Math.round(w.kcal) : null, source: "trainerize", exercises: w.exercises,
+  }));
+  const sets = part.workouts.filter((w) => w.date).flatMap((w) => w.exercises.flatMap((x, pos) => x.sets.map((s, k) => ({
+    history_id: w.id, client_id: p.id, position: pos + 1, set_no: Number(s[0]) || k + 1, exercise_id: x.ex, exercise_name: x.name,
+    reps: s[1] === null ? null : Math.round(Number(s[1])), weight: s[2], seconds: s[3] === null ? null : Math.round(Number(s[3])), distance: s[4], performed_on: w.date,
+  })))).filter((s, i, a) => a.findIndex((t) => t.history_id === s.history_id && t.position === s.position && t.set_no === s.set_no) === i);
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await db.from("workout_history").upsert(rows.slice(i, i + 200), { onConflict: "id" });
+    if (error) return { error: error.message };
+  }
+  for (let i = 0; i < sets.length; i += 1000) {
+    const { error } = await db.from("history_sets").upsert(sets.slice(i, i + 1000), { onConflict: "history_id,position,set_no" });
+    if (error) return { error: error.message };
+  }
+  return { ok: true, workouts: rows.length, sets: sets.length };
+}

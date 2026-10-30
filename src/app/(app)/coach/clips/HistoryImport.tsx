@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { importHistory, type HistoryPart } from "./history";
+import { importHistory, importWorkouts, type HistoryPart, type WorkoutPart } from "./history";
 
 type Food = [string, number | null, string, number, number];
 type Client = { id: number; email: string; first: string; last: string; weights: [string, number][]; weightGoal: number | null; steps: [string, number][];
@@ -22,7 +22,7 @@ function favoritesOf(c: Client): NonNullable<HistoryPart["favorites"]> {
     .map((x) => ({ name: x.foods.slice(0, 2).map((f) => tidy(f[0])).join(" & ") + (x.foods.length > 2 ? " +" : ""), foods: x.foods, fiber: x.fiber, potassium: x.potassium }));
 }
 
-/** Pick "dwtp-trainerize-history.json" and bring every client's weigh-ins, steps and meals in. Safe to run again. */
+/** Pick "dwtp-trainerize-history.json" (weigh-ins, steps, meals) or "dwtp-trainerize-workouts.json" (workouts and sets). Safe to run again. */
 export default function HistoryImport() {
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -30,7 +30,25 @@ export default function HistoryImport() {
   async function run(file: File) {
     setBusy(true); setLog(["Reading…"]);
     try {
-      const all = JSON.parse(await file.text()) as Client[];
+      const parsed = JSON.parse(await file.text()) as (Client | { email: string; first: string; last: string; workouts: WorkoutPart["workouts"] })[];
+      if (parsed.length && "workouts" in parsed[0]) {
+        let w = 0, st = 0;
+        for (const c of parsed as { email: string; first: string; last: string; workouts: WorkoutPart["workouts"] }[]) {
+          const name = `${c.first} ${c.last}`.trim();
+          let cw = 0, cs = 0, skipped = false;
+          for (let i = 0; i < c.workouts.length; i += 60) {
+            const r = await importWorkouts({ email: c.email, workouts: c.workouts.slice(i, i + 60) });
+            if (r && "skipped" in r) { skipped = true; break; }
+            if (r && "error" in r && r.error) throw new Error(`${name}: ${r.error}`);
+            if (r && "workouts" in r) { cw += r.workouts ?? 0; cs += r.sets ?? 0; }
+          }
+          w += cw; st += cs;
+          add(skipped ? `${name}: not in the app (${c.email}), skipped` : `${name}: ${cw} workouts, ${cs} sets`);
+        }
+        add(`Done: ${w} workouts and ${st} sets for ${parsed.length} clients.`);
+        setBusy(false); return;
+      }
+      const all = parsed as Client[];
       let tot = { w: 0, s: 0, m: 0, f: 0, skip: 0 };
       for (const c of all) {
         const name = `${c.first} ${c.last}`.trim();
@@ -57,8 +75,8 @@ export default function HistoryImport() {
   return (
     <div className="space-y-2">
       <label className="flex min-h-[80px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[16px] border-2 border-dashed border-[#3a3a3a] bg-card p-4 text-center">
-        <span className="text-[15px] font-semibold">Import client history: choose &ldquo;dwtp-trainerize-history.json&rdquo;</span>
-        <span className="text-[13px] text-dim">Weigh-ins, steps, meals and favorites from Trainerize. Safe to import again.</span>
+        <span className="text-[15px] font-semibold">Import client history: choose &ldquo;dwtp-trainerize-history.json&rdquo;, then &ldquo;dwtp-trainerize-workouts.json&rdquo;</span>
+        <span className="text-[13px] text-dim">Weigh-ins, steps, meals and favorites; then workouts with every set. One file at a time. Safe to import again.</span>
         <input type="file" accept="application/json,.json" className="hidden" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f); e.target.value = ""; }} />
       </label>
       {log.length > 0 && <ul className="max-h-72 space-y-0.5 overflow-y-auto rounded-xl border border-border p-2.5 text-[12px]">{log.map((l, i) => <li key={i}>{l}</li>)}</ul>}

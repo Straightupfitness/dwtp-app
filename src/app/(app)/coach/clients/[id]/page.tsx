@@ -51,6 +51,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <WelcomeButton clientId={id} failed={welcome === "failed"} />
           <a href="#details" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Edit details</a>
           <Link href={`/coach/clients/${id}/food`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Food log</Link>
+          <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Workouts</Link>
           <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Chat</Link>
           <a href="#progress" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Progress</a>
         </div>
