@@ -34,7 +34,7 @@ export default async function ClipsPage() {
         <p className="text-sm text-dim">{recipeCount ?? 0} recipes and {recipeFiles} recipe photos/videos are in the app.</p>
         <RecipeImport />
         <SyncMedia />
-        <Uploader prefix="recipes" folder="DWTP Recipe Media" what="recipes" />
+        <Uploader prefix="recipes" folder="DWTP Recipe Media” or “DWTP Library Videos" what="recipes" />
       </div>
       <Link href="/workouts" className="inline-flex min-h-11 items-center text-sm text-accent">See the workouts as a client sees them →</Link>
     </section>
