@@ -61,3 +61,31 @@ export async function toggleHeart(id: string) {
   await supabase.from("messages").update({ hearted_at: m.hearted_at ? null : new Date().toISOString() }).eq("id", id);
   revalidatePath("/", "layout");
 }
+
+/** "{first}", "{first name}", "[first name]" or the word "firstname" become her first name. */
+export async function personalize(template: string, first: string) {
+  return template.replace(/\{\s*first\s*(name)?\s*\}|\[\s*first\s*name\s*\]|\bfirst_?name\b/gi, first);
+}
+
+/**
+ * Michael sends one message to many clients (October 29), each a 1:1 message in her own chat with her first
+ * name filled in. Each client gets her usual notification.
+ */
+export async function sendBulk(clientIds: string[], template: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (me?.role !== "coach") return { error: "Coach only" };
+  if (!template.trim() || !clientIds.length || clientIds.length > 500) return { error: "Write a message and pick at least one client." };
+  const { data: people } = await supabase.from("profiles").select("id, full_name, email").in("id", clientIds);
+  const rows = await Promise.all((people ?? []).map(async (p) => {
+    const first = (p.full_name || p.email || "").trim().split(/\s+/)[0] || "there";
+    return { client_id: p.id, sender_id: user.id, body: (await personalize(template, first)).trim() };
+  }));
+  const { error } = await supabase.from("messages").insert(rows);
+  if (error) return { error: error.message };
+  for (const r of rows) notifyLater(r.client_id, { title: "Michael", body: r.body.slice(0, 120), url: "/chat", email: "push-fallback" });
+  revalidatePath("/", "layout");
+  return { ok: true, sent: rows.length };
+}
