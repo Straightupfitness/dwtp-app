@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Uploader from "./Uploader";
 import RecipeImport from "./RecipeImport";
+import SyncMedia from "./SyncMedia";
 
 export default async function ClipsPage() {
   const supabase = await createClient();
@@ -32,6 +33,7 @@ export default async function ClipsPage() {
         <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">Recipe photos &amp; videos</h2>
         <p className="text-sm text-dim">{recipeCount ?? 0} recipes and {recipeFiles} recipe photos/videos are in the app.</p>
         <RecipeImport />
+        <SyncMedia />
         <Uploader prefix="recipes" folder="DWTP Recipe Media" what="recipes" />
       </div>
       <Link href="/workouts" className="inline-flex min-h-11 items-center text-sm text-accent">See the workouts as a client sees them →</Link>

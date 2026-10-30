@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { syncRecipeMedia } from "./actions";
 
 /**
  * Pick a folder once: every <id>.mp4 and <id>.jpg in it goes to exercise-clips/<prefix>/.
@@ -12,6 +13,7 @@ export default function Uploader({ prefix = "sltp", folder = "DWTP Exercise Clip
   const [failed, setFailed] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [note, setNote] = useState("");
 
   async function upload() {
     setRunning(true); setDone(0); setFailed([]); setFinished(false);
@@ -27,6 +29,8 @@ export default function Uploader({ prefix = "sltp", folder = "DWTP Exercise Clip
       }
     };
     await Promise.all([worker(), worker(), worker(), worker()]);
+    // Recipes: switch each recipe's photo/video on now that the files are there.
+    if (prefix === "recipes") { const r = await syncRecipeMedia(); if (r && "videos" in r) setNote(`${r.photos} photos and ${r.videos} videos are on their recipes.`); }
     setRunning(false); setFinished(true);
   }
 
@@ -47,6 +51,7 @@ export default function Uploader({ prefix = "sltp", folder = "DWTP Exercise Clip
           <div className="h-2 rounded-full bg-[#262626]"><div className="h-2 rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} /></div>
           <p className="text-[13px] text-dim">{running ? `Uploading… ${done} of ${files.length}. Keep this page open.` : finished ? `Done: ${done - failed.length} uploaded${failed.length ? `, ${failed.length} failed` : ""}.` : "Ready."}</p>
           {!running && !finished && <button type="button" onClick={upload} className="min-h-12 w-full rounded-[12px] bg-accent font-semibold text-black">Upload all</button>}
+          {note && <p className="text-[13px] text-[#7ee2a8]">{note}</p>}
           {failed.length > 0 && <ul className="max-h-40 overflow-y-auto text-[12px] text-[var(--red)]">{failed.map((f) => <li key={f}>{f}</li>)}</ul>}
           {finished && failed.length > 0 && <button type="button" onClick={upload} className="min-h-11 w-full rounded-[12px] border border-border">Try again</button>}
         </div>

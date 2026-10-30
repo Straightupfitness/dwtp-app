@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { importRecipes, type RecipeRow } from "./actions";
+import { importRecipes, syncRecipeMedia, type RecipeRow } from "./actions";
 
 type Raw = {
   id: number; mine: boolean; order: number; name: string; types: string[]; tags: string[]; description: string | null;
@@ -23,14 +23,15 @@ export default function RecipeImport() {
         prep_min: x.prep, cook_min: x.cook, servings: x.servings || 1,
         calories: r1(x.kcal), protein_g: r1(x.protein), carbs_g: r1(x.carbs), fat_g: r1(x.fat), fiber_g: r1(x.fiber), potassium_mg: x.potassium === null ? null : Math.round(x.potassium),
         ingredients: (x.ingredients ?? []).map((i) => ({ name: i.name, amount: i.amount, unit: i.unit })), steps: x.steps ?? [],
-        has_photo: !!x.photo, has_video: x.mine && !!x.video,
+        has_photo: !!x.photo, has_video: false, // switched on per recipe once its video is uploaded (Re-check)
       }));
       for (let i = 0; i < rows.length; i += 200) {
         const r = await importRecipes(rows.slice(i, i + 200));
         if (r?.error) throw new Error(r.error);
         setMsg(`Imported ${Math.min(i + 200, rows.length)} of ${rows.length}…`);
       }
-      setMsg(`Done: ${rows.length} recipes are in the app.`);
+      const s = await syncRecipeMedia();
+      setMsg(`Done: ${rows.length} recipes are in the app.${s && "videos" in s ? ` ${s.photos} photos and ${s.videos} videos found.` : ""}`);
     } catch (e) { setMsg(`Stopped: ${(e as Error).message}`); }
     setBusy(false);
   }
