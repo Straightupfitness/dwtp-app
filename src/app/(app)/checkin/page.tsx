@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { currentWindow, questionsFor, DEADLINE_TZ } from "@/lib/checkin";
+import { currentWindow, questionsFor } from "@/lib/checkin";
 import { loadProgram } from "@/lib/circles";
 import CheckinForm, { type NewHabit } from "./CheckinForm";
 import BackButton from "@/components/BackButton";
@@ -12,13 +12,16 @@ function timeLeft(until: Date) {
   return d ? `${d} day${d > 1 ? "s" : ""} ${h} hrs left` : h ? `${h} hrs left` : `${mins} min left`;
 }
 
-const fmt = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d) + " Pacific";
+/** A check-in time in her own time zone ("Friday, Oct 30, 12:00 AM EDT"). */
+const fmtIn = (tz: string) => (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(d);
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 export default async function CheckinPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("program_start, plan").eq("id", user!.id).single();
+  const { data: profile } = await supabase.from("profiles").select("program_start, plan, timezone").eq("id", user!.id).single();
+  const myTz = profile?.timezone ?? "America/Los_Angeles";
+  const fmt = fmtIn(myTz);
   const { open, next } = currentWindow(profile?.program_start ?? null);
 
   const { data: history } = await supabase.from("checkins")
@@ -59,7 +62,7 @@ export default async function CheckinPage() {
     }
     form = (
       <CheckinForm week={open.week} userId={user!.id} isVideo={!!tw?.checkin_is_video} habits={habits}
-        closes={new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short", hour: "numeric" }).format(open.closes)}
+        closes={new Intl.DateTimeFormat("en-US", { timeZone: myTz, weekday: "short", hour: "numeric", timeZoneName: "short" }).format(open.closes)}
         timeLeft={timeLeft(open.closes)} last={lastScores}
         questions={questionsFor(open.week, tw, { onFullYear: profile.plan === "52_weeks" })} />
     );

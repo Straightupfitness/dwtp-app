@@ -41,6 +41,7 @@ function Metric({ label, value, sub, tone = "" }: { label: string; value: React.
  */
 export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"attention" | "az" | "seen">("attention");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [composing, setComposing] = useState(false);
@@ -51,11 +52,12 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const score = (r: RosterRow) => (r.checkin?.state === "needs-reply" ? 8 : 0) + (r.missedCheckin ? 4 : 0) + (r.noFoodYesterday ? 2 : 0) + (r.missedWorkouts ? 2 : 0) + (r.notSeen48 ? 3 : 0) + ((r.daysSinceWeigh ?? 99) >= 4 ? 1 : 0);
   const shown = useMemo(() => {
     const f = FILTERS.find((x) => x.key === filter)!;
-    const list = rows.filter(f.test);
+    const q = search.trim().toLowerCase();
+    const list = rows.filter(f.test).filter((r) => !q || r.name.toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q));
     return list.sort((a, b) => sort === "az" ? a.name.localeCompare(b.name)
       : sort === "seen" ? (b.hoursSinceSeen ?? 1e9) - (a.hoursSinceSeen ?? 1e9)
       : score(b) - score(a) || a.name.localeCompare(b.name));
-  }, [rows, filter, sort]);
+  }, [rows, filter, sort, search]);
   const allPicked = shown.length > 0 && shown.every((r) => picked.has(r.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const pickedRows = rows.filter((r) => picked.has(r.id));
@@ -63,6 +65,12 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
 
   return (
     <div className="space-y-3 pb-24">
+      {/* Find a client by name (October 30). */}
+      <div className="relative">
+        <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clients by name or email" aria-label="Search clients"
+          className="min-h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-[15px] outline-none focus:border-accent" />
+      </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
         {FILTERS.map((f) => {
           const n = rows.filter(f.test).length;

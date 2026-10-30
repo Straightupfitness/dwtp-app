@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
 import { journey, todayIn } from "@/lib/program";
 import StageBars, { JOURNEY_WEEKS, journeyWeek } from "@/components/JourneyBar";
-import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
+import { currentWindow } from "@/lib/checkin";
 import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
@@ -140,7 +140,7 @@ export default async function TodayPage() {
           <span className="flex-1">
             <span className="block text-[15px] font-semibold">Your Week {open.week} check-in is open</span>
             <span className="block text-xs text-[#c9b48a]">
-              Closes {new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short", hour: "numeric" }).format(open.closes)} · {timeLeft(open.closes)} · +10 CPs
+              Closes {new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "numeric", timeZoneName: "short" }).format(open.closes)} · {timeLeft(open.closes)} · +10 CPs
             </span>
           </span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>

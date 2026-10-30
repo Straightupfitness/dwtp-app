@@ -28,7 +28,9 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
     return { who: q.sender_id === viewerId ? "You" : otherName, snippet: q.body ? q.body.slice(0, 120) : q.attachment_kind === "audio" ? "🎤 Voice note" : "📷 Photo" };
   };
   const unread = list.filter((m) => m.sender_id !== viewerId && !m.read_at).length;
-  const fmt = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  // Times in the viewer's own time zone.
+  const { data: viewer } = await supabase.from("profiles").select("timezone").eq("id", viewerId).maybeSingle();
+  const fmt = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: viewer?.timezone ?? "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const lastMine = [...list].reverse().find((m) => m.sender_id === viewerId);
 
   return (

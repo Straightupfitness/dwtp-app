@@ -1,5 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import TopBar from "@/components/TopBar";
+import TimezoneSync from "@/components/TimezoneSync";
 import { after } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <TopBar coach={coach} unread={count ?? 0} name={me?.full_name ?? null} avatarPath={me?.avatar_path ?? null} />
       <main className="mx-auto max-w-md px-4 pb-28 pt-4">{children}</main>
       <BottomNav coach={coach} />
+      {user && <TimezoneSync saved={me?.timezone ?? null} />}
     </>
   );
 }
