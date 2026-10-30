@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Uploader from "./Uploader";
 import RecipeImport from "./RecipeImport";
 import SyncMedia from "./SyncMedia";
+import HistoryImport from "./HistoryImport";
 
 export default async function ClipsPage() {
   const supabase = await createClient();
@@ -36,6 +37,12 @@ export default async function ClipsPage() {
         <SyncMedia />
         <Uploader prefix="recipes" folder="DWTP Recipe Media” or “DWTP Library Videos" what="recipes" />
       </div>
+      {/* Clients' Trainerize history (October 29). */}
+      <div className="space-y-2 pt-4">
+        <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">Client history from Trainerize</h2>
+        <HistoryImport />
+      </div>
+
       <Link href="/workouts" className="inline-flex min-h-11 items-center text-sm text-accent">See the workouts as a client sees them →</Link>
     </section>
   );
