@@ -21,6 +21,26 @@ export async function createInvite(userId: string, days = INVITE_DAYS) {
   return `${appUrl()}/welcome?t=${token}`;
 }
 
+/**
+ * A 6-digit sign-in code (October 31: Supabase's own code is replaced every time she asks for another email, so the
+ * code she was reading kept failing). Ours: every code sent in the last 2 hours works, not only the newest.
+ */
+export async function createSignInCode(userId: string) {
+  const db = adminClient();
+  for (let i = 0; i < 3; i++) {
+    const code = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, "0");
+    const { error } = await db.from("invites").insert({
+      user_id: userId, token_hash: hash(`code:${userId}:${code}`), expires_at: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+    });
+    if (!error) return code;
+  }
+  return null;
+}
+export async function checkSignInCode(userId: string, code: string) {
+  const { data } = await adminClient().from("invites").select("id, expires_at").eq("token_hash", hash(`code:${userId}:${code}`)).maybeSingle();
+  return !!data && Date.parse(data.expires_at) > Date.now();
+}
+
 /** The invite behind a link, if it's still good. */
 export async function findInvite(token: string) {
   if (!token) return null;
