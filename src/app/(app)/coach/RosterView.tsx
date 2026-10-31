@@ -25,15 +25,6 @@ function kcalTone(v: number | null, target: number | null) {
   return d <= 100 ? "text-[#7ee2a8]" : d <= 250 ? "text-accent" : "text-[#fb7185]";
 }
 
-function Metric({ label, value, sub, tone = "" }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-[0.08em] text-dim">{label}</p>
-      <p className={`truncate text-[15px] font-semibold tabular-nums ${tone}`}>{value}</p>
-      {sub && <p className="truncate text-[11px] text-dim">{sub}</p>}
-    </div>
-  );
-}
 
 /**
  * Every client at a glance (October 29): weight, steps, food, check-in, workouts and when she was last in the app.
@@ -88,49 +79,53 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
         ))}
       </div>
 
-      <ul className="space-y-2">
+      {/* One compact row per client (October 31): numbers in columns, alerts stacked on the right. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 grid grid-cols-6 gap-1 bg-bg/95 py-1.5 pl-[42px] pr-2.5 md:px-2.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid-cols-[24px_minmax(170px,1.5fr)_repeat(6,minmax(58px,1fr))_minmax(230px,1.6fr)] md:gap-2">
+        <span className="hidden md:block" /><span className="hidden md:block">Client</span>
+        <span>Weight</span><span>Kcal yday</span><span>Kcal avg</span><span>Protein</span><span>Steps</span><span>Workouts</span>
+        <span className="hidden text-right md:block">Alerts</span>
+      </div>
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {shown.map((r) => {
           const on = picked.has(r.id);
           const wk = r.lastWorkoutWeek;
+          const cell = "min-w-0 md:order-3";
+          const val = "block truncate text-[14px] font-semibold tabular-nums";
+          const sub = "block truncate text-[10px] text-dim";
+          const alerts: { text: string; cls: string; href?: string }[] = [];
+          if (r.checkin?.state === "needs-reply") alerts.push({ text: `Wk ${r.checkin.week}: reply`, cls: "border border-accent text-accent", href: `/coach/checkins/${r.checkin.id}` });
+          if (r.missedCheckin) alerts.push({ text: "Missed check-in", cls: "bg-[#2a1218] text-[#fb7185]" });
+          if (r.noFoodYesterday) alerts.push({ text: "No food yesterday", cls: "bg-[#2a1a10] text-gold" });
+          if (r.missedWorkouts) alerts.push({ text: "Missed workouts", cls: "bg-[#2a1a10] text-gold" });
+          if (r.notSeen48 && r.week > 0) alerts.push({ text: `Away ${ago(r.hoursSinceSeen)}`, cls: "bg-[#1d1d2a] text-[#a5b4fc]" });
+          if ((r.daysSinceWeigh ?? 99) >= 4 && r.week > 0) alerts.push({ text: r.weighedOn ? `No weigh-in ${r.daysSinceWeigh}d` : "No weigh-ins", cls: "bg-[#2a1218] text-[#fb7185]" });
+          // The check-in reply goes first; the rest wrap two to a line, so a row stays short.
+          for (const f of r.flags) alerts.push({ text: f, cls: "bg-[#2a1a10] text-gold" });
           return (
-            <li key={r.id} className={`rounded-xl border bg-card p-3 ${on ? "border-accent" : "border-border"}`}>
-              <div className="flex items-start gap-2.5">
-                <input type="checkbox" checked={on} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="mt-3 size-5 shrink-0 accent-[var(--accent)]" />
-                <Link href={`/coach/clients/${r.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-                  <Avatar name={r.name} path={r.avatar} size={40} />
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">{r.name}</span>
-                    <span className="block text-xs text-dim">{r.week ? `Week ${r.week}` : "Not started"} · {r.cpsWeek} CPs this week · in app {ago(r.hoursSinceSeen)}</span>
-                  </span>
-                </Link>
-                {r.checkin && (
-                  r.checkin.id
-                    ? <Link href={`/coach/checkins/${r.checkin.id}`} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${r.checkin.state === "needs-reply" ? "border-accent text-accent" : "border-[var(--green)] text-[var(--green)]"}`}>Wk {r.checkin.week}: {r.checkin.state === "needs-reply" ? "reply" : "replied"}</Link>
-                    : <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${r.checkin.state === "missed" ? "border-[var(--red)] text-[var(--red)]" : "border-border text-dim"}`}>Wk {r.checkin.week}: {r.checkin.state === "missed" ? "missed" : "not in yet"}</span>
-                )}
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2.5 sm:grid-cols-6">
-                <Metric label="Weight" value={r.weight !== null ? `${r.weight} lb` : "–"}
-                  sub={r.weighedOn ? `${r.daysSinceWeigh === 0 ? "today" : `${r.daysSinceWeigh}d ago`}${r.weightChange14 !== null ? ` · ${r.weightChange14 > 0 ? "+" : ""}${r.weightChange14} in 2 wk` : ""}` : "no weigh-ins"}
-                  tone={(r.daysSinceWeigh ?? 99) >= 4 && r.week ? "text-[#fb7185]" : ""} />
-                <Metric label="Kcal yesterday" value={r.kcalYesterday ?? "none"} sub={r.kcalTarget ? `target ${r.kcalTarget}` : "no target yet"} tone={r.kcalYesterday === null ? (r.week ? "text-[#fb7185]" : "") : kcalTone(r.kcalYesterday, r.kcalTarget)} />
-                <Metric label="Kcal avg 7d" value={r.kcalAvg ?? "–"} sub={`${r.foodDays7}/7 days logged`} tone={kcalTone(r.kcalAvg, r.kcalTarget)} />
-                <Metric label="Protein avg" value={r.proteinAvg !== null ? `${r.proteinAvg} g` : "–"} sub={`target ${r.proteinTarget} g`} tone={r.proteinAvg !== null && r.proteinAvg < r.proteinTarget - 10 ? "text-accent" : ""} />
-                <Metric label="Steps avg 7d" value={k(r.stepsAvg)} sub={r.stepsDays ? `${r.stepsDays} days synced` : "not synced"} />
-                <Metric label="Workouts last wk" value={wk ? `${wk.done}/${wk.planned}` : "–"} sub={wk ? `week ${wk.week}` : "starts week 2"} tone={r.missedWorkouts ? "text-[#fb7185]" : wk && wk.planned ? "text-[#7ee2a8]" : ""} />
-              </div>
-
-              {(r.missedCheckin || r.noFoodYesterday || r.missedWorkouts || (r.notSeen48 && r.week > 0) || r.flags.length > 0 || r.waterAvg !== null) && (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {r.missedCheckin && <span className="rounded bg-[#2a1218] px-2 py-0.5 text-xs text-[#fb7185]">Missed check-in</span>}
-                  {r.noFoodYesterday && <span className="rounded bg-[#2a1a10] px-2 py-0.5 text-xs text-gold">No food logged yesterday</span>}
-                  {r.missedWorkouts && <span className="rounded bg-[#2a1a10] px-2 py-0.5 text-xs text-gold">Missed workouts</span>}
-                  {r.notSeen48 && r.week > 0 && <span className="rounded bg-[#1d1d2a] px-2 py-0.5 text-xs text-[#a5b4fc]">Not in the app {ago(r.hoursSinceSeen)}</span>}
-                  {r.flags.map((f) => <span key={f} className="rounded bg-[#2a1a10] px-2 py-0.5 text-xs text-gold">{f}</span>)}
-                  {r.waterAvg !== null && <span className="rounded bg-[#0f1c24] px-2 py-0.5 text-xs text-[#9bdcff]">Water {r.waterAvg} oz avg</span>}
-                </div>
-              )}
+            <li key={r.id} className={`grid grid-cols-[24px_1fr_auto] items-center gap-x-2 gap-y-1.5 px-2.5 py-2 md:grid-cols-[24px_minmax(170px,1.5fr)_repeat(6,minmax(58px,1fr))_minmax(230px,1.6fr)] md:gap-x-2 ${on ? "bg-accent/10" : ""}`}>
+              <input type="checkbox" checked={on} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="size-[18px] accent-[var(--accent)] md:order-1" />
+              <Link href={`/coach/clients/${r.id}`} className="flex min-w-0 items-center gap-2 md:order-2">
+                <Avatar name={r.name} path={r.avatar} size={32} />
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] font-semibold leading-tight">{r.name}</span>
+                  <span className="block truncate text-[11px] text-dim">{r.week ? `Wk ${r.week}` : "Not started"} · {r.cpsWeek} CPs · {ago(r.hoursSinceSeen)}</span>
+                </span>
+              </Link>
+              {/* Alerts, stacked on the right. */}
+              <span className="flex max-w-[230px] flex-wrap content-center justify-end gap-0.5 justify-self-end md:order-4 md:max-w-none">
+                {alerts.map((x, i) => x.href
+                  ? <Link key={i} href={x.href} className={`whitespace-nowrap rounded px-1.5 py-px text-[11px] ${x.cls}`}>{x.text}</Link>
+                  : <span key={i} className={`whitespace-nowrap rounded px-1.5 py-px text-[11px] ${x.cls}`}>{x.text}</span>)}
+                {!alerts.length && <span className="text-[11px] text-[#7ee2a8]">On track</span>}
+              </span>
+              <span className="col-span-3 grid grid-cols-6 gap-1 pl-[32px] md:contents">
+                <span className={cell}><span className={`${val} ${(r.daysSinceWeigh ?? 99) >= 4 && r.week ? "text-[#fb7185]" : ""}`}>{r.weight ?? "–"}</span><span className={sub}>{r.weighedOn ? (r.daysSinceWeigh === 0 ? "today" : `${r.daysSinceWeigh}d ago`) : "none"}</span></span>
+                <span className={cell}><span className={`${val} ${r.kcalYesterday === null ? (r.week ? "text-[#fb7185]" : "") : kcalTone(r.kcalYesterday, r.kcalTarget)}`}>{r.kcalYesterday ?? "–"}</span><span className={sub}>{r.kcalTarget ? `of ${r.kcalTarget}` : "no target"}</span></span>
+                <span className={cell}><span className={`${val} ${kcalTone(r.kcalAvg, r.kcalTarget)}`}>{r.kcalAvg ?? "–"}</span><span className={sub}>{r.foodDays7}/7 days</span></span>
+                <span className={cell}><span className={`${val} ${r.proteinAvg !== null && r.proteinAvg < r.proteinTarget - 10 ? "text-accent" : ""}`}>{r.proteinAvg !== null ? `${r.proteinAvg}g` : "–"}</span><span className={sub}>of {r.proteinTarget}g</span></span>
+                <span className={cell}><span className={val}>{k(r.stepsAvg)}</span><span className={sub}>{r.stepsDays ? `${r.stepsDays}d synced` : "not synced"}</span></span>
+                <span className={cell}><span className={`${val} ${r.missedWorkouts ? "text-[#fb7185]" : wk && wk.planned ? "text-[#7ee2a8]" : ""}`}>{wk ? `${wk.done}/${wk.planned}` : "–"}</span><span className={sub}>{wk ? `wk ${wk.week}` : "from wk 2"}</span></span>
+              </span>
             </li>
           );
         })}

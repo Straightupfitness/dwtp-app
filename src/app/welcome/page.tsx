@@ -11,10 +11,8 @@ async function open(form: FormData) {
   const inv = await findInvite(t);
   if (!inv?.valid) redirect(`/welcome?t=${encodeURIComponent(t)}`);
   const db = adminClient();
-  // Use it up first, so a link can only ever sign in once.
-  const { data: claimed } = await db.from("invites").update({ used_at: new Date().toISOString() })
-    .eq("id", inv.id).is("used_at", null).select("id").maybeSingle();
-  if (!claimed) redirect(`/welcome?t=${encodeURIComponent(t)}`);
+  // Note the first use (links keep working for their 14 days: see createInvite).
+  await db.from("invites").update({ used_at: new Date().toISOString() }).eq("id", inv.id).is("used_at", null);
   const { data: p } = await db.from("profiles").select("email").eq("id", inv.user_id).single();
   const { data, error } = await db.auth.admin.generateLink({ type: "magiclink", email: p!.email! });
   if (error || !data?.properties?.hashed_token) { console.error("welcome sign-in failed", safeError(error)); redirect("/login?error=expired"); }
@@ -48,7 +46,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   if (sent) {
     body = <>
       <h1 className={`${display} text-[34px] font-semibold leading-tight`}>Check your email</h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-[#a8a8a8]">I sent you a fresh link. Tap the button in that email and you&apos;re in.</p>
+      <p className="mt-3 text-[15px] leading-relaxed text-[#a8a8a8]">I sent you a fresh link. Open the <b className="text-text">newest</b> email from DWTP (check spam too), tap the button, and you&apos;re in.</p>
     </>;
   } else {
     const inv = await findInvite(t);
@@ -69,8 +67,9 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     } else if (inv) {
       body = <>
         <h1 className={`${display} text-[34px] font-semibold leading-tight`}>This link has expired</h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-[#a8a8a8]">Welcome links work once, for 14 days. Tap below and I&apos;ll email you a fresh one.</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-[#a8a8a8]">Sign-in links work for 14 days. Tap below and I&apos;ll email you a fresh one. Then open the newest email.</p>
         <form action={resend} className="mt-7"><input type="hidden" name="t" value={t} /><button className={button}>Send me a new link</button></form>
+        <p className="mt-5 text-[14px] leading-relaxed text-[#a8a8a8]">Still stuck? Message Michael and he&apos;ll text you a link that works.</p>
       </>;
     } else redirect("/login");
   }

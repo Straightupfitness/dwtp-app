@@ -107,3 +107,12 @@ export async function deletePurchase(clientId: string, id: string) {
   await supabase.from("client_purchases").delete().eq("id", id).eq("client_id", clientId);
   revalidatePath(`/coach/clients/${clientId}`);
 }
+
+/** A sign-in link for Michael to text her himself (October 31: for when email doesn't reach her). Good for 14 days. */
+export async function signInLinkFor(clientId: string) {
+  await coach();
+  const { createInvite } = await import("@/lib/invite");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { data: p } = await adminClient().from("profiles").select("full_name, phone").eq("id", clientId).single();
+  return { link: await createInvite(clientId), first: (p?.full_name ?? "").split(" ")[0] || "", phone: (p?.phone as string | null) ?? null };
+}

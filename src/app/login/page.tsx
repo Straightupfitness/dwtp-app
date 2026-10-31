@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setCodeErr("");
     const { error } = await createClient().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: "email" });
-    if (error) setCodeErr("That code didn't work. Check it, or send a new email.");
+    if (error) setCodeErr("That code didn't work. Use the code from the newest email (each new email replaces the last code), or tap the button in the email instead.");
     else router.replace("/");
   }
 

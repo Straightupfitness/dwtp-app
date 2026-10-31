@@ -6,13 +6,16 @@ export const INVITE_DAYS = 14;
 const hash = (t: string) => createHash("sha256").update(t).digest("hex");
 export const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightupfitness.com").replace(/\/$/, "");
 
-/** A personal link that signs her in with one tap. Good for 14 days; earlier unused links stop working. */
-export async function createInvite(userId: string) {
+/**
+ * A personal link that signs her in with one tap. Good for 14 days (or `days`), and it keeps working until then
+ * (October 31: single-use links sent clients in circles when an email app opened them first or she tapped an
+ * older email). Newer links don't cancel older ones. The link only shows a button; signing in takes her tap.
+ */
+export async function createInvite(userId: string, days = INVITE_DAYS) {
   const db = adminClient();
   const token = randomBytes(32).toString("base64url");
-  await db.from("invites").update({ used_at: new Date().toISOString() }).eq("user_id", userId).is("used_at", null);
   const { error } = await db.from("invites").insert({
-    user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString(),
+    user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + days * 86_400_000).toISOString(),
   });
   if (error) throw new Error(`Couldn't create the welcome link: ${error.message}`);
   return `${appUrl()}/welcome?t=${token}`;
@@ -23,7 +26,7 @@ export async function findInvite(token: string) {
   if (!token) return null;
   const { data } = await adminClient().from("invites").select("id, user_id, expires_at, used_at").eq("token_hash", hash(token)).maybeSingle();
   if (!data) return null;
-  return { ...data, valid: !data.used_at && Date.parse(data.expires_at) > Date.now() };
+  return { ...data, valid: Date.parse(data.expires_at) > Date.now() };
 }
 
 export async function sendWelcome(userId: string, email: string, name: string | null) {
@@ -34,7 +37,7 @@ export async function sendWelcome(userId: string, email: string, name: string | 
     "Your DWTP app is ready. It's where your habits, food logging, weekly check-ins and messages with me live.",
     `Tap this link on your phone to open it. No password needed:\n${link}`,
     "Then, on iPhone: tap Share in Safari, then Add to Home Screen. On Android: tap the ⋮ menu, then Add to Home screen.",
-    `The link is just for you and works for ${INVITE_DAYS} days.`,
+    `The link is just for you and works for ${INVITE_DAYS} days. Keep this email: you can use it again on a new phone.`,
     "Talk to you soon,\nMichael",
   ].join("\n\n");
   const html = `<div style="background:#0a0a0a;padding:32px 16px;font-family:system-ui,-apple-system,sans-serif">
