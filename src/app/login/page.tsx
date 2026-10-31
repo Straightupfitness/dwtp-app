@@ -14,6 +14,12 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [codeErr, setCodeErr] = useState("");
   const [checking, setChecking] = useState(false);
+  const [homeApp, setHomeApp] = useState(false);
+  useEffect(() => {
+    // October 31: on iPhone the Home Screen app keeps its own sign-in, separate from Safari's.
+    setHomeApp(window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true); // eslint-disable-line react-hooks/set-state-in-effect -- read once
+  }, []);
+  const homeNote = homeApp && <p className="rounded-[14px] border border-accent/40 bg-accent/10 px-3.5 py-2.5 text-[14px] leading-snug">You&apos;re in the app on your Home Screen. <b>Come back here and type the code</b> from the email. Tapping the button in the email signs in your web browser, not this app.</p>;
   const router = useRouter();
 
   async function verify(e: React.FormEvent) {
@@ -77,6 +83,7 @@ export default function LoginPage() {
         <div className="mt-16 space-y-3">
           <h1 className={`${display} text-3xl font-semibold`}>Check your email</h1>
           <p className="text-[15px] leading-relaxed text-[#a8a8a8]">I sent a sign-in link to <b className="text-text">{email.trim().toLowerCase()}</b>. Tap the button in that email and you&apos;re in. Check spam if it isn&apos;t there in a minute.</p>
+          {homeNote}
           <form onSubmit={verify} className="flex flex-col gap-2.5 pt-3">
             <label htmlFor="code" className="text-[13px] text-[#a8a8a8]">Or type the code from the email</label>
             <input id="code" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -93,6 +100,7 @@ export default function LoginPage() {
             <h1 className={`${display} text-[34px] font-semibold leading-tight`}>Welcome back</h1>
             <p className="text-[15px] leading-relaxed text-[#a8a8a8]">Enter the email you joined with. I&apos;ll send you a sign-in link. No password needed.</p>
           </div>
+          {homeNote && <div className="mt-5">{homeNote}</div>}
           <form onSubmit={send} className="mt-7 flex flex-col gap-3.5">
             <label htmlFor="email" className="text-[13px] text-[#a8a8a8]">Email</label>
             <input id="email" type="email" required autoComplete="email" autoCapitalize="none" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)}
