@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateDraft } from "@/lib/ai/reply-draft";
 
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 export async function POST(req: Request) {
   const supabase = await createClient();

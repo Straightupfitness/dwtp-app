@@ -128,7 +128,7 @@ ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin
     if (file) shots.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: Buffer.from(await file.arrayBuffer()).toString("base64") } });
   }
   const sleepNote = shots.length ? `\n\nHER SLEEP SCREENSHOTS (${shots.length}, attached): read her sleep from them (hours per night, sleep score, wakeups, trends) and use the real numbers in the Steps and sleep line and, where it helps, in the reply.` : "";
-  const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context + sleepNote }, ...shots], maxTokens: 2500 });
+  const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context + sleepNote }, ...shots], maxTokens: 6000 });
   const out = parseDraft(reply);
   await supabase.from("checkins").update({ ai_summary: out.summary }).eq("id", c.id);
   await supabase.from("checkin_replies").upsert({ checkin_id: c.id, ai_draft: out.draft, updated_at: new Date().toISOString() }, { onConflict: "checkin_id" });
