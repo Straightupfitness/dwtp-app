@@ -20,7 +20,7 @@ function Bar({ value, goal, color }: { value: number; goal: number; color: strin
  * Her last 7 days of food on one screen (November 1). Tap a day for every meal, food and photo in a pop-up,
  * then swipe (or use the arrows, or ← → on the keyboard) to go from day to day.
  */
-export default function FoodWeek({ data, title = "Food · last 7 days" }: { data: FoodWeekData; title?: string }) {
+export default function FoodWeek({ data, title = "Food · last 7 days", compact = false }: { data: FoodWeekData; title?: string; compact?: boolean }) {
   const [open, setOpen] = useState<number | null>(null);
   const { days, targets: t } = data;
   const logged = days.filter((d) => d.meals.length);
@@ -32,10 +32,10 @@ export default function FoodWeek({ data, title = "Food · last 7 days" }: { data
         <h2 className="text-sm uppercase tracking-widest text-dim">{title}</h2>
         <p className="text-[12px] text-dim">{logged.length}/7 days logged{avg((d) => d.kcal) !== null && <> · avg <b className="text-text">{avg((d) => d.kcal)}</b> kcal · <b className="text-text">{avg((d) => d.protein)}</b> g protein · <b className="text-text">{avg((d) => d.fiber)}</b> g fiber</>}{t.kcal ? ` · target ${t.kcal}` : ""}</p>
       </div>
-      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-7 md:overflow-visible md:px-0">
+      <div className={`-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0 ${compact ? "" : "lg:grid lg:grid-cols-7 lg:overflow-visible"}`}>
         {days.map((d, i) => (
           <button key={d.date} type="button" onClick={() => setOpen(i)}
-            className={`flex w-[170px] shrink-0 snap-start flex-col gap-2 rounded-[14px] border bg-card p-2.5 text-left transition hover:border-accent md:w-auto ${d.date === data.today ? "border-[#3a3020]" : "border-border"}`}>
+            className={`flex w-[170px] shrink-0 snap-start flex-col gap-2 rounded-[14px] border bg-card p-2.5 text-left transition hover:border-accent ${compact ? "" : "lg:w-auto"} ${d.date === data.today ? "border-[#3a3020]" : "border-border"}`}>
             <span className="flex items-baseline justify-between">
               <span className="text-[13px] font-semibold">{d.date === data.today ? "Today" : wd(d.date)}</span>
               <span className="text-[11px] text-dim">{md(d.date)}</span>
