@@ -10,7 +10,7 @@ import { CopyMeal, FavoriteMeal } from "./MealButtons";
 const display = "font-[family-name:var(--font-display)] uppercase";
 const SLOT_LABEL: Record<string, string> = { meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3", other: "Other" };
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
-const MAX_BACK = 62; // days she can look back (and log, edit, copy)
+const MAX_BACK = 366; // days she can look back (and log, edit, copy): November 2, as far back as she needs
 
 function Mini({ label, value, target, unit, fmt }: { label: string; value: number; target: number; unit: string; fmt?: (n: number) => string }) {
   const f = fmt ?? ((n: number) => String(Math.round(n)));

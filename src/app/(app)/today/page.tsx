@@ -166,7 +166,7 @@ export default async function TodayPage() {
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
-        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, food, water and habits</span></span><span className="text-accent">›</span>
+        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, food, water and habits</span></span><span className="text-accent">›</span>
       </Link>
       {!notStarted && <CirclesGlance state={state} />}
 

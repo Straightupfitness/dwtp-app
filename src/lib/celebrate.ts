@@ -2,7 +2,6 @@
 /** Ka-ching and confetti when she earns Capacity Points. Sound can be turned off under Me; confetti respects reduced motion. */
 const SOUND_KEY = "dwtp-sound";
 export type Sound = "ka-ching" | "quiz-passed" | "checkin-sent" | "wrong-answer" | "habit-done" | "set-done" | "rest-over";
-const players: Partial<Record<Sound, HTMLAudioElement>> = {};
 
 export function soundOn() {
   try { return localStorage.getItem(SOUND_KEY) !== "off"; } catch { return true; }
@@ -15,15 +14,47 @@ export function setSound(on: boolean) {
  * Michael's sounds (October 27): ka-ching for a right answer, quiz-passed for the answer that passes the quiz,
  * wrong-answer for a wrong one, habit-done for checking off a habit, checkin-sent for sending her check-in.
  * Workouts (October 28): set-done (a plate clink) when she checks off a set, rest-over (a timer double beep) when rest ends.
+ *
+ * November 2: played through Web Audio as "ambient" sound, so they mix with her music instead of stopping it
+ * (an <audio> element takes over the phone's audio and paused Spotify, sometimes for good), and so the rest
+ * timer can ding on its own after she has tapped once (iPhone blocked the old ding because no tap started it).
  */
+let ctx: AudioContext | null = null;
+const buffers: Partial<Record<Sound, Promise<AudioBuffer>>> = {};
+function audio() {
+  if (typeof window === "undefined") return null;
+  if (!ctx) {
+    try {
+      const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = "ambient"; // mix with her music; quiet when the ringer is off (iPhone)
+      const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      ctx = AC ? new AC() : null;
+    } catch { ctx = null; }
+  }
+  return ctx;
+}
+function load(name: Sound) {
+  const c = audio();
+  if (!c) return null;
+  return (buffers[name] ??= fetch(`/sounds/${name}.mp3`).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)));
+}
+/** Call from a tap (starting a workout): wakes the sound up and loads these sounds, so later dings work on their own. */
+export function primeSounds(names: Sound[]) {
+  const c = audio();
+  if (c && c.state !== "running") void c.resume().catch(() => {});
+  names.forEach((n) => void load(n)?.catch(() => {}));
+}
 export function play(name: Sound) {
   if (!soundOn()) return;
-  try {
-    const a = (players[name] ??= new Audio(`/sounds/${name}.mp3`));
-    a.currentTime = 0;
-    a.volume = 0.85;
-    void a.play().catch(() => { /* the browser blocked sound until she taps something */ });
-  } catch { /* no audio */ }
+  const c = audio(), buf = load(name);
+  if (!c || !buf) return;
+  if (c.state !== "running") void c.resume().catch(() => {});
+  buf.then((b) => {
+    const src = c.createBufferSource(), gain = c.createGain();
+    src.buffer = b; gain.gain.value = 0.85;
+    src.connect(gain).connect(c.destination);
+    src.start();
+  }).catch(() => { /* no sound */ });
 }
 export const kaChing = () => play("ka-ching");
 

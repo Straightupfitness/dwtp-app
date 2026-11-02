@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { celebrate, play } from "@/lib/celebrate";
+import { celebrate, play, primeSounds } from "@/lib/celebrate";
 import { finishWorkout, logSet, startSession } from "../actions";
 
 type SetVals = { weight?: number | null; reps?: number | null; seconds?: number | null; note?: string | null };
@@ -65,6 +65,21 @@ export default function Player({ workout, phase, overview, steps, session, previ
   const [result, setResult] = useState<{ cps: number } | null>(session?.completed ? { cps: 0 } : null);
   const finishRef = useRef<HTMLDivElement>(null);
 
+  // November 2: keep the screen on during a workout (it kept going dark between sets). The phone lets go of it
+  // when she leaves the app, so ask again when she comes back.
+  const inWorkout = step >= 0 && step < steps.length;
+  useEffect(() => {
+    if (!inWorkout) return;
+    type Lock = { release: () => Promise<void> };
+    const wl = (navigator as Navigator & { wakeLock?: { request: (t: "screen") => Promise<Lock> } }).wakeLock;
+    if (!wl) return;
+    let lock: Lock | null = null, gone = false;
+    const get = () => { if (document.visibilityState === "visible") wl.request("screen").then((l) => { if (gone) void l.release(); else lock = l; }).catch(() => {}); };
+    get();
+    document.addEventListener("visibilitychange", get);
+    return () => { gone = true; document.removeEventListener("visibilitychange", get); void lock?.release().catch(() => {}); };
+  }, [inWorkout]);
+
   // Rest timer tick, and a sound + buzz when it runs out.
   useEffect(() => {
     if (!rest) return;
@@ -83,6 +98,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
   };
 
   async function begin() {
+    primeSounds(["set-done", "rest-over"]);
     if (preview) { setStep(0); return; }
     setBusy(true); setError("");
     const r = await startSession(workout.id);
@@ -103,7 +119,8 @@ export default function Player({ workout, phase, overview, steps, session, previ
     setVals((v) => ({ ...v, [k]: { ...filled, done } }));
     if (done) {
       play("set-done");
-      if (s.rest && setNo < s.sets) setRest({ ends: nowMs() + s.rest * 1000, total: s.rest });
+      // November 2: rest after every set, the last one too (she rests before the next exercise).
+      if (s.rest) setRest({ ends: nowMs() + s.rest * 1000, total: s.rest });
     }
     if (!sessionId || preview) return;
     const r = await logSet(sessionId, s.position, setNo, s.exerciseId, { ...filled, done });
@@ -243,6 +260,23 @@ export default function Player({ workout, phase, overview, steps, session, previ
   return (
     <div className={shell}>
       {header}
+      {/* Rest timer: a ring that empties, with skip and +15 s. Pinned at the top, and it keeps going when she moves to the next exercise. */}
+      {rest && (
+        <div className="mx-auto mt-2 flex w-[calc(100%-2rem)] max-w-md items-center gap-3 rounded-[18px] border border-accent/60 bg-[#161310] p-2.5" role="timer" aria-live="polite">
+          <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="#2a2a2a" strokeWidth="5" />
+            <circle cx="26" cy="26" r="22" fill="none" stroke="var(--accent,#f5a623)" strokeWidth="5" strokeLinecap="round" transform="rotate(-90 26 26)"
+              strokeDasharray={`${2 * Math.PI * 22}`} strokeDashoffset={`${2 * Math.PI * 22 * (1 - left / rest.total)}`} />
+          </svg>
+          <div className="flex-1">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#d9c9a8]">Rest</p>
+            <p className={`${display} text-[26px] leading-none tabular-nums`}>{mmss(Math.ceil(left))}</p>
+          </div>
+          <button type="button" onClick={() => setRest({ ends: rest.ends + 15000, total: rest.total + 15 })} className="min-h-11 rounded-[12px] border border-[#3a3022] px-3 text-[14px]">+15 s</button>
+          <button type="button" onClick={() => setRest(null)} className="min-h-11 rounded-[12px] bg-accent px-3.5 text-[14px] font-semibold text-black">Skip</button>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-md flex-1 space-y-3.5 overflow-y-auto px-4 pb-6 pt-2">
         <div className="relative aspect-video overflow-hidden rounded-[18px] bg-black">
           {s.clip ? (
@@ -319,23 +353,6 @@ export default function Player({ workout, phase, overview, steps, session, previ
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       </div>
 
-      {/* Rest timer: a ring that empties, with skip and +15 s. */}
-      {rest && (
-        <div className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-md items-center gap-3 rounded-[18px] border border-[#2b2418] bg-[#161310] p-2.5" role="timer" aria-live="polite">
-          <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
-            <circle cx="26" cy="26" r="22" fill="none" stroke="#2a2a2a" strokeWidth="5" />
-            <circle cx="26" cy="26" r="22" fill="none" stroke="var(--accent,#f5a623)" strokeWidth="5" strokeLinecap="round" transform="rotate(-90 26 26)"
-              strokeDasharray={`${2 * Math.PI * 22}`} strokeDashoffset={`${2 * Math.PI * 22 * (1 - left / rest.total)}`} />
-          </svg>
-          <div className="flex-1">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[#d9c9a8]">Rest</p>
-            <p className={`${display} text-[26px] leading-none tabular-nums`}>{mmss(Math.ceil(left))}</p>
-          </div>
-          <button type="button" onClick={() => setRest({ ends: rest.ends + 15000, total: rest.total + 15 })} className="min-h-11 rounded-[12px] border border-[#3a3022] px-3 text-[14px]">+15 s</button>
-          <button type="button" onClick={() => setRest(null)} className="min-h-11 rounded-[12px] bg-accent px-3.5 text-[14px] font-semibold text-black">Skip</button>
-        </div>
-      )}
-
       <Bottom>
         <div className="flex gap-2">
           <button type="button" onClick={() => setStep(step - 1)} className="min-h-[54px] rounded-[16px] border border-border px-5 text-[16px]">{step === 0 ? "Start" : "Back"}</button>
@@ -344,7 +361,7 @@ export default function Player({ workout, phase, overview, steps, session, previ
               {busy ? "Saving…" : preview ? "Finish preview" : `Finish workout${totalSets ? ` · ${doneSets}/${totalSets} sets` : ""}`}
             </button>
           ) : (
-            <button type="button" onClick={() => { setStep(step + 1); setRest(null); }} className={`min-h-[54px] flex-1 rounded-[16px] text-[17px] font-semibold ${stepDone(s) ? "bg-accent text-black" : "border border-accent text-accent"}`}>
+            <button type="button" onClick={() => setStep(step + 1)} className={`min-h-[54px] flex-1 rounded-[16px] text-[17px] font-semibold ${stepDone(s) ? "bg-accent text-black" : "border border-accent text-accent"}`}>
               Next: {steps[step + 1].name.length > 22 ? steps[step + 1].name.slice(0, 21) + "…" : steps[step + 1].name}
             </button>
           )}

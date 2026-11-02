@@ -5,8 +5,8 @@ import { totals, type FoodItem } from "@/lib/food";
 import { todayIn } from "@/lib/program";
 import { awardAutoHabit, closeOutRings } from "@/lib/progress";
 
-/** She can log, edit and copy meals on any of the last 62 days (October 29: browse and fix previous days). */
-const MAX_BACK_MS = 62 * 86_400_000;
+/** She can log, edit and copy meals on any past day (October 29: browse and fix previous days; November 2: no limit, a year back). */
+const MAX_BACK_MS = 366 * 86_400_000;
 
 export async function saveMeal(input: {
   items: FoodItem[];
