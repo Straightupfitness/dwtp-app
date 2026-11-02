@@ -13,7 +13,7 @@ export default async function CoachHome() {
   const toReply = rows.filter((r) => r.checkin?.state === "needs-reply").length;
   return (
     // Wider than the phone column on a computer, so a row of numbers fits.
-    <section className="space-y-4 md:relative md:left-1/2 md:w-[min(1080px,calc(100vw-3rem))] md:-translate-x-1/2">
+    <section className="space-y-4">
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">Coach</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Clients</h1>
