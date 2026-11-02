@@ -22,7 +22,7 @@ export default function TopBar({ coach, unread, name, avatarPath }: {
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-md items-center justify-between px-3">
+      <div className={`mx-auto flex h-14 items-center justify-between px-3 ${coach ? "max-w-md md:max-w-[1400px] md:px-8" : "max-w-md"}`}>
         <Link href={coach ? "/coach" : "/today"} aria-label="Home">
           <Image src="/brand/dwtp-logo.png" alt="DWTP" width={67} height={32} className="h-8 w-auto mix-blend-lighten" priority />
         </Link>

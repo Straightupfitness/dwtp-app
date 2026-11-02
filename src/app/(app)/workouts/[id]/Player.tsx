@@ -21,8 +21,7 @@ type Props = {
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const key = (pos: number, set: number) => `${pos}:${set}`;
-const yt = (id: string, loop = false) =>
-  `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1${loop ? `&autoplay=1&mute=1&loop=1&playlist=${id}&controls=0` : ""}`;
+const yt = (id: string) => `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`;
 /** What she types into a time box: "90" or "90s" → 90 s, "1:30" → 90 s, "2m" or "2 min" → 120 s. */
 const toSeconds = (s: string) => {
   const t = s.trim().toLowerCase();
@@ -50,6 +49,7 @@ function describe(s: SetVals) {
 
 export default function Player({ workout, phase, overview, steps, session, preview }: Props) {
   const [step, setStep] = useState<number>(-1); // -1 = start screen, steps.length = finished
+  const [sound, setSound] = useState(false); // clips start muted; one tap turns the sound on (November 1)
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
   // A time box keeps exactly what she types ("1:3" on the way to "1:30") until she leaves it (October 30 fix).
   const [timeText, setTimeText] = useState<Record<string, string>>({});
@@ -246,9 +246,17 @@ export default function Player({ workout, phase, overview, steps, session, previ
       <div className="mx-auto w-full max-w-md flex-1 space-y-3.5 overflow-y-auto px-4 pb-6 pt-2">
         <div className="relative aspect-video overflow-hidden rounded-[18px] bg-black">
           {s.clip ? (
-            <video key={s.clip} src={s.clip} poster={s.poster ?? undefined} autoPlay muted loop playsInline preload="auto" className="size-full object-cover" />
+            <>
+              <video key={s.clip} src={s.clip} poster={s.poster ?? undefined} autoPlay muted={!sound} loop playsInline preload="auto" className="size-full object-cover" />
+              <button type="button" onClick={() => setSound((x) => !x)} aria-pressed={sound} aria-label={sound ? "Turn sound off" : "Turn sound on"}
+                className="absolute bottom-2 right-2 flex min-h-9 items-center gap-1.5 rounded-full bg-black/65 px-3 text-[12px] font-semibold text-white backdrop-blur">
+                {sound ? "🔊 Sound on" : "🔇 Tap for sound"}
+              </button>
+            </>
           ) : s.youtube ? (
-            <iframe key={s.youtube} src={yt(s.youtube, true)} title={s.name} allow="autoplay; encrypted-media" className="size-full" />
+            // November 1: a full YouTube player (with sound and controls). The old muted loop had no way to unmute,
+            // so mobility routines and other talking videos were silent unless opened on YouTube.
+            <iframe key={s.youtube} src={yt(s.youtube)} title={s.name} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="size-full" />
           ) : <div className="grid size-full place-items-center text-dim">No video</div>}
         </div>
 

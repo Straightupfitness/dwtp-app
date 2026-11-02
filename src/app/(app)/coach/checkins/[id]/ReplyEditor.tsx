@@ -5,13 +5,37 @@ import { saveReply } from "./actions";
 
 type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
 
-const GOOD = /superfood|fruit|meat|vegetable|win/i, BAD = /processed|alcohol|low-|high-|fix/i;
+const TONE: [RegExp, string][] = [[/worst/i, "text-[#ff8a7e]"], [/nutrient|best/i, "text-[#7ee2a8]"], [/fruit|next/i, "text-accent"]];
+
+/** "## Heading" lines and "- bullet" lines, as a compact list. */
+function Points({ text }: { text: string }) {
+  const blocks: { h: string; items: string[] }[] = [];
+  for (const raw of text.split("\n")) {
+    const l = raw.trim();
+    if (!l) continue;
+    const h = l.match(/^#{1,4}\s*(.+)$/) ?? l.match(/^\*\*(.+)\*\*:?$/);
+    if (h) { blocks.push({ h: h[1].replace(/:$/, ""), items: [] }); continue; }
+    if (!blocks.length) blocks.push({ h: "", items: [] });
+    blocks[blocks.length - 1].items.push(l.replace(/^[-*•]\s*/, ""));
+  }
+  return (
+    <div className="space-y-2.5 text-[14px] leading-snug">
+      {blocks.map((b, i) => (
+        <div key={i}>
+          {b.h && <p className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${TONE.find(([r]) => r.test(b.h))?.[1] ?? "text-text"}`}>{b.h}</p>}
+          <ul className="mt-1 space-y-1">{b.items.map((x, j) => <li key={j} className="flex gap-2"><span className="text-dim">•</span><span>{x}</span></li>)}</ul>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ReplyEditor({ checkinId, clientId, initialText, initialDraft, initialSummary, videoUrl, sentAt }: {
   checkinId: string; clientId: string; initialText: string; initialDraft: string; initialSummary: Summary;
   videoUrl: string | null; sentAt: string | null;
 }) {
-  const [text, setText] = useState(initialText || initialDraft);
+  const [text, setText] = useState(initialText);
+  const [points, setPoints] = useState(initialDraft);
   const [summary, setSummary] = useState<Summary>(initialSummary);
   const [video, setVideo] = useState<string | null>(null);
   const [busy, setBusy] = useState<"" | "draft" | "save" | "send">("");
@@ -19,17 +43,13 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
   const [sent, setSent] = useState(sentAt);
 
   async function draft() {
-    if (text.trim() && !confirmReplace()) return;
     setBusy("draft"); setMsg("");
     const res = await fetch("/api/coach/draft", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ checkinId }) });
     const data = await res.json();
     setBusy("");
     if (!res.ok) { setMsg(data.error); return; }
-    setText(data.draft); setSummary(data.summary);
+    setPoints(data.draft); setSummary(data.summary);
   }
-  // Inline confirmation instead of a browser dialog.
-  const [askReplace, setAskReplace] = useState(false);
-  function confirmReplace() { if (askReplace) { setAskReplace(false); return true; } setAskReplace(true); return false; }
 
   async function save(send: boolean) {
     setBusy(send ? "send" : "save"); setMsg("");
@@ -49,30 +69,19 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
           {!!summary.flags?.length && <p><b className="text-gold">Flags:</b> {summary.flags.join(" · ")}</p>}
         </div>
       )}
-      {!!summary?.report?.length && (
-        <details open className="rounded-xl border border-border bg-card p-3 text-sm">
-          <summary className="cursor-pointer text-xs uppercase tracking-widest text-accent">Food and weight report</summary>
-          <dl className="mt-2 divide-y divide-border">
-            {summary.report.map((r) => {
-              const empty = /^(none|not logged)\.?$/i.test(r.text);
-              return (
-                <div key={r.label} className="grid grid-cols-[8.5rem_1fr] gap-2 py-1.5">
-                  <dt className={`font-semibold ${empty ? "text-dim" : GOOD.test(r.label) ? "text-[#7ee2a8]" : BAD.test(r.label) ? "text-[#ff8a7e]" : "text-text"}`}>{r.label}</dt>
-                  <dd className={empty ? "text-dim" : ""}>{r.text}</dd>
-                </div>
-              );
-            })}
-          </dl>
-        </details>
-      )}
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm uppercase tracking-widest text-dim">Your reply</h2>
-        <button type="button" onClick={draft} disabled={busy !== ""} className="min-h-11 rounded-lg border border-accent px-3 text-sm text-accent disabled:opacity-50">
-          {busy === "draft" ? "Drafting… (about 20 sec)" : askReplace ? "Tap again to replace your text" : text ? "Redraft with AI" : "Draft with AI"}
-        </button>
+      {/* November 1: talking points in bullets (his own words do the rest). */}
+      <div className="space-y-2 rounded-xl border border-[#3a3020] bg-[#15120c] p-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm uppercase tracking-widest text-accent">Talking points</h2>
+          <button type="button" onClick={draft} disabled={busy !== ""} className="min-h-10 rounded-lg border border-accent px-3 text-[13px] text-accent disabled:opacity-50">
+            {busy === "draft" ? "Thinking… (about 30 sec)" : points ? "Redo with AI" : "Draft with AI"}
+          </button>
+        </div>
+        {points ? <Points text={points} /> : <p className="text-[13px] text-dim">Tap Draft with AI for bullet points: her questions and concerns, worst foods, most nutrient-dense foods, her weigh-ins and her lowest-hanging fruit.</p>}
       </div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={16}
-        placeholder="Tap Draft with AI, or write your reply. Use it as your script when you record your Loom."
+      <h2 className="text-sm uppercase tracking-widest text-dim">Your reply</h2>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8}
+        placeholder="Record a video below, or type a reply. She sees this text with your video."
         className="w-full rounded-xl border border-border bg-bg p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
       <p className="text-xs text-dim">{text.trim().split(/\s+/).filter(Boolean).length} words · about {Math.max(1, Math.round(text.trim().split(/\s+/).length / 150))} min spoken</p>
 

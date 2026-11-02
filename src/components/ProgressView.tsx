@@ -48,7 +48,7 @@ export default function ProgressView({ data, badges, range, base, coach = false,
 
       <section className="space-y-2.5">
         <H>{coach ? "Her goals" : "Your goals"}</H>
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid grid-cols-2 gap-2 ${coach ? "md:grid-cols-4 xl:grid-cols-7" : ""}`}>
           <Goal label="Weight" value={g.goalWeight ? String(g.goalWeight) : "–"} unit={g.goalWeight ? "lbs" : undefined} sub={g.startWeight ? `Started at ${g.startWeight} lbs` : undefined} />
           <Goal label="Calories a day" value={g.calories ? g.calories.toLocaleString() : "Coming"} sub={g.calories ? "Within 100 counts as on target" : "Michael sets it after 14 days of logging"} />
           <Goal label="Protein a day" value={String(g.protein)} unit="g" sub="40 g+ at every meal" />

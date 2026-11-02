@@ -23,7 +23,7 @@ function pickType() {
  * The chat box (October 29): photos, dictation (speak, it types), voice notes (record and send the audio),
  * replying to a message and editing your own.
  */
-export default function ChatComposer({ clientId, unread }: { clientId: string; unread: number }) {
+export default function ChatComposer({ clientId, unread, wide = false }: { clientId: string; unread: number; wide?: boolean }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -119,7 +119,7 @@ export default function ChatComposer({ clientId, unread }: { clientId: string; u
   const round = "grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full";
   return (
     <div className="fixed inset-x-0 z-10 bottom-[calc(env(safe-area-inset-bottom)+57px)] border-t border-border bg-bg/95 px-4 py-2 backdrop-blur">
-      <div className="mx-auto max-w-md space-y-1.5">
+      <div className={`mx-auto space-y-1.5 ${wide ? "max-w-md md:max-w-3xl" : "max-w-md"}`}>
         {(reply || editing) && (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-[13px]">
             <span className="min-w-0 flex-1">

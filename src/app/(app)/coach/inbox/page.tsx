@@ -4,6 +4,7 @@ import { timeAgo } from "@/lib/names";
 import LiveRefresh from "@/components/LiveRefresh";
 import Avatar from "@/components/Avatar";
 import BackButton from "@/components/BackButton";
+import InboxSearch from "./InboxSearch";
 
 export default async function Inbox() {
   const supabase = await createClient();
@@ -23,13 +24,14 @@ export default async function Inbox() {
     .sort((a, b) => (b.t?.unread ?? 0) - (a.t?.unread ?? 0) || (b.t?.last.created_at ?? "").localeCompare(a.t?.last.created_at ?? ""));
 
   return (
-    <section className="space-y-4">
+    <section className="mx-auto max-w-3xl space-y-4">
       <BackButton fallback="/coach" />
       <LiveRefresh tables={["messages"]} />
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">Coach</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Inbox</h1>
       </header>
+      <InboxSearch clients={(clients ?? []).filter((c) => c.id !== user!.id).map((c) => ({ id: c.id, name: c.full_name || c.email || "Client", email: c.email, avatar: c.avatar_path }))} />
       <ul className="space-y-2">
         {rows.map(({ c, t }) => (
           <li key={c.id}>

@@ -5,6 +5,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "./supabase/admin";
+import { loadSeen, type SeenWeek } from "./seen";
 import { currentWindow, windowFor } from "./checkin";
 import { programWeek, programWeekOf, todayIn, trainingWeek } from "./program";
 import { daysFor } from "./workouts";
@@ -34,6 +35,7 @@ export type RosterRow = {
   lastWorkoutWeek: { week: number; planned: number; done: number } | null; missedWorkouts: boolean;
   lastSeen: string | null; hoursSinceSeen: number | null; notSeen48: boolean;
   cpsWeek: number; flags: string[];
+  seen: SeenWeek | null;
 };
 
 export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]> {
@@ -69,6 +71,8 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
   };
 
   const now = Date.now();
+  let seenWeeks = new Map<string, SeenWeek>();
+  try { seenWeeks = await loadSeen(adminClient(), list.map((c) => ({ id: c.id, timezone: c.timezone, lastSeen: seen.get(c.id) ?? null }))); } catch { /* no service key locally */ }
   return list.map((c) => {
     const tz = c.timezone ?? "America/Los_Angeles";
     const today = todayIn(tz), yesterday = addDays(today, -1);
@@ -139,6 +143,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       lastSeen, hoursSinceSeen, notSeen48: hoursSinceSeen === null || hoursSinceSeen >= 48,
       cpsWeek: (cps ?? []).find((x) => x.client_id === c.id)?.this_week ?? 0,
       flags: ((mine[0]?.flags as string[] | null) ?? []),
+      seen: seenWeeks.get(c.id) ?? null,
     };
     return row;
   });

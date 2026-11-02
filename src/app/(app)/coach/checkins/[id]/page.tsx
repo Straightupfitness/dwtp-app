@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { weekData } from "@/lib/coach-data";
 import { questionLabels } from "@/lib/checkin";
 import ReplyEditor from "./ReplyEditor";
+import { loadDaily } from "@/lib/daily";
+import { loadFoodWeek } from "@/lib/food-week";
+import FoodWeek from "@/components/FoodWeek";
+import { DayBars, WeightLine } from "@/components/Charts";
 import TranscribeButton from "./TranscribeButton";
 
 export const maxDuration = 120;
@@ -19,10 +23,16 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   const reply = (Array.isArray(c.checkin_replies) ? c.checkin_replies[0] : c.checkin_replies) as
     { ai_draft?: string; final_text?: string; video_path?: string; sent_at?: string } | null;
 
-  const [d, { data: baseline }] = await Promise.all([
+  const [d, { data: baseline }, daily] = await Promise.all([
     weekData(supabase, c.client_id, c.week_number),
     supabase.from("checkins").select("sleep, energy, stress, hunger").eq("client_id", c.client_id).order("week_number").limit(1).maybeSingle(),
+    loadDaily(supabase, c.client_id, 60),
   ]);
+  // November 1: everything Michael used to have open in Trainerize next to VideoAsk, on this one screen.
+  const foodWeek = await loadFoodWeek(supabase, c.client_id, { end: d.end });
+  const weights60 = daily.weights.filter((w) => w.date >= daily.days[0].date);
+  const steps28 = daily.days.slice(-28);
+  const firstW = weights60[0], lastW = weights60[weights60.length - 1];
   const last = d.previous[0] ?? null;
   const sleepShots = ((c.answers?.sleep_photos ?? []) as string[]);
   const paths = [c.video_path, reply?.video_path, ...sleepShots].filter(Boolean) as string[];
@@ -41,6 +51,8 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   return (
     <section className="space-y-5">
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(340px,0.95fr)] xl:items-start">
+      <div className="space-y-5">
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{weekName(c.week_number)} check-in{d.dietBreak ? " · diet break" : ""}{d.checkinType && d.checkinType !== "standard" ? ` · ${d.checkinType.replace("_", " ")}` : ""}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">
@@ -108,8 +120,28 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
         )}
       </div>
 
-      <details className="rounded-xl border border-border bg-card p-3" open>
-        <summary className="cursor-pointer text-sm uppercase tracking-widest text-dim">{name}&apos;s week in data</summary>
+      </div>
+
+      {/* Her numbers: weight, steps and food, like Trainerize next to VideoAsk. */}
+      <div className="space-y-5">
+        <div className="space-y-2 rounded-[18px] border border-border bg-card p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm uppercase tracking-widest text-dim">Weight · 60 days</h2>
+            {firstW && lastW && firstW !== lastW && <span className={`text-[13px] font-semibold ${lastW.lbs < firstW.lbs ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lastW.lbs < firstW.lbs ? "−" : "+"}{Math.abs(Math.round((lastW.lbs - firstW.lbs) * 10) / 10)} lbs</span>}
+          </div>
+          <p className="text-[13px] text-[#a8a8a8]">{d.weekWeights.length}/7 weigh-ins this week{lastW ? <> · latest <b className="text-text">{lastW.lbs} lbs</b> on {new Date(lastW.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}</> : ""}{d.profile?.goal_weight_lbs ? ` · goal ${d.profile.goal_weight_lbs}` : ""}</p>
+          <WeightLine points={weights60} goal={daily.goals.goalWeight} />
+          {d.weekWeights.length > 0 && <p className="text-[12px] text-dim">This week: {d.weekWeights.map((w) => `${new Date(w.log_date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })} ${w.weight_lbs}`).join(" · ")}</p>}
+        </div>
+        <div className="space-y-2 rounded-[18px] border border-border bg-card p-3">
+          <h2 className="text-sm uppercase tracking-widest text-dim">Steps · 28 days</h2>
+          {steps28.some((x) => x.steps)
+            ? <DayBars days={steps28.map((x) => ({ date: x.date, value: x.steps }))} color="#a3e635" unit="steps" goal={daily.goals.steps} />
+            : <p className="text-[13px] text-dim">No steps synced.{(c.answers as Record<string, unknown> | null)?.steps_avg ? ` She reported ${String((c.answers as Record<string, unknown>).steps_avg)} a day in her check-in.` : ""}</p>}
+        </div>
+        <FoodWeek data={foodWeek} title="Food · her check-in week" />
+      <details className="rounded-xl border border-border bg-card p-3">
+        <summary className="cursor-pointer text-sm uppercase tracking-widest text-dim">{name}&apos;s week in numbers</summary>
         <div className="mt-3 space-y-3 text-sm">
           <p><b>Weight:</b> {d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none logged in 3 weeks"} · {d.weekWeights.length}/7 weigh-ins this week
             {d.profile?.start_weight_lbs ? ` · start ${d.profile.start_weight_lbs}` : ""}{d.profile?.goal_weight_lbs ? ` · goal ${d.profile.goal_weight_lbs}` : ""}</p>
@@ -128,8 +160,13 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
         </div>
       </details>
 
+      </div>
+
+      <div className="space-y-3 xl:sticky xl:top-[72px] xl:max-h-[calc(100dvh-90px)] xl:overflow-y-auto">
       <ReplyEditor checkinId={c.id} clientId={c.client_id} initialText={reply?.final_text ?? ""} initialDraft={reply?.ai_draft ?? ""}
         initialSummary={(c.ai_summary as never) ?? null} videoUrl={reply?.video_path ? signed.get(reply.video_path) ?? null : null} sentAt={reply?.sent_at ?? null} />
+      </div>
+      </div>
     </section>
   );
 }

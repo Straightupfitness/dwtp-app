@@ -33,7 +33,7 @@ export default function BottomNav({ coach = false }: { coach?: boolean }) {
   const active = tabs.filter((t) => here.startsWith(t.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+      <ul className={`mx-auto grid ${coach ? "max-w-md md:max-w-2xl" : "max-w-md"}`} style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map(({ href, label, Icon }) => (
           <li key={href}>
             <Link href={href} aria-current={active === href ? "page" : undefined}

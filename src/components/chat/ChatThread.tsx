@@ -55,7 +55,7 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
       </ol>
       {lastMine && <p className="pt-1 text-right text-xs text-dim">{lastMine.read_at ? `Seen by ${otherName}` : "Sent"}</p>}
       {!list.length && <p className="py-8 text-center text-dim">No messages yet. Say hi to {otherName}.</p>}
-      <ChatComposer clientId={clientId} unread={unread} />
+      <ChatComposer clientId={clientId} unread={unread} wide={viewerId !== clientId} />
     </div>
   );
 }

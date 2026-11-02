@@ -5,7 +5,7 @@ import { loadProgram } from "./circles";
 
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
-export type MealFood = { calories: number; protein: number; items: string[] };
+export type MealFood = { slot: string; time: string; calories: number; protein: number; fiber: number; items: string[] };
 export type DayFood = { date: string; meals: number; calories: number; protein: number; fiber: number; items: string[]; list: MealFood[]; steps: number | null; sleepMin: number | null };
 
 export async function weekData(supabase: SupabaseClient, clientId: string, week: number) {
@@ -18,7 +18,7 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
 
   const [{ data: weights }, { data: food }, { data: target }, { data: tw }, { data: assessment }, { data: prev }, state, { data: health }] = await Promise.all([
     supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", clientId).gte("log_date", addDays(start, -21)).order("log_date"),
-    supabase.from("food_logs").select("eaten_at, items, calories, protein_g, fiber_g").eq("client_id", clientId)
+    supabase.from("food_logs").select("eaten_at, meal_slot, items, calories, protein_g, fiber_g").eq("client_id", clientId)
       .gte("eaten_at", addDays(start, -1) + "T00:00:00Z").lte("eaten_at", addDays(end, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("maintenance_calories, calorie_target, protein_g").eq("client_id", clientId).maybeSingle(),
     supabase.from("trajectory_weeks").select("phase, checkin_type, is_diet_break, moments").eq("week_number", Math.min(Math.max(week, 1), 52)).maybeSingle(),
@@ -42,7 +42,9 @@ export async function weekData(supabase: SupabaseClient, clientId: string, week:
       steps: health?.find((h) => h.day === date)?.steps ?? null,
       sleepMin: health?.find((h) => h.day === date)?.sleep_minutes ?? null,
       list: rows.map((r) => ({
-        calories: r.calories ?? 0, protein: Math.round(Number(r.protein_g ?? 0)),
+        slot: ({ meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3" } as Record<string, string>)[r.meal_slot ?? ""] ?? "Other",
+        time: new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(r.eaten_at)),
+        calories: r.calories ?? 0, protein: Math.round(Number(r.protein_g ?? 0)), fiber: Math.round(Number(r.fiber_g ?? 0)),
         items: ((r.items as { name: string; amount: string }[]) ?? []).map((i) => `${i.amount} ${i.name}`.trim()),
       })),
     });

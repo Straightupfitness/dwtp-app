@@ -3,8 +3,17 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import Avatar from "@/components/Avatar";
 import { sendBulk } from "@/components/chat/actions";
+import SeenStrip, { lastInLabel } from "@/components/SeenStrip";
+import { resendWelcome } from "./clients/[id]/actions";
+import { TextLink } from "./clients/[id]/WelcomeButton";
 import type { RosterRow } from "@/lib/roster";
 
+type SortKey = "attention" | "name" | "seen" | "weight" | "kcalY" | "kcalAvg" | "protein" | "steps" | "workouts";
+const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) => number | null> = {
+  seen: (r) => r.hoursSinceSeen ?? 1e9, weight: (r) => r.weight, kcalY: (r) => r.kcalYesterday, kcalAvg: (r) => r.kcalAvg,
+  protein: (r) => r.proteinAvg, steps: (r) => r.stepsAvg, workouts: (r) => (r.lastWorkoutWeek?.planned ? r.lastWorkoutWeek.done / r.lastWorkoutWeek.planned : null),
+};
+const COLS = "md:grid-cols-[24px_minmax(170px,1.4fr)_minmax(150px,1fr)_repeat(6,minmax(58px,0.8fr))_minmax(210px,1.5fr)]";
 type Filter = "all" | "reply" | "checkin" | "food" | "workout" | "seen";
 const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[] = [
   { key: "all", label: "All clients", test: () => true },
@@ -33,7 +42,10 @@ function kcalTone(v: number | null, target: number | null) {
 export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"attention" | "az" | "seen">("attention");
+  const [sort, setSortState] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "attention", dir: 1 });
+  // Tap a column heading to sort by it (November 1: "Client" = A–Z); tap again to flip the order.
+  const setSort = (key: SortKey) => setSortState((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : 1 }));
+  const [actionMsg, setActionMsg] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [composing, setComposing] = useState(false);
   const [text, setText] = useState("Hi {first}, ");
@@ -45,9 +57,14 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
     const f = FILTERS.find((x) => x.key === filter)!;
     const q = search.trim().toLowerCase();
     const list = rows.filter(f.test).filter((r) => !q || r.name.toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q));
-    return list.sort((a, b) => sort === "az" ? a.name.localeCompare(b.name)
-      : sort === "seen" ? (b.hoursSinceSeen ?? 1e9) - (a.hoursSinceSeen ?? 1e9)
-      : score(b) - score(a) || a.name.localeCompare(b.name));
+    return list.sort((a, b) => {
+      if (sort.key === "name") return sort.dir * a.name.localeCompare(b.name);
+      if (sort.key === "attention") return sort.dir * (score(b) - score(a)) || a.name.localeCompare(b.name);
+      // Biggest first (longest away, heaviest, most calories…); empty values always last.
+      const f = SORT_VALUE[sort.key], x = f(a), y = f(b);
+      if (x === null || y === null) return x === null && y === null ? a.name.localeCompare(b.name) : x === null ? 1 : -1;
+      return sort.dir * (y - x) || a.name.localeCompare(b.name);
+    });
   }, [rows, filter, sort, search]);
   const allPicked = shown.length > 0 && shown.every((r) => picked.has(r.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -55,7 +72,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const chip = (on: boolean) => `shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${on ? "border-accent bg-accent font-semibold text-black" : "border-[#2f2f2f] text-[#cfcfcf]"}`;
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className={`space-y-3 ${picked.size ? "pb-56" : "pb-24"}`}>
       {/* Find a client by name (October 30). */}
       <div className="relative">
         <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
@@ -74,15 +91,18 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           Select all {shown.length}
         </label>
         <span className="text-dim">Sort:</span>
-        {([["attention", "Needs attention"], ["az", "A–Z"], ["seen", "Longest away"]] as const).map(([v, l]) => (
-          <button key={v} type="button" onClick={() => setSort(v)} aria-pressed={sort === v} className={`min-h-9 rounded-full border px-3 ${sort === v ? "border-accent text-accent" : "border-border text-dim"}`}>{l}</button>
+        {([["attention", "Needs attention"], ["name", "A–Z"], ["seen", "Longest away"]] as const).map(([v, l]) => (
+          <button key={v} type="button" onClick={() => setSort(v)} aria-pressed={sort.key === v} className={`min-h-9 rounded-full border px-3 ${sort.key === v ? "border-accent text-accent" : "border-border text-dim"}`}>{l}{sort.key === v && sort.dir === -1 ? " ↑" : ""}</button>
         ))}
       </div>
 
       {/* One compact row per client (October 31): numbers in columns, alerts stacked on the right. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 grid grid-cols-6 gap-1 bg-bg/95 py-1.5 pl-[42px] pr-2.5 md:px-2.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid-cols-[24px_minmax(170px,1.5fr)_repeat(6,minmax(58px,1fr))_minmax(230px,1.6fr)] md:gap-2">
-        <span className="hidden md:block" /><span className="hidden md:block">Client</span>
-        <span>Weight</span><span>Kcal yday</span><span>Kcal avg</span><span>Protein</span><span>Steps</span><span>Workouts</span>
+      <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 grid grid-cols-6 gap-1 bg-bg/95 py-1.5 pl-[42px] pr-2.5 md:px-2.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur ${COLS} md:gap-2`}>
+        <span className="hidden md:block" />
+        {([["name", "Client", "hidden md:block"], ["seen", "Last in app", "hidden md:block"], ["weight", "Weight"], ["kcalY", "Kcal yday"], ["kcalAvg", "Kcal avg"], ["protein", "Protein"], ["steps", "Steps"], ["workouts", "Workouts"]] as [SortKey, string, string?][]).map(([key, label, cls]) => (
+          <button key={key} type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
+            className={`text-left uppercase ${cls ?? ""} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.key === "name" ? (sort.dir === 1 ? " ↓" : " ↑") : sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
+        ))}
         <span className="hidden text-right md:block">Alerts</span>
       </div>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
@@ -102,13 +122,14 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           // The check-in reply goes first; the rest wrap two to a line, so a row stays short.
           for (const f of r.flags) alerts.push({ text: f, cls: "bg-[#2a1a10] text-gold" });
           return (
-            <li key={r.id} className={`grid grid-cols-[24px_1fr_auto] items-center gap-x-2 gap-y-1.5 px-2.5 py-2 md:grid-cols-[24px_minmax(170px,1.5fr)_repeat(6,minmax(58px,1fr))_minmax(230px,1.6fr)] md:gap-x-2 ${on ? "bg-accent/10" : ""}`}>
+            <li key={r.id} className={`grid grid-cols-[24px_1fr_auto] items-center gap-x-2 gap-y-1.5 px-2.5 py-2 ${COLS} md:gap-x-2 ${on ? "bg-accent/10" : ""}`}>
               <input type="checkbox" checked={on} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="size-[18px] accent-[var(--accent)] md:order-1" />
               <Link href={`/coach/clients/${r.id}`} className="flex min-w-0 items-center gap-2 md:order-2">
                 <Avatar name={r.name} path={r.avatar} size={32} />
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-semibold leading-tight">{r.name}</span>
-                  <span className="block truncate text-[11px] text-dim">{r.week ? `Wk ${r.week}` : "Not started"} · {r.cpsWeek} CPs · {ago(r.hoursSinceSeen)}</span>
+                  <span className="block truncate text-[11px] text-dim">{r.week ? `Wk ${r.week}` : "Not started"} · {r.cpsWeek} CPs<span className="md:hidden"> · in app {lastInLabel(r.seen).toLowerCase()}</span></span>
+                  <span className="mt-0.5 block md:hidden"><SeenStrip seen={r.seen} size={12} /></span>
                 </span>
               </Link>
               {/* Alerts, stacked on the right. */}
@@ -119,6 +140,10 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                 {!alerts.length && <span className="text-[11px] text-[#7ee2a8]">On track</span>}
               </span>
               <span className="col-span-3 grid grid-cols-6 gap-1 pl-[32px] md:contents">
+                <span className="hidden min-w-0 md:order-3 md:block">
+                  <span className="block truncate text-[13px] font-semibold">{lastInLabel(r.seen)}</span>
+                  <SeenStrip seen={r.seen} size={14} />
+                </span>
                 <span className={cell}><span className={`${val} ${(r.daysSinceWeigh ?? 99) >= 4 && r.week ? "text-[#fb7185]" : ""}`}>{r.weight ?? "–"}</span><span className={sub}>{r.weighedOn ? (r.daysSinceWeigh === 0 ? "today" : `${r.daysSinceWeigh}d ago`) : "none"}</span></span>
                 <span className={cell}><span className={`${val} ${r.kcalYesterday === null ? (r.week ? "text-[#fb7185]" : "") : kcalTone(r.kcalYesterday, r.kcalTarget)}`}>{r.kcalYesterday ?? "–"}</span><span className={sub}>{r.kcalTarget ? `of ${r.kcalTarget}` : "no target"}</span></span>
                 <span className={cell}><span className={`${val} ${kcalTone(r.kcalAvg, r.kcalTarget)}`}>{r.kcalAvg ?? "–"}</span><span className={sub}>{r.foodDays7}/7 days</span></span>
@@ -132,16 +157,41 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
       </ul>
       {!shown.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-6 text-center text-dim">Nobody here. Nice.</p>}
 
-      {/* Message the ones she ticked: one personal message each. */}
-      {picked.size > 0 && (
-        <div className="fixed inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+57px)] border-t border-border bg-bg/95 px-4 py-2.5 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl items-center gap-2">
-            <span className="flex-1 text-sm"><b>{picked.size}</b> selected</span>
-            <button type="button" onClick={() => setPicked(new Set())} className="min-h-11 rounded-xl border border-border px-3 text-sm text-dim">Clear</button>
-            <button type="button" onClick={() => { setComposing(true); setMsg(""); }} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-black">Message {picked.size}</button>
+      {/* What to do with the ones he ticked (November 1): chat, her pages, sign-in help, emails. */}
+      {picked.size > 0 && (() => {
+        const one = pickedRows.length === 1 ? pickedRows[0] : null;
+        const act = "inline-flex min-h-10 shrink-0 items-center rounded-xl border border-border px-3 text-[13px] font-semibold hover:border-accent";
+        return (
+          <div className="fixed inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+57px)] border-t border-border bg-bg/95 px-4 py-2.5 backdrop-blur">
+            <div className="mx-auto max-w-5xl space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 truncate text-sm">{one ? <b>{one.name}</b> : <><b>{picked.size}</b> selected</>}</span>
+                <button type="button" onClick={() => { setPicked(new Set()); setActionMsg(""); }} className="min-h-10 rounded-xl px-3 text-sm text-dim">Clear</button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-0.5">
+                {one
+                  ? <Link href={`/coach/inbox/${one.id}`} className={`${act} border-accent bg-accent text-black`}>Message in chat</Link>
+                  : <button type="button" onClick={() => { setComposing(true); setMsg(""); }} className={`${act} border-accent bg-accent text-black`}>Message {picked.size} in chat</button>}
+                {one && <Link href={`/coach/clients/${one.id}`} className={act}>Open her page</Link>}
+                {one?.checkin?.id && <Link href={`/coach/checkins/${one.checkin.id}`} className={act}>Week {one.checkin.week} check-in</Link>}
+                {one && <Link href={`/coach/clients/${one.id}#food`} className={act}>Food · 7 days</Link>}
+                {one && <Link href={`/coach/clients/${one.id}/workouts`} className={act}>Workouts</Link>}
+                <button type="button" disabled={pending} onClick={() => start(async () => {
+                  let ok = 0;
+                  for (const r of pickedRows) { const x = await resendWelcome(r.id).catch(() => ({ ok: false })); if (x.ok) ok++; }
+                  setActionMsg(`Sign-in email sent to ${ok} of ${pickedRows.length}.`);
+                })} className={act}>{pending ? "Sending…" : `Email sign-in link${one ? "" : "s"}`}</button>
+                <button type="button" onClick={async () => {
+                  const list = pickedRows.map((r) => r.email).filter(Boolean).join(", ");
+                  try { await navigator.clipboard.writeText(list); setActionMsg(`Copied ${pickedRows.filter((r) => r.email).length} email address${pickedRows.length === 1 ? "" : "es"}.`); } catch { setActionMsg(list); }
+                }} className={act}>Copy email{one ? "" : "s"}</button>
+              </div>
+              {one && <div className="[&>button]:min-h-10"><TextLink key={one.id} clientId={one.id} /></div>}
+              {actionMsg && <p className="text-[13px] text-dim">{actionMsg}</p>}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {composing && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Message clients">
           <div className="w-full max-w-lg space-y-3 rounded-[20px] border border-border bg-[#121212] p-4">

@@ -21,7 +21,7 @@ export default function WelcomeButton({ clientId, failed }: { clientId: string; 
  * "Text her a link": a sign-in link to copy or send by text, for when the email doesn't reach her
  * (spam, Yahoo, an old email). It works for 14 days and doesn't cancel other links.
  */
-function TextLink({ clientId }: { clientId: string }) {
+export function TextLink({ clientId }: { clientId: string }) {
   const [l, setL] = useState<{ link: string; first: string; phone: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);

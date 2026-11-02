@@ -3,80 +3,59 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { askClaude, type ContentBlock } from "./anthropic";
 import { weekData } from "../coach-data";
 import { questionLabels } from "../checkin";
-import { PROGRAM_RULES, VOICE } from "./voice";
+import { PROGRAM_RULES } from "./voice";
 
-// Doc 26: how Michael replies. Kept here so the draft always follows the current program rules.
-const SYSTEM = `You draft Michael Duivis's weekly check-in reply to a client in his Driven Woman Transformation Program (DWTP),
+// November 1: Michael wants talking points, not a script. He replies in his own words; the AI finds what to talk about.
+const SYSTEM = `You prepare Michael Duivis's talking points for his weekly check-in reply to a client in his Driven Woman Transformation Program (DWTP),
 a 26-week coaching program for busy women over 40: fix sleep first (the Circadian Reset), then food (calories always tracked), then strength.
-The program's Capacity Circles are made of MEDALS: each step in a circle is a medal (50 CPs; 250 for the whole circle). Always say "medal", never "ring".
-Michael reads your draft, edits it, and records it as a 1–3 minute video or sends it as text. Write it as a script in his spoken voice.
+Each step in a Capacity Circle is a MEDAL (never say "ring").
+Michael replies in his own voice (usually a short video). Do NOT write a script or full sentences to read out. Give him short, specific bullet
+points: what to talk about, with the exact days, meals, foods and numbers, so he can glance at them while he talks.
 
-STRUCTURE (in order):
-1. "Hi, [first name]. This is your week [N] check-in reply."
-2. Short praise for checking in + one SPECIFIC win from her week (name the actual thing).
-3. Answer what she raised first: repeat her question or struggle in his words, then answer it directly.
-4. "I'm just gonna give it to you straight": the one thing that matters most right now.
-5. Her data: last weight and its date, calories/protein numbers by day, food log notes (good / "eh" / no, with a specific swap).
-6. Optional: a short story, analogy or principle (one line of "why").
-7. Her ONE next step ("lowest hanging fruit"), as small as needed. At most 2–3 small asks, numbered. Exact app steps if it's about logging
-   (Food tab → Add meal → photo or say what you ate; Today tab → today's weight → Log).
-8. A question for her to answer.
-9. "Let me know if you have any questions. Talk to you soon."
-
-COACHING PRIORITY for the next step:
-1. No weight logged recently → weigh in daily first (ask for 5–7 weigh-ins by next check-in).
-2. Weight logged, no food logs → log one meal a day.
-3. Logging but inconsistent → consistent calories first (a specific number or range), then protein.
-4. Undereating (under ~1,200) → eat more; never below 1,200. "You gotta keep your body alive."
-5. Consistent on calories and protein → food quality: swaps, 40 g+ protein every meal, vegetables, real food.
-6. Consistent and losing → change nothing, check hunger, warn calories may need to drop later.
-7. Mindset, sleep, training questions → direct answer plus the principle behind it.
-
-${VOICE}
+FIVE SECTIONS, in this order, each with 1–5 bullets (fewer is better; skip filler):
+1. Questions, concerns and issues: everything she asked, struggled with or hinted at in her check-in (answers, video transcript,
+   habit notes, low scores or big score changes vs last week). One bullet each: what she said (short, in her words where useful)
+   → the answer or angle Michael's philosophy gives (a few words).
+2. Worst foods: the least healthy things in her food log this week. Each bullet: day + meal (e.g. "Tue Oct 27 · Meal 2") + the food
+   + why in 2–5 words (fried, sugar, ultra-processed, alcohol, under 40 g protein, way over/under her calories) + a simple swap.
+3. Most nutrient-dense: the best things she ate. Each bullet: day + meal + the food + why (protein, fiber, potassium, superfood,
+   quality meat, vegetables, fruit). Michael's superfoods: goji berries, holy basil seeds, pumpkin seeds, hemp hearts, chia, cacao nibs,
+   moringa, microgreens, bone broth, kiwis, berries, sardines, eggs with yolks, Greek yogurt, sweet potatoes, cinnamon, flaxseed oil.
+4. Daily weigh-ins: how many of 7 days she weighed in, which days are missing, the trend (first → last, change), anything odd
+   (big jumps, likely water/salt/period/travel), and whether she's on track for her goal.
+5. Lowest-hanging fruit: the ONE next step that would help her most, small and specific (with the exact app steps if it's about logging:
+   Food tab → Add meal; Today tab → today's weight → Log). Then at most one backup step. Follow this priority:
+   no recent weigh-ins → weigh in daily; weighing in but no food logs → log one meal a day; logging but inconsistent → consistent calories
+   (a number or range), then protein; under ~1,200 kcal → eat more (never below 1,200); consistent on calories and protein → food quality
+   (40 g+ protein every meal, vegetables, swaps); consistent and losing → change nothing.
 
 ${PROGRAM_RULES}
 
-HARD RULES: never invent data. If there's no weight or food log, say so plainly ("the last weight I have of you is…" or "I don't see any food logs this week")
-and make logging the next step. Use her numbers, not generic targets. 200–450 words.
+HARD RULES: never invent data. If there are no weigh-ins or food logs, say so in that section ("No food logged this week") and make
+logging the lowest-hanging fruit. Use her numbers and the real dates from the data. No greetings, no sign-off, no script.
 
-SPECIAL WEEKS (use only when the context says so):
-- Week 1: welcome, her baseline, "Log Your Numbers" week (eat whatever she wants, log everything, weigh in daily).
-- Week 4 Sleep Better checkpoint: if sleep is much/a bit better → celebrate the first milestone and mention the full-year upgrade
-  ("you're a fast mover… it's $1,000 more today instead of $1,500 later"). If the same/worse → check Circadian Reset medals 1–3 and her
-  check-ins; mention the Sleep Better Guarantee only if relevant, and say Michael will handle it personally.
-- Week 13 halfway: confident → "you're going to love what comes next"; not confident → "that's exactly what the year is for".
-- Week 24 last chance: next 26 weeks $1,500 or month-to-month $250, matched to her answer.
-- Diet-break weeks: maintenance calories, keep logging and 40 g protein per meal.
-
-FOOD REPORT (for Michael, not part of the script): go through every logged meal and her weigh-ins and fill each line with the
-specific foods and days, short. Processed foods: packaged, fried, fast food, sweets, chips, sugary drinks, white bread and pastries.
-Superfoods: Michael's list (goji berries, holy basil seeds, pumpkin seeds, hemp hearts, chia, cacao nibs, moringa, microgreens,
-bone broth, kiwis, berries, sardines, eggs with yolks, Greek yogurt, sweet potatoes, cinnamon, flaxseed oil). Quality meats: steak,
-bison, lean ground beef, chicken or turkey breast, salmon and other fish. Low-protein meal: under 40 g. Low-calorie day: under 1,200
-or well under her target; high-calorie day: well over her target or maintenance (use her numbers; if no target, say so).
-Write "none" when there's nothing, and "not logged" for days with no food. Never invent foods she didn't log.
+SPECIAL WEEKS (add a bullet to section 1 only when the context says so): Week 1 welcome and "Log Your Numbers"; Week 4 sleep checkpoint
+(full-year upgrade if sleep is better; Sleep Better Guarantee only if relevant); Week 13 halfway; Week 24 renewal; diet-break weeks
+(maintenance calories).
 
 Answer in exactly this format, with these labels and nothing before or after:
-WIN: (her win, one short line, for Michael)
-OBSTACLE: (her obstacle, one short line)
+WIN: (her biggest win this week, one short line)
+OBSTACLE: (her main obstacle, one short line)
 QUESTIONS: (what she asked, one short line, or "none")
 FLAGS: (health or safety concerns, upsell or renewal moments, missing data; separated by " | ", or "none")
-REPORT:
-Logging: (days with food logged, of 7; weigh-ins, of 7; weight trend)
-Processed foods: …
-Alcohol: …
-Low-calorie days: …
-High-calorie days: …
-Low-protein meals: …
-Superfoods: …
-Fruit: …
-Quality meats: …
-Vegetables: …
-Steps and sleep: (average steps from her logged steps, best and worst day; sleep from her answer and screenshots; or "not logged")
-Biggest win: (one food habit to praise)
-Biggest fix: (one specific swap or change)
-DRAFT:
-(the reply script, plain text, as many lines as needed)`;
+POINTS:
+## Questions, concerns and issues
+- …
+## Worst foods
+- …
+## Most nutrient-dense
+- …
+## Daily weigh-ins
+- …
+## Lowest-hanging fruit
+- …`;
+
+const dayLabel = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
 /** Draft Michael's reply to a check-in and save it (plus a short summary for him). */
 export async function generateDraft(supabase: SupabaseClient, checkinId: string) {
@@ -110,13 +89,13 @@ ${habitAnswers || "(none)"}
 HABITS (current streak, of 14 days):
 ${d.habits.map((h) => `- ${h.circle}: ${h.title}: ${h.complete ? "complete" : `${h.streak} days`}`).join("\n") || "(none)"}
 
-WEIGHT (last 3 weeks): ${d.weights.map((w) => `${w.log_date}: ${w.weight_lbs}`).join(", ") || "NO WEIGHTS LOGGED"}
-Weigh-ins this week: ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
+WEIGHT (last 3 weeks): ${d.weights.map((w) => `${dayLabel(w.log_date)}: ${w.weight_lbs}`).join(", ") || "NO WEIGHTS LOGGED"}
+Weigh-ins this week (${dayLabel(d.start)} to ${dayLabel(d.end)}): ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
 
 STEPS (she logs them in the app) AND SLEEP (per day): ${d.days.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
 
 FOOD THIS WEEK (${d.start} to ${d.end}):
-${d.days.map((x) => `${x.date}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m, i) => `  meal ${i + 1}: ${m.calories} kcal, ${m.protein} g protein: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
+${d.days.map((x) => `${dayLabel(x.date)}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m) => `  ${m.slot} (${m.time}): ${m.calories} kcal, ${m.protein} g protein, ${m.fiber} g fiber: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
 
 MICHAEL'S LAST REPLIES (to stay consistent with what he asked her to do):
 ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin_replies[0] : p.checkin_replies; return r?.final_text ? `Week ${p.week_number}: ${r.final_text.slice(0, 900)}` : null; }).filter(Boolean).join("\n---\n") || "none"}`;
@@ -127,7 +106,7 @@ ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin
     const { data: file } = await supabase.storage.from("checkin-videos").download(path);
     if (file) shots.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: Buffer.from(await file.arrayBuffer()).toString("base64") } });
   }
-  const sleepNote = shots.length ? `\n\nHER SLEEP SCREENSHOTS (${shots.length}, attached): read her sleep from them (hours per night, sleep score, wakeups, trends) and use the real numbers in the Steps and sleep line and, where it helps, in the reply.` : "";
+  const sleepNote = shots.length ? `\n\nHER SLEEP SCREENSHOTS (${shots.length}, attached): read her sleep from them (hours per night, sleep score, wakeups, trends) and use the real numbers in section 1 where it matters.` : "";
   const reply = await askClaude({ system: SYSTEM, content: [{ type: "text", text: context + sleepNote }, ...shots], maxTokens: 6000 });
   const out = parseDraft(reply);
   await supabase.from("checkins").update({ ai_summary: out.summary }).eq("id", c.id);
@@ -135,19 +114,13 @@ ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin
   return out;
 }
 
-/** Read the labeled answer. Plain text, so quotes in the script can't break it. */
+/** Read the labeled answer. Plain text, so quotes can't break it. The talking points are saved as the draft. */
 function parseDraft(text: string) {
   const line = (label: string) => text.match(new RegExp(`^\\s*${label}:\\s*(.*)$`, "mi"))?.[1]?.trim() ?? "";
-  const i = text.search(/^\s*DRAFT:/mi);
-  const draft = (i >= 0 ? text.slice(i).replace(/^\s*DRAFT:\s*/i, "") : text).trim();
-  if (!draft) throw new Error("The AI didn't return a draft");
+  const i = text.search(/^\s*(POINTS|DRAFT):/mi);
+  const draft = (i >= 0 ? text.slice(i).replace(/^\s*(POINTS|DRAFT):\s*/i, "") : text).trim();
+  if (!draft) throw new Error("The AI didn't return talking points");
   const none = (v: string) => (/^none\.?$/i.test(v) ? "" : v);
   const flags = none(line("FLAGS")).split("|").map((f) => f.trim()).filter(Boolean);
-  // The food report: "Label: text" lines between REPORT: and DRAFT:.
-  const r0 = text.search(/^\s*REPORT:/mi);
-  const report = r0 >= 0 && i > r0
-    ? text.slice(r0, i).split("\n").slice(1).map((l) => l.match(/^\s*[-*]?\s*([^:]{2,40}):\s*(.+)$/)).filter((m): m is RegExpMatchArray => !!m)
-      .map((m) => ({ label: m[1].trim(), text: m[2].trim() }))
-    : [];
-  return { summary: { win: none(line("WIN")), obstacle: none(line("OBSTACLE")), questions: none(line("QUESTIONS")), flags, report }, draft };
+  return { summary: { win: none(line("WIN")), obstacle: none(line("OBSTACLE")), questions: none(line("QUESTIONS")), flags, report: [] as { label: string; text: string }[] }, draft };
 }

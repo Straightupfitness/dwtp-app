@@ -10,7 +10,7 @@ export default async function CoachThread({ params }: { params: Promise<{ client
   const { data: p } = await supabase.from("profiles").select("full_name, email, avatar_path").eq("id", clientId).single();
   const first = p?.full_name?.split(" ")[0] ?? "her";
   return (
-    <section className="space-y-3">
+    <section className="mx-auto max-w-3xl space-y-3">
       <Link href="/coach/inbox" className="inline-flex min-h-11 items-center text-sm text-dim">← Inbox</Link>
       <header className="flex items-end justify-between">
         <span className="flex items-center gap-3"><Avatar name={p?.full_name} path={p?.avatar_path} size={44} />
