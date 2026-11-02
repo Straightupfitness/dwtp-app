@@ -16,6 +16,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { progressFor } from "@/lib/badges-server";
 import WaterCard from "./WaterCard";
 import CirclesGlance from "@/components/CirclesGlance";
+import BookCall from "@/components/BookCall";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -73,34 +74,31 @@ export default async function TodayPage() {
     </header>
   );
 
-  if (week === 0) {
-    return (
-      <section className="space-y-4">
-        {top}
-        <p className="text-[15px] leading-relaxed text-[#a8a8a8]">
-          Your program starts on <b className="text-text">{state.programStart
-            ? new Date(state.programStart + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })
-            : "your first Monday"}</b>. Your workouts and your first habits go live that morning.
-        </p>
-        <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />
-        <NotificationSettings />
-        <Link href="/faq" className="flex min-h-12 items-center justify-center rounded-xl border border-border text-sm font-semibold">Browse the FAQ while you wait</Link>
-      </section>
-    );
-  }
+  // November 2: before her start date she can still log weight, steps, food and water every day.
+  const notStarted = week === 0;
+  const startNote = notStarted && (
+    <p className="text-[15px] leading-relaxed text-[#a8a8a8]">
+      Your program starts on <b className="text-text">{state.programStart
+        ? new Date(state.programStart + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })
+        : "your first Monday"}</b>. Your habits go live that morning. Until then, log your weight, steps and food every day.
+    </p>
+  );
 
   // Award any badge she has just earned (so it shows in Community even if she never opens Progress).
   const uid = user!.id;
   after(async () => { try { await progressFor(adminClient(), uid); } catch (e) { console.error("badges", e); } });
 
   const { open } = currentWindow(state.programStart);
-  const [{ data: tw }, { data: weights }, { data: meals }, { data: target }, { data: water }, { data: done }] = await Promise.all([
-    supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(week, 52)).maybeSingle(),
+  const yesterday = addDays(today, -1);
+  const [{ data: tw }, { data: weights }, { data: meals }, { data: target }, { data: water }, { data: done }, { data: health }, { data: goals }] = await Promise.all([
+    supabase.from("trajectory_weeks").select("phase, is_diet_break").eq("week_number", Math.min(Math.max(week, 1), 52)).maybeSingle(),
     supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", user!.id).gte("log_date", addDays(today, -14)).order("log_date"),
-    supabase.from("food_logs").select("eaten_at, calories, protein_g").eq("client_id", user!.id).gte("eaten_at", addDays(today, -1) + "T00:00:00Z"),
+    supabase.from("food_logs").select("eaten_at, calories, protein_g").eq("client_id", user!.id).gte("eaten_at", addDays(today, -7) + "T00:00:00Z"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     supabase.from("water_days").select("oz").eq("client_id", user!.id).eq("day", today).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("health_days").select("day, steps").eq("client_id", user!.id).gte("day", addDays(today, -8)),
+    supabase.from("profiles").select("step_goal").eq("id", user!.id).single(),
   ]);
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
   const kcal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0);
@@ -109,7 +107,17 @@ export default async function TodayPage() {
   const kcalTarget = target?.calorie_target ?? null;
   const w = weights ?? [];
   const weightToday = w.find((x) => x.log_date === today);
-  const change = w.length >= 2 ? Number(w[w.length - 1].weight_lbs) - Number(w[0].weight_lbs) : null;
+  // The last 7 days for the little charts (weight and food end today; steps end yesterday).
+  const week7 = (end: string) => Array.from({ length: 7 }, (_, i) => addDays(end, i - 6));
+  const weightWeek = week7(today).map((date) => { const x = w.find((r) => r.log_date === date); return { date, value: x ? Number(x.weight_lbs) : null }; });
+  const firstInWeek = weightWeek.find((d) => d.value !== null);
+  const change = weightToday && firstInWeek && firstInWeek.date !== today ? Number(weightToday.weight_lbs) - firstInWeek.value! : null;
+  const stepsWeek = week7(yesterday).map((date) => ({ date, value: (health ?? []).find((h) => h.day === date)?.steps ?? null }));
+  const stepsYesterday = stepsWeek[6].value;
+  const byDay = new Map<string, { kcal: number; protein: number }>();
+  for (const m of meals ?? []) { const d = todayIn(tz, new Date(m.eaten_at)); const t = byDay.get(d) ?? { kcal: 0, protein: 0 }; t.kcal += m.calories ?? 0; t.protein += Number(m.protein_g ?? 0); byDay.set(d, t); }
+  const kcalWeek = week7(today).map((date) => ({ date, value: byDay.has(date) ? Math.round(byDay.get(date)!.kcal) : null }));
+  const proteinWeek = week7(today).map((date) => ({ date, value: byDay.has(date) ? Math.round(byDay.get(date)!.protein) : null }));
 
   // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
@@ -151,14 +159,16 @@ export default async function TodayPage() {
         ? <NotificationSettings compact />
         : <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />}
 
-      <QuickStats today={today}
-        weight={weightToday ? Number(weightToday.weight_lbs) : null} spark={w.map((x) => Number(x.weight_lbs))} change={change}
-        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} />
+      {startNote}
+      <QuickStats today={today} yesterday={yesterday}
+        weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
+        steps={stepsYesterday} stepGoal={goals?.step_goal ?? 10000} stepsWeek={stepsWeek}
+        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
         <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, food, water and habits</span></span><span className="text-accent">›</span>
       </Link>
-      <CirclesGlance state={state} />
+      {!notStarted && <CirclesGlance state={state} />}
 
       {all.length > 0 && (
         <>
@@ -197,7 +207,8 @@ export default async function TodayPage() {
           })}
         </div>
       )}
-      {!circleGroups.length && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
+      {!circleGroups.length && !notStarted && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
+      <BookCall />
 
     </section>
   );

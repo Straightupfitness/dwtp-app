@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadWeek, type CalEvent } from "@/lib/calendar";
 import WorkoutDays from "./WorkoutDays";
+import BookCall from "@/components/BookCall";
 import BackButton from "@/components/BackButton";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -25,6 +26,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your week at a glance</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Calendar</h1>
       </header>
+      <BookCall compact />
 
       <div className="flex items-center justify-between gap-2">
         <Link href={`/calendar?w=${offset - 1}`} className={nav} aria-label="Previous week">
