@@ -4,8 +4,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/welcome", "/api/webhooks", "/api/cron", "/api/health/sync", "/sw.js", "/manifest.webmanifest", "/brand", "/sounds"];
 
+// The path, for the server: Michael's "see her app" view applies to her pages, never to /coach (November 2).
+const withPath = (request: NextRequest) => {
+  const headers = new Headers(request.headers);
+  headers.set("x-dwtp-path", request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers } });
+};
+
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  let response = withPath(request);
   const url = supabaseUrl();
   const key = supabaseKey();
   if (!url || !key) {
@@ -20,7 +27,7 @@ export async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (list) => {
           list.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = withPath(request);
           list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },

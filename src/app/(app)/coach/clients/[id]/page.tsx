@@ -1,6 +1,7 @@
 import { weekName } from "@/lib/program";
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
+import SeeHerApp from "./SeeHerApp";
 import ThursdayScript from "./ThursdayScript";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -71,6 +72,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <SeenStrip seen={seen} size={18} labels />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          <SeeHerApp clientId={id} />
           <WelcomeButton clientId={id} failed={welcome === "failed"} />
           <a href="#details" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Edit details</a>
           <a href="#food" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Food log</a>

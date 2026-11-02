@@ -5,15 +5,16 @@ import { InstallCatcher } from "@/components/InstallHelp";
 import { after } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { recordSeen } from "@/lib/seen";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, viewAsInfo } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: me } = user ? await supabase.from("profiles").select("role, full_name, avatar_path, program_start, timezone").eq("id", user.id).single() : { data: null };
   const coach = me?.role === "coach";
+  const viewing = user && !coach ? await viewAsInfo() : null;
   // Last seen (for Michael's "not in the app for 48 hours"): at most one write every 15 minutes.
-  if (user && !coach) after(async () => {
+  if (user && !coach && !viewing) after(async () => {
     const uid = user.id;
     const now = new Date(), cutoff = new Date(now.getTime() - 15 * 60_000).toISOString();
     const db = adminClient();
@@ -27,11 +28,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { count } = user ? await q : { count: 0 };
   return (
     <>
+      {viewing && (
+        <div className="relative z-30 flex items-center gap-2 bg-[#7c3aed] px-3 py-1.5 text-[13px] text-white">
+          <span className="min-w-0 flex-1 truncate">👀 You&apos;re seeing <b>{viewing.name ?? "her"}</b>&apos;s app · look only, nothing you tap is saved</span>
+          <a href={`/coach/view-as/exit?to=/coach/clients/${viewing.id}`} className="shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-[#5b21b6]">Exit</a>
+        </div>
+      )}
       <TopBar coach={coach} unread={count ?? 0} name={me?.full_name ?? null} avatarPath={me?.avatar_path ?? null} />
       {/* November 1: Michael's screens use the full width on a computer. */}
       <main className={`mx-auto px-4 pb-28 pt-4 ${coach ? "max-w-md md:max-w-[1400px] md:px-8" : "max-w-md"}`}>{children}</main>
       <BottomNav coach={coach} />
-      {user && <TimezoneSync saved={me?.timezone ?? null} />}
+      {user && !viewing && <TimezoneSync saved={me?.timezone ?? null} />}
       <InstallCatcher />
     </>
   );

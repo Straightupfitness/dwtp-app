@@ -6,6 +6,7 @@ import { sendBulk } from "@/components/chat/actions";
 import SeenStrip, { lastInLabel } from "@/components/SeenStrip";
 import { resendWelcome } from "./clients/[id]/actions";
 import { TextLink } from "./clients/[id]/WelcomeButton";
+import SeeHerApp from "./clients/[id]/SeeHerApp";
 import type { RosterRow } from "@/lib/roster";
 
 type SortKey = "attention" | "name" | "seen" | "weighins" | "checkin" | "kcalAvg" | "protein" | "steps" | "workouts";
@@ -189,6 +190,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                   ? <Link href={`/coach/inbox/${one.id}`} className={`${act} border-accent bg-accent text-black`}>Message in chat</Link>
                   : <button type="button" onClick={() => { setComposing(true); setMsg(""); }} className={`${act} border-accent bg-accent text-black`}>Message {picked.size} in chat</button>}
                 {one && <Link href={`/coach/clients/${one.id}`} className={act}>Open her page</Link>}
+                {one && <SeeHerApp clientId={one.id} />}
                 {one?.checkin?.id && <Link href={`/coach/checkins/${one.checkin.id}`} className={act}>Week {one.checkin.week} check-in</Link>}
                 {one && <Link href={`/coach/clients/${one.id}#food`} className={act}>Food · 7 days</Link>}
                 {one && <Link href={`/coach/clients/${one.id}/workouts`} className={act}>Workouts</Link>}
