@@ -36,6 +36,9 @@ export type RosterRow = {
   lastSeen: string | null; hoursSinceSeen: number | null; notSeen48: boolean;
   cpsWeek: number; flags: string[];
   seen: SeenWeek | null;
+  /** November 1: her weigh-ins over the last 7 days (✓/✗) and her most recent check-in. */
+  weighins: SeenWeek; weighins7: number;
+  lastCheckin: { week: number; at: string; id: string } | null;
 };
 
 export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]> {
@@ -53,7 +56,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
     all<{ client_id: string; day: string; steps: number | null }>((a, b) => supabase.from("health_days").select("client_id, day, steps").in("client_id", ids).gte("day", since).order("day").range(a, b)),
     all<{ client_id: string; day: string; oz: number }>((a, b) => supabase.from("water_days").select("client_id, day, oz").in("client_id", ids).gte("day", since).order("day").range(a, b)),
     supabase.from("nutrition_targets").select("client_id, calorie_target, protein_g").in("client_id", ids),
-    all<{ id: string; client_id: string; week_number: number; flags: string[] | null; checkin_replies: unknown }>((a, b) => supabase.from("checkins").select("id, client_id, week_number, flags, checkin_replies(sent_at)").in("client_id", ids).order("week_number", { ascending: false }).range(a, b)),
+    all<{ id: string; client_id: string; week_number: number; flags: string[] | null; submitted_at: string | null; checkin_replies: unknown }>((a, b) => supabase.from("checkins").select("id, client_id, week_number, flags, submitted_at, checkin_replies(sent_at)").in("client_id", ids).order("week_number", { ascending: false }).range(a, b)),
     all<{ client_id: string; program_week: number }>((a, b) => supabase.from("workout_sessions").select("client_id, program_week, workouts!inner(kind)").in("client_id", ids).not("completed_at", "is", null).eq("workouts.kind", "strength").order("started_at").range(a, b)),
     supabase.from("cp_totals").select("client_id, this_week").in("client_id", ids),
     supabase.from("program_phases").select("program, weeks, first_week, phase_workouts(day, from_week, to_week, workouts(kind))"),
@@ -125,6 +128,9 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
 
     const lastSeen = seen.get(c.id) ?? null;
     const hoursSinceSeen = lastSeen ? Math.round((now - Date.parse(lastSeen)) / 3_600_000) : null;
+    const weighed = new Set(w.map((x) => x.log_date));
+    const weighins: SeenWeek = { lastDate: latest?.log_date ?? null, days: Array.from({ length: 7 }, (_, i) => { const date = addDays(today, i - 6); return { date, seen: weighed.has(date) }; }) };
+    const latestCheckin = mine.filter((x) => x.submitted_at).sort((a, b) => b.submitted_at!.localeCompare(a.submitted_at!))[0] ?? null;
     const daysSinceWeigh = latest ? Math.round((Date.parse(today) - Date.parse(latest.log_date)) / 86_400_000) : null;
     const active = week >= 1;
     const row: RosterRow = {
@@ -144,6 +150,8 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       cpsWeek: (cps ?? []).find((x) => x.client_id === c.id)?.this_week ?? 0,
       flags: ((mine[0]?.flags as string[] | null) ?? []),
       seen: seenWeeks.get(c.id) ?? null,
+      weighins, weighins7: weighins.days.filter((x) => x.seen).length,
+      lastCheckin: latestCheckin ? { week: latestCheckin.week_number, at: latestCheckin.submitted_at!, id: latestCheckin.id } : null,
     };
     return row;
   });

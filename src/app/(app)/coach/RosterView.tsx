@@ -8,15 +8,19 @@ import { resendWelcome } from "./clients/[id]/actions";
 import { TextLink } from "./clients/[id]/WelcomeButton";
 import type { RosterRow } from "@/lib/roster";
 
-type SortKey = "attention" | "name" | "seen" | "weight" | "kcalY" | "kcalAvg" | "protein" | "steps" | "workouts";
+type SortKey = "attention" | "name" | "seen" | "weighins" | "checkin" | "kcalAvg" | "protein" | "steps" | "workouts";
 const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) => number | null> = {
-  seen: (r) => r.hoursSinceSeen ?? 1e9, weight: (r) => r.weight, kcalY: (r) => r.kcalYesterday, kcalAvg: (r) => r.kcalAvg,
+  seen: (r) => r.hoursSinceSeen ?? 1e9, weighins: (r) => r.weighins7, checkin: (r) => (r.lastCheckin ? Date.parse(r.lastCheckin.at) : null), kcalAvg: (r) => r.kcalAvg,
   protein: (r) => r.proteinAvg, steps: (r) => r.stepsAvg, workouts: (r) => (r.lastWorkoutWeek?.planned ? r.lastWorkoutWeek.done / r.lastWorkoutWeek.planned : null),
 };
-const COLS = "md:grid-cols-[24px_minmax(170px,1.4fr)_minmax(150px,1fr)_repeat(6,minmax(58px,0.8fr))_minmax(210px,1.5fr)]";
-type Filter = "all" | "reply" | "checkin" | "food" | "workout" | "seen";
+const COLS = "md:grid-cols-[24px_minmax(160px,1.3fr)_minmax(140px,1fr)_minmax(125px,0.9fr)_minmax(120px,0.9fr)_repeat(4,minmax(58px,0.7fr))_minmax(200px,1.4fr)]";
+const when = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric" });
+const at = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
+type Filter = "all" | "open" | "reply" | "checkin" | "food" | "workout" | "seen";
 const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[] = [
   { key: "all", label: "All clients", test: () => true },
+  // November 1: check-ins are open (Fri–Mon noon) and she hasn't sent hers yet: who to remind.
+  { key: "open", label: "Hasn't checked in yet", test: (r) => r.checkin?.state === "open" },
   { key: "reply", label: "Needs a reply", test: (r) => r.checkin?.state === "needs-reply" },
   { key: "checkin", label: "Missed check-in", test: (r) => r.missedCheckin },
   { key: "food", label: "No food logged yesterday", test: (r) => r.noFoodYesterday },
@@ -100,7 +104,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
       {/* One compact row per client (October 31): numbers in columns, alerts stacked on the right. */}
       <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 grid grid-cols-6 gap-1 bg-bg/95 py-1.5 pl-[42px] pr-2.5 md:px-2.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur ${COLS} md:gap-2`}>
         <span className="hidden md:block" />
-        {([["name", "Client", "hidden md:block"], ["seen", "Last in app", "hidden md:block"], ["weight", "Weight"], ["kcalY", "Kcal yday"], ["kcalAvg", "Kcal avg"], ["protein", "Protein"], ["steps", "Steps"], ["workouts", "Workouts"]] as [SortKey, string, string?][]).map(([key, label, cls]) => (
+        {([["name", "Client", "hidden md:block"], ["seen", "Last in app", "hidden md:block"], ["weighins", "Weigh-ins"], ["checkin", "Last check-in"], ["kcalAvg", "Kcal avg"], ["protein", "Protein"], ["steps", "Steps"], ["workouts", "Workouts"]] as [SortKey, string, string?][]).map(([key, label, cls]) => (
           <button key={key} type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
             className={`text-left uppercase ${cls ?? ""} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.key === "name" ? (sort.dir === 1 ? " ↓" : " ↑") : sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
         ))}
@@ -145,8 +149,19 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                   <span className="block truncate text-[13px] font-semibold">{lastInLabel(r.seen)}</span>
                   <SeenStrip seen={r.seen} size={14} />
                 </span>
-                <span className={cell}><span className={`${val} ${(r.daysSinceWeigh ?? 99) >= 4 && r.week ? "text-[#fb7185]" : ""}`}>{r.weight ?? "–"}</span><span className={sub}>{r.weighedOn ? (r.daysSinceWeigh === 0 ? "today" : `${r.daysSinceWeigh}d ago`) : "none"}</span></span>
-                <span className={cell}><span className={`${val} ${r.kcalYesterday === null ? (r.week ? "text-[#fb7185]" : "") : kcalTone(r.kcalYesterday, r.kcalTarget)}`}>{r.kcalYesterday ?? "–"}</span><span className={sub}>{r.kcalTarget ? `of ${r.kcalTarget}` : "no target"}</span></span>
+                {/* November 1: her last 7 days of weigh-ins instead of the number. */}
+                <span className={cell}>
+                  <span className="hidden md:block"><SeenStrip seen={r.weighins} size={14} what="weighed in" /></span>
+                  <span className={`${val} md:hidden`}>{r.weighins7}/7</span>
+                  <span className={sub}><span className="hidden md:inline">{r.weighins7}/7 · </span>{r.weighedOn ? (r.daysSinceWeigh === 0 ? "today" : `last ${r.daysSinceWeigh}d ago`) : "none yet"}</span>
+                </span>
+                {/* Her last check-in: green when it's this week's. */}
+                {(() => {
+                  const c = r.lastCheckin, current = !!c && !!r.checkin && c.week === r.checkin.week;
+                  return c
+                    ? <Link href={`/coach/checkins/${c.id}`} className={cell}><span className={`${val} ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={sub}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
+                    : <span className={cell}><span className={`${val} text-dim`}>–</span><span className={sub}>no check-ins</span></span>;
+                })()}
                 <span className={cell}><span className={`${val} ${kcalTone(r.kcalAvg, r.kcalTarget)}`}>{r.kcalAvg ?? "–"}</span><span className={sub}>{r.foodDays7}/7 days</span></span>
                 <span className={cell}><span className={`${val} ${r.proteinAvg !== null && r.proteinAvg < r.proteinTarget - 10 ? "text-accent" : ""}`}>{r.proteinAvg !== null ? `${r.proteinAvg}g` : "–"}</span><span className={sub}>of {r.proteinTarget}g</span></span>
                 <span className={cell}><span className={val}>{k(r.stepsAvg)}</span><span className={sub}>{r.stepsDays ? `${r.stepsDays}d synced` : "not synced"}</span></span>

@@ -88,7 +88,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           return (
             <Link key={k.id} href={`/coach/checkins/${k.id}`} className="block space-y-1 rounded-xl border border-border bg-card p-3 text-sm">
               <span className="flex items-center justify-between gap-2">
-                <span><b>{weekName(k.week_number)}</b> · sleep {k.sleep ?? "–"} · energy {k.energy ?? "–"} · stress {k.stress ?? "–"} · hunger {k.hunger ?? "–"}</span>
+                <span><b>{weekName(k.week_number)}</b>{k.submitted_at && <span className="text-dim"> · {new Date(k.submitted_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}<br className="sm:hidden" /><span className="hidden sm:inline"> · </span>sleep {k.sleep ?? "–"} · energy {k.energy ?? "–"} · stress {k.stress ?? "–"} · hunger {k.hunger ?? "–"}</span>
                 <span className={`shrink-0 ${sent ? "text-[var(--green)]" : "text-accent"}`}>{sent ? "Replied" : "Reply"}</span>
               </span>
               {((k.flags as string[] | null) ?? []).length > 0 && <span className="flex flex-wrap gap-1">{(k.flags as string[]).map((f) => <span key={f} className="rounded-full bg-[#2a1218] px-2 py-0.5 text-[11px] text-[#fb7185]">{f}</span>)}</span>}

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { HeartButton } from "./Heart";
+import Linkify from "@/components/Linkify";
 
 export const REPLY_EVENT = "dwtp:chat-reply";
 export const EDIT_EVENT = "dwtp:chat-edit";
@@ -25,7 +26,7 @@ export default function Bubble({ m }: { m: BubbleMsg }) {
   return (
     <div className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
       <div className={`flex items-end gap-1 ${m.mine ? "justify-end" : "justify-start"} w-full`}>
-        <div role="button" tabIndex={0} onClick={() => setOpen(!open)} onKeyDown={(e) => { if (e.key === "Enter") setOpen(!open); }}
+        <div role="button" tabIndex={0} onClick={(e) => { if ((e.target as HTMLElement).closest("a")) return; setOpen(!open); }} onKeyDown={(e) => { if (e.key === "Enter") setOpen(!open); }}
           aria-label="Message options"
           className={`relative max-w-[80%] cursor-pointer space-y-1 rounded-[18px] px-3.5 py-2.5 text-[15px] leading-snug ${m.mine ? "rounded-br-md bg-accent text-black" : "rounded-bl-md bg-[#1b1b1b]"} ${open ? "ring-2 ring-white/30" : ""}`}>
           {m.quote && (
@@ -42,7 +43,7 @@ export default function Bubble({ m }: { m: BubbleMsg }) {
               {m.seconds ? <span className="text-[12px] opacity-70">{mmss(m.seconds)}</span> : null}
             </span>
           )}
-          {m.body && <p className="whitespace-pre-line">{m.body}</p>}
+          {m.body && <p className="whitespace-pre-line break-words"><Linkify text={m.body} className={`break-all font-medium underline underline-offset-2 ${m.mine ? "text-black" : "text-accent"}`} /></p>}
           {m.edited && <span className={`block text-right text-[10px] ${m.mine ? "text-black/60" : "text-dim"}`}>edited</span>}
           {m.mine && m.hearted && <span className="absolute -bottom-2 -left-2 grid size-6 place-items-center rounded-full border-2 border-bg bg-[#2a1218] text-[12px] text-[#fb7185]" aria-label="Liked">♥</span>}
         </div>
