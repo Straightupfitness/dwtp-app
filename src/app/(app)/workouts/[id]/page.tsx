@@ -15,8 +15,8 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
   const items = ((w.workout_items ?? []) as unknown as Item[]).filter((i) => i.exercise).sort((a, b) => a.position - b.position);
 
   const wk = await loadWorkoutWeek(supabase, user!.id, Number(sp.w) || undefined);
-  const preview = wk.week < 1 || !!sp.w && Number(sp.w) !== wk.current;
-  const { data: session } = wk.week >= 1 && !preview
+  const preview = !wk.phase || !!sp.w && Number(sp.w) !== wk.current;
+  const { data: session } = !!wk.phase && !preview
     ? await supabase.from("workout_sessions").select("id, completed_at").eq("client_id", user!.id).eq("workout_id", w.id).eq("program_week", wk.week).maybeSingle()
     : { data: null };
   const { data: logs } = session

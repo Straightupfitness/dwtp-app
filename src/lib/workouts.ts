@@ -8,7 +8,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseUrl } from "./supabase/config";
-import { programWeek, todayIn } from "./program";
+import { programWeekOf, todayIn, trainingWeek } from "./program";
 
 export type Phase = { id: number; name: string; stage: string; kind: "build" | "deload" | "pivot" | "max"; weeks: number; first_week: number };
 export type WorkoutCard = {
@@ -67,11 +67,11 @@ export function daysFor(perWeek: number | null, available: number[]) {
 export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string, weekOverride?: number) {
   const { data: p } = await supabase.from("profiles").select("program_start, timezone, strength_days_per_week, workout_program, workout_start_week").eq("id", clientId).single();
   const today = todayIn(p?.timezone ?? "America/Los_Angeles");
-  const current = programWeek(p?.program_start ?? null, today);
-  const week = weekOverride ?? current;                         // her program week (sessions are saved by this)
+  // Her training week keeps counting before her start date, so workouts don't pause before the Nov 9 launch.
+  const current = p?.program_start ? trainingWeek(p.program_start, today) : 0;
+  const week = weekOverride ?? current;                         // her training week (sessions are saved by this)
   const programId = (p?.workout_program as string | null) ?? "sltp";
-  const offset = Math.max(0, ((p?.workout_start_week as number | null) ?? 1) - 1); // "start her at week N" of her workout program
-  const pweek = week >= 1 ? week + offset : week;               // the week of her workout program
+  const pweek = p?.program_start || weekOverride ? programWeekOf(week, p?.workout_start_week as number | null) : 0; // the week of her workout program
   const [{ data: phases }, { data: prog }] = await Promise.all([
     supabase.from("program_phases").select("id, name, stage, kind, weeks, first_week").eq("program", programId).order("position"),
     supabase.from("programs").select("id, name").eq("id", programId).maybeSingle(),

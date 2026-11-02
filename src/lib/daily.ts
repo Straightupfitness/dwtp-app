@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAILY_TARGETS } from "./food";
-import { programWeek, todayIn } from "./program";
+import { programWeekOf, todayIn, trainingWeek } from "./program";
 import { daysFor } from "./workouts";
 
 export const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -64,18 +64,19 @@ export async function loadDaily(supabase: SupabaseClient, clientId: string, span
   };
 
   // Workouts: for each program week so far, the strength workouts on her plan and how many she finished.
-  const current = programWeek(p?.program_start ?? null, today);
+  const current = trainingWeek(p?.program_start ?? null, today);
   const doneBy = new Map<number, number>();
   for (const s of sessions ?? []) doneBy.set(s.program_week as number, (doneBy.get(s.program_week as number) ?? 0) + 1);
   const workoutWeeks: WorkoutWeek[] = [];
-  if (current >= 1) {
+  if (p?.program_start) {
     const programId = (p?.workout_program as string | null) ?? "sltp";
-    const offset = Math.max(0, ((p?.workout_start_week as number | null) ?? 1) - 1);
+    const ws = (p?.workout_start_week as number | null) ?? 1;
     const { data: phases } = await supabase.from("program_phases")
       .select("weeks, first_week, phase_workouts(day, from_week, to_week, workouts(kind))").eq("program", programId);
     type PW = { day: number | null; from_week: number | null; to_week: number | null; workouts: { kind: string } | null };
-    for (let w = 1; w <= current; w++) {
-      const pw = w + offset;
+    // Training weeks that map onto her workout program, the last 30 at most (they count before the Nov 9 launch too).
+    for (let w = Math.max(2 - ws, current - 29); w <= current; w++) {
+      const pw = programWeekOf(w, ws);
       const ph = (phases ?? []).find((x) => pw >= x.first_week && pw < x.first_week + x.weeks);
       const wop = ph ? pw - ph.first_week + 1 : 0;
       const days = ph ? [...new Set(((ph.phase_workouts ?? []) as unknown as PW[])

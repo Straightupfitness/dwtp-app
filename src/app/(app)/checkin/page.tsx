@@ -1,3 +1,4 @@
+import { weekName } from "@/lib/program";
 import { createClient } from "@/lib/supabase/server";
 import { currentWindow, questionsFor } from "@/lib/checkin";
 import { loadProgram } from "@/lib/circles";
@@ -91,7 +92,7 @@ export default async function CheckinPage() {
             const r = (Array.isArray(c.checkin_replies) ? c.checkin_replies[0] : c.checkin_replies) as { final_text?: string | null; video_path?: string | null; sent_at?: string | null } | null;
             return (
               <article key={c.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
-                <p className="text-xs uppercase tracking-wider text-accent">Week {c.week_number}</p>
+                <p className="text-xs uppercase tracking-wider text-accent">{weekName(c.week_number)}</p>
                 {r?.sent_at ? (
                   <>
                     {r.video_path && replyVideos.get(r.video_path) && <video src={replyVideos.get(r.video_path)} controls playsInline className="w-full rounded-lg bg-black" />}

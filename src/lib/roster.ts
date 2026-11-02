@@ -6,7 +6,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "./supabase/admin";
 import { currentWindow, windowFor } from "./checkin";
-import { programWeek, todayIn } from "./program";
+import { programWeek, programWeekOf, todayIn, trainingWeek } from "./program";
 import { daysFor } from "./workouts";
 import { DAILY_TARGETS } from "./food";
 
@@ -111,8 +111,9 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
 
     // Workouts: last finished program week.
     let lastWorkoutWeek: RosterRow["lastWorkoutWeek"] = null;
-    if (week >= 2) {
-      const lw = week - 1, pweek = lw + Math.max(0, (c.workout_start_week ?? 1) - 1);
+    const tweek = c.program_start ? trainingWeek(c.program_start, today) : 0;
+    const lw = tweek - 1, pweek = programWeekOf(lw, c.workout_start_week);
+    if (c.program_start && pweek >= 1) {
       const planned = plannedFor(c.workout_program ?? "sltp", pweek, c.strength_days_per_week);
       const done = sessions.filter((s) => s.client_id === c.id && s.program_week === lw).length;
       lastWorkoutWeek = { week: lw, planned, done };

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { programWeek, todayIn } from "@/lib/program";
+import { todayIn, trainingWeek } from "@/lib/program";
 import { closeOutRings } from "@/lib/progress";
 
 const WORKOUT_CPS = 5;
@@ -17,7 +17,7 @@ export async function startSession(workoutId: number) {
   const { supabase, user } = await me();
   if (!user) return { error: "Not signed in" };
   const { data: p } = await supabase.from("profiles").select("program_start, timezone").eq("id", user.id).single();
-  const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
+  const week = trainingWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
   const { data: existing } = await supabase.from("workout_sessions").select("id, completed_at")
     .eq("client_id", user.id).eq("workout_id", workoutId).eq("program_week", week).maybeSingle();
   if (existing) return { id: existing.id as string, completed: !!existing.completed_at };

@@ -1,3 +1,4 @@
+import { weekName } from "@/lib/program";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -41,7 +42,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
     <section className="space-y-5">
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
       <header>
-        <p className="text-xs uppercase tracking-[0.15em] text-accent">Week {c.week_number} check-in{d.dietBreak ? " · diet break" : ""}{d.checkinType && d.checkinType !== "standard" ? ` · ${d.checkinType.replace("_", " ")}` : ""}</p>
+        <p className="text-xs uppercase tracking-[0.15em] text-accent">{weekName(c.week_number)} check-in{d.dietBreak ? " · diet break" : ""}{d.checkinType && d.checkinType !== "standard" ? ` · ${d.checkinType.replace("_", " ")}` : ""}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">
           <Link href={`/coach/clients/${c.client_id}`}>{d.profile?.full_name ?? "Client"}</Link>
         </h1>

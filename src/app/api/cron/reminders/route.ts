@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { notify } from "@/lib/notify";
 import { currentWindow, DEADLINE_TZ } from "@/lib/checkin";
-import { programWeek, todayIn } from "@/lib/program";
+import { LAUNCH_DATE, programWeek, todayIn } from "@/lib/program";
 import { lessonEmail } from "@/lib/lesson-email";
 
 export const maxDuration = 60;
@@ -18,6 +18,9 @@ const APP = () => (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightupfit
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // November 1: nothing from the app before the Nov 9 launch (the Nov 6 check-ins run in VideoAsk and Xperiencify).
+  if (todayIn(DEADLINE_TZ) < LAUNCH_DATE) return NextResponse.json({ ok: true, skipped: `before launch (${LAUNCH_DATE})` });
 
   const db = adminClient();
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short" }).format(new Date());

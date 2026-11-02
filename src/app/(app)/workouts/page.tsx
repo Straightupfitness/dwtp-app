@@ -41,8 +41,8 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const asked = Number(sp.w) || undefined;
   const first = await loadWorkoutWeek(supabase, user!.id);
-  // Before her start date she sees Week 1 as a preview.
-  const preview = !asked && first.week < 1;
+  // No workouts on her plan yet (no start date): she sees Week 1 as a preview.
+  const preview = !asked && !first.phase;
   const data = asked || preview ? await loadWorkoutWeek(supabase, user!.id, asked ?? 1) : first;
   const { phase } = data;
   const stage = stageOf(phase?.stage ?? "DWTP", data.program.name);

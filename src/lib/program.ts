@@ -17,6 +17,29 @@ export function programWeek(programStart: string | null, today: string): number 
   return days < 0 ? 0 : Math.floor(days / 7) + 1;
 }
 
+/**
+ * The launch (November 1): the 26-week journey, check-ins, Strong Body Wednesday and Strong Mind Friday start
+ * Monday, November 9. Nothing goes out from the app before then.
+ */
+export const LAUNCH_DATE = "2026-11-09";
+
+/**
+ * Her workout week, counted from her start date like programWeek but it keeps counting before it (0, −1, …),
+ * so her workouts carry on while the journey hasn't started yet (November 9 launch).
+ */
+export function trainingWeek(programStart: string | null, today: string): number {
+  if (!programStart) return 0;
+  return Math.floor((Date.parse(today) - Date.parse(programStart)) / 86_400_000 / 7) + 1;
+}
+/** The week of her workout program for a training week (start her at week N): 0 when there isn't one. */
+export function programWeekOf(week: number, workoutStartWeek: number | null) {
+  const pw = week + Math.max(0, (workoutStartWeek ?? 1) - 1);
+  return pw >= 1 ? pw : 0;
+}
+
+/** "Week 3", or "Pre-launch" for check-ins sent before the Nov 9 launch (renumbered 0, −1, …). */
+export const weekName = (n: number) => (n >= 1 ? `Week ${n}` : "Pre-launch");
+
 /** Count consecutive done days ending today (or yesterday, so today isn't "broken" before she logs). */
 export function dailyStreak(doneDates: Set<string>, today: string): number {
   let streak = 0;
