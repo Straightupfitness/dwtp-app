@@ -11,6 +11,7 @@ a 26-week coaching program for busy women over 40: fix sleep first (the Circadia
 Each step in a Capacity Circle is a MEDAL (never say "ring").
 Michael replies in his own voice (usually a short video). Do NOT write a script or full sentences to read out. Give him short, specific bullet
 points: what to talk about, with the exact days, meals, foods and numbers, so he can glance at them while he talks.
+Keep every bullet under about 20 words: fragments, not sentences. Skim-able at a glance.
 
 FIVE SECTIONS, in this order, each with 1–5 bullets (fewer is better; skip filler):
 1. Questions, concerns and issues: everything she asked, struggled with or hinted at in her check-in (answers, video transcript,
@@ -68,7 +69,7 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
   const habitAnswers = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[])
     .map((h) => `- ${h.title}: ${h.status}${h.note ? ` (${h.note})` : ""}`).join("\n");
 
-  const context = `CLIENT: ${d.profile?.full_name ?? "(no name)"} · Week ${c.week_number} · phase ${d.phase ?? "?"} · check-in type ${d.checkinType ?? "standard"}${d.dietBreak ? " · DIET BREAK WEEK" : ""}${d.moments.length ? ` · moments: ${d.moments.join(", ")}` : ""}
+  const context = `CLIENT: ${d.profile?.full_name ?? "(no name)"} · ${c.week_number >= 1 ? `Week ${c.week_number}` : "Pre-launch check-in (before her 26 weeks start Nov 9; no special week)"} · phase ${d.phase ?? "?"} · check-in type ${d.checkinType ?? "standard"}${d.dietBreak ? " · DIET BREAK WEEK" : ""}${d.moments.length ? ` · moments: ${d.moments.join(", ")}` : ""}
 Plan: ${d.profile?.plan ?? "unknown"} · start weight ${d.profile?.start_weight_lbs ?? "?"} lbs · goal ${d.profile?.goal_weight_lbs ?? "?"} lbs · strength ${d.profile?.strength_days_per_week ?? "?"}x/week
 Calorie target: ${d.target?.calorie_target ?? "not set yet"} · maintenance: ${d.target?.maintenance_calories ?? "not set yet"} · protein target: ${d.target?.protein_g ?? "120"} g
 Focus circles: ${d.focus.join(", ")}

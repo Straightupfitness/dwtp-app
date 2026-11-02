@@ -25,6 +25,7 @@ const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[]
 ];
 const personalize = (t: string, first: string) => t.replace(/\{\s*first\s*(name)?\s*\}|\[\s*first\s*name\s*\]|\bfirst_?name\b/gi, first);
 const ago = (h: number | null) => (h === null ? "never" : h < 1 ? "just now" : h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`);
+const startLabel = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const k = (n: number | null) => (n === null ? "–" : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** How far off target: green within 100 kcal, amber within 250, red beyond. */
@@ -128,7 +129,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                 <Avatar name={r.name} path={r.avatar} size={32} />
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-semibold leading-tight">{r.name}</span>
-                  <span className="block truncate text-[11px] text-dim">{r.week ? `Wk ${r.week}` : "Not started"} · {r.cpsWeek} CPs<span className="md:hidden"> · in app {lastInLabel(r.seen).toLowerCase()}</span></span>
+                  <span className="block truncate text-[11px] text-dim">{r.week ? `Wk ${r.week}` : r.start ? `Starts ${startLabel(r.start)}` : "Not started"} · {r.cpsWeek} CPs<span className="md:hidden"> · in app {lastInLabel(r.seen).toLowerCase()}</span></span>
                   <span className="mt-0.5 block md:hidden"><SeenStrip seen={r.seen} size={12} /></span>
                 </span>
               </Link>

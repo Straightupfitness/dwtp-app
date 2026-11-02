@@ -25,7 +25,7 @@ async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
 export type RosterRow = {
-  id: string; name: string; first: string; email: string | null; avatar: string | null; status: string; week: number;
+  id: string; start: string | null; name: string; first: string; email: string | null; avatar: string | null; status: string; week: number;
   weight: number | null; weighedOn: string | null; daysSinceWeigh: number | null; weightChange14: number | null; goalWeight: number | null;
   stepsAvg: number | null; stepsDays: number;
   kcalYesterday: number | null; kcalAvg: number | null; kcalTarget: number | null; proteinAvg: number | null; proteinTarget: number;
@@ -128,7 +128,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
     const daysSinceWeigh = latest ? Math.round((Date.parse(today) - Date.parse(latest.log_date)) / 86_400_000) : null;
     const active = week >= 1;
     const row: RosterRow = {
-      id: c.id, name, first: name.split(" ")[0], email: c.email, avatar: c.avatar_path, status: c.status, week,
+      id: c.id, start: c.program_start, name, first: name.split(" ")[0], email: c.email, avatar: c.avatar_path, status: c.status, week,
       weight: latest ? Number(latest.weight_lbs) : null, weighedOn: latest?.log_date ?? null, daysSinceWeigh, weightChange14,
       goalWeight: c.goal_weight_lbs != null ? Number(c.goal_weight_lbs) : null,
       stepsAvg: st.length ? Math.round(avg(st.map((x) => x.steps!))!) : null, stepsDays: st.length,

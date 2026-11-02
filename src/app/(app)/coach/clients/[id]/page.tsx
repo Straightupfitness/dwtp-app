@@ -63,7 +63,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
     <section className="space-y-6">
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
       <header>
-        <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : "Not started"} · {p.status}</p>
+        <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : p.program_start ? `Starts ${new Date(p.program_start + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}` : "Not started"} · {p.status}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email} <BadgeRow badges={earned} size={22} /></h1>
         <p className="text-xs text-dim">{p.email}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
