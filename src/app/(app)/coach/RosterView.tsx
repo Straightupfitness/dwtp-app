@@ -9,12 +9,52 @@ import { TextLink } from "./clients/[id]/WelcomeButton";
 import SeeHerApp from "./clients/[id]/SeeHerApp";
 import type { RosterRow } from "@/lib/roster";
 
-type SortKey = "attention" | "name" | "seen" | "weighins" | "checkin" | "kcalAvg" | "protein" | "steps" | "workouts";
+type SortKey = "attention" | "name" | "seen" | "weighins" | "checkin" | "kcalAvg" | "steps";
 const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) => number | null> = {
   seen: (r) => r.hoursSinceSeen ?? 1e9, weighins: (r) => r.weighins7, checkin: (r) => (r.lastCheckin ? Date.parse(r.lastCheckin.at) : null), kcalAvg: (r) => r.kcalAvg,
-  protein: (r) => r.proteinAvg, steps: (r) => r.stepsAvg, workouts: (r) => (r.lastWorkoutWeek?.planned ? r.lastWorkoutWeek.done / r.lastWorkoutWeek.planned : null),
+  steps: (r) => r.stepsAvg,
 };
-const COLS = "md:grid-cols-[24px_minmax(160px,1.3fr)_minmax(140px,1fr)_minmax(125px,0.9fr)_minmax(120px,0.9fr)_repeat(4,minmax(58px,0.7fr))_minmax(200px,1.4fr)]";
+// November 2: name · last in app · weight · steps · calories (7 days each) · last check-in · alerts.
+const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(215px,1.35fr)_minmax(215px,1.35fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(150px,1fr)]";
+const letter = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
+const kk = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+/** 7 tiny day cells, oldest to today. */
+function Week({ days, color, fmt, title }: { days: { date: string; value: number | null }[]; color: string; fmt: (n: number) => string; title: (d: string, v: number | null) => string }) {
+  return (
+    <span className="grid grid-cols-7 gap-[2px]">
+      {days.map((d, i) => (
+        <span key={d.date} title={title(d.date, d.value)}
+          className={`rounded-[3px] py-[3px] text-center text-[10px] font-semibold leading-none tabular-nums ${d.value === null ? "bg-[#1a1a1a] text-[#4a4a4a]" : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
+          style={d.value === null ? undefined : { color }}>{d.value === null ? "·" : fmt(d.value)}</span>
+      ))}
+    </span>
+  );
+}
+/** A tiny battery: how much of her target she hit (green full, amber partway, red low). */
+function Battery({ pct, label }: { pct: number; label: string }) {
+  const p = Math.max(0, Math.min(1, pct));
+  const c = pct >= 0.9 ? "#22c55e" : pct >= 0.6 ? "#f5a623" : "#ef4444";
+  return (
+    <span className="relative block h-[10px] w-[6px] rounded-[1.5px] border border-[#555]" aria-label={`${label} ${Math.round(pct * 100)}%`}>
+      <span className="absolute inset-x-0 bottom-0 rounded-[0.5px]" style={{ height: `${p * 100}%`, background: c }} />
+    </span>
+  );
+}
+function FoodDays({ r }: { r: RosterRow }) {
+  const t = r.targets;
+  return (
+    <span className="grid grid-cols-7 gap-[2px]">
+      {r.foodWeek.map((d, i) => (
+        <span key={d.date} className={`flex flex-col items-center gap-[3px] rounded-[3px] py-[3px] ${d.kcal === null ? "bg-[#1a1a1a]" : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
+          title={d.kcal === null ? `${d.date}: nothing logged` : `${d.date}: ${d.kcal} kcal${t.kcal ? ` (target ${t.kcal})` : ""} · protein ${d.protein}/${t.protein} g · fiber ${d.fiber}/${t.fiber} g · potassium ${d.potassium}/${t.potassium} mg`}>
+          <span className={`text-[10px] font-semibold leading-none tabular-nums ${d.kcal === null ? "text-[#4a4a4a]" : "text-[#fdba74]"}`}>{d.kcal === null ? "·" : d.kcal}</span>
+          {d.kcal !== null && <span className="flex gap-[1.5px]"><Battery pct={d.protein / t.protein} label="Protein" /><Battery pct={d.fiber / t.fiber} label="Fiber" /><Battery pct={d.potassium / t.potassium} label="Potassium" /></span>}
+        </span>
+      ))}
+    </span>
+  );
+}
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric" });
 const at = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
 type Filter = "all" | "open" | "reply" | "checkin" | "food" | "workout" | "seen";
@@ -31,14 +71,7 @@ const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[]
 const personalize = (t: string, first: string) => t.replace(/\{\s*first\s*(name)?\s*\}|\[\s*first\s*name\s*\]|\bfirst_?name\b/gi, first);
 const ago = (h: number | null) => (h === null ? "never" : h < 1 ? "just now" : h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`);
 const startLabel = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const k = (n: number | null) => (n === null ? "–" : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-/** How far off target: green within 100 kcal, amber within 250, red beyond. */
-function kcalTone(v: number | null, target: number | null) {
-  if (v === null || !target) return "";
-  const d = Math.abs(v - target);
-  return d <= 100 ? "text-[#7ee2a8]" : d <= 250 ? "text-accent" : "text-[#fb7185]";
-}
 
 
 /**
@@ -75,6 +108,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const allPicked = shown.length > 0 && shown.every((r) => picked.has(r.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const pickedRows = rows.filter((r) => picked.has(r.id));
+  const days7 = rows[0]?.weightWeek.map((d) => d.date);
   const chip = (on: boolean) => `shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${on ? "border-accent bg-accent font-semibold text-black" : "border-[#2f2f2f] text-[#cfcfcf]"}`;
 
   return (
@@ -102,19 +136,23 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
         ))}
       </div>
 
-      {/* One compact row per client (October 31): numbers in columns, alerts stacked on the right. */}
-      <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 grid grid-cols-6 gap-1 bg-bg/95 py-1.5 pl-[42px] pr-2.5 md:px-2.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur ${COLS} md:gap-2`}>
-        <span className="hidden md:block" />
-        {([["name", "Client", "hidden md:block"], ["seen", "Last in app", "hidden md:block"], ["weighins", "Weigh-ins"], ["checkin", "Last check-in"], ["kcalAvg", "Kcal avg"], ["protein", "Protein"], ["steps", "Steps"], ["workouts", "Workouts"]] as [SortKey, string, string?][]).map(([key, label, cls]) => (
-          <button key={key} type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
-            className={`text-left uppercase ${cls ?? ""} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.key === "name" ? (sort.dir === 1 ? " ↓" : " ↑") : sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
+      {/* One row per client (November 2): her last 7 days of weight, steps and calories side by side. */}
+      <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 hidden gap-2 bg-bg/95 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid ${COLS}`}>
+        <span />
+        {([["name", "Client"], ["seen", "Last in app"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"]] as [SortKey, string][]).map(([key, label]) => (
+          <span key={key} className="min-w-0">
+            <button type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
+              className={`text-left uppercase ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
+            {["weighins", "steps", "kcalAvg"].includes(key) && days7 && (
+              <span className="mt-0.5 grid grid-cols-7 gap-[2px] text-center normal-case tracking-normal">{days7.map((d) => <span key={d}>{letter(d)}</span>)}</span>
+            )}
+          </span>
         ))}
-        <span className="hidden text-right md:block">Alerts</span>
+        <span className="text-right">Alerts</span>
       </div>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {shown.map((r) => {
           const on = picked.has(r.id);
-          const wk = r.lastWorkoutWeek;
           const cell = "min-w-0 md:order-3";
           const val = "block truncate text-[14px] font-semibold tabular-nums";
           const sub = "block truncate text-[10px] text-dim";
@@ -145,28 +183,31 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                   : <span key={i} className={`whitespace-nowrap rounded px-1.5 py-px text-[11px] ${x.cls}`}>{x.text}</span>)}
                 {!alerts.length && <span className="text-[11px] text-[#7ee2a8]">On track</span>}
               </span>
-              <span className="col-span-3 grid grid-cols-6 gap-1 pl-[32px] md:contents">
+              <span className="col-span-3 grid gap-1.5 pl-[32px] md:contents">
                 <span className="hidden min-w-0 md:order-3 md:block">
                   <span className="block truncate text-[13px] font-semibold">{lastInLabel(r.seen)}</span>
                   <SeenStrip seen={r.seen} size={14} />
                 </span>
-                {/* November 1: her last 7 days of weigh-ins instead of the number. */}
-                <span className={cell}>
-                  <span className="hidden md:block"><SeenStrip seen={r.weighins} size={14} what="weighed in" /></span>
-                  <span className={`${val} md:hidden`}>{r.weighins7}/7</span>
-                  <span className={sub}><span className="hidden md:inline">{r.weighins7}/7 · </span>{r.weighedOn ? (r.daysSinceWeigh === 0 ? "today" : `last ${r.daysSinceWeigh}d ago`) : "none yet"}</span>
+                {/* Weight, steps and calories: the last 7 days (November 2). */}
+                <span className={`${cell} flex items-center gap-2`}>
+                  <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Weight</span>
+                  <span className="min-w-0 flex-1"><Week days={r.weightWeek} color="#7dd3fc" fmt={(n) => n.toFixed(1)} title={(d, v) => `${d}: ${v === null ? "no weigh-in" : `${v} lbs`}`} /></span>
+                </span>
+                <span className={`${cell} flex items-center gap-2`}>
+                  <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Steps</span>
+                  <span className="min-w-0 flex-1"><Week days={r.stepsWeek} color="#f5f5f5" fmt={kk} title={(d, v) => `${d}: ${v === null ? "no steps" : `${v.toLocaleString()} steps`} (goal ${r.stepGoal.toLocaleString()})`} /></span>
+                </span>
+                <span className={`${cell} flex items-center gap-2`}>
+                  <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Food</span>
+                  <span className="min-w-0 flex-1"><FoodDays r={r} /></span>
                 </span>
                 {/* Her last check-in: green when it's this week's. */}
                 {(() => {
                   const c = r.lastCheckin, current = !!c && !!r.checkin && c.week === r.checkin.week;
                   return c
-                    ? <Link href={`/coach/checkins/${c.id}`} className={cell}><span className={`${val} ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={sub}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
-                    : <span className={cell}><span className={`${val} text-dim`}>–</span><span className={sub}>no check-ins</span></span>;
+                    ? <Link href={`/coach/checkins/${c.id}`} className={cell}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline md:block ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={`${sub} ml-1 inline md:ml-0 md:block`}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
+                    : <span className={cell}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline text-dim md:block`}>–</span></span>;
                 })()}
-                <span className={cell}><span className={`${val} ${kcalTone(r.kcalAvg, r.kcalTarget)}`}>{r.kcalAvg ?? "–"}</span><span className={sub}>{r.foodDays7}/7 days</span></span>
-                <span className={cell}><span className={`${val} ${r.proteinAvg !== null && r.proteinAvg < r.proteinTarget - 10 ? "text-accent" : ""}`}>{r.proteinAvg !== null ? `${r.proteinAvg}g` : "–"}</span><span className={sub}>of {r.proteinTarget}g</span></span>
-                <span className={cell}><span className={val}>{k(r.stepsAvg)}</span><span className={sub}>{r.stepsDays ? `${r.stepsDays}d synced` : "not synced"}</span></span>
-                <span className={cell}><span className={`${val} ${r.missedWorkouts ? "text-[#fb7185]" : wk && wk.planned ? "text-[#7ee2a8]" : ""}`}>{wk ? `${wk.done}/${wk.planned}` : "–"}</span><span className={sub}>{wk ? `wk ${wk.week}` : "from wk 2"}</span></span>
               </span>
             </li>
           );

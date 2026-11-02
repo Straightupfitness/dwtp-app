@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { programWeek, todayIn } from "@/lib/program";
-import { setEmailNotifications, signOut, updateName } from "./actions";
+import { setEmailNotifications, signOut, updateBirthday, updateName } from "./actions";
 import NotificationSettings from "@/components/NotificationSettings";
 import SoundToggle from "@/components/SoundToggle";
 import AvatarPicker from "./AvatarPicker";
@@ -11,7 +11,7 @@ export default async function MePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: p }, { data: cps }] = await Promise.all([
-    supabase.from("profiles").select("full_name, email, program_start, timezone, plan, email_notifications, avatar_path").eq("id", user!.id).single(),
+    supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("cp_totals").select("total").eq("client_id", user!.id).maybeSingle(),
   ]);
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
@@ -27,6 +27,12 @@ export default async function MePage() {
       <form action={updateName} className="flex items-end gap-2">
         <label className="flex-1 text-sm text-dim">Your name (the community sees your first name and last initial)
           <input name="full_name" defaultValue={p?.full_name ?? ""} className="mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent" />
+        </label>
+        <button className="min-h-11 rounded-lg border border-border px-4">Save</button>
+      </form>
+      <form action={updateBirthday} className="flex items-end gap-2">
+        <label className="flex-1 text-sm text-dim">Your birthday
+          <input name="birthday" type="date" defaultValue={(p as { birthday?: string | null } | null)?.birthday ?? ""} className="mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none [color-scheme:dark] focus:border-accent" />
         </label>
         <button className="min-h-11 rounded-lg border border-border px-4">Save</button>
       </form>

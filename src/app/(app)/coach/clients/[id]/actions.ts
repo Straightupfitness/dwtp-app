@@ -37,6 +37,8 @@ export async function updateClient(clientId: string, form: FormData) {
     water_goal_oz: Math.round(num(form.get("water_goal_oz")) ?? 128), step_goal: Math.round(num(form.get("step_goal")) ?? 10000),
   }).eq("id", clientId);
   if (error) return { error: error.message };
+  // Birthday (November 2) on its own, so the rest saves even before the birthday column exists (0032).
+  if (form.has("birthday")) await supabase.from("profiles").update({ birthday: str(form.get("birthday")) }).eq("id", clientId);
   const { error: e2 } = await supabase.from("nutrition_targets").upsert({
     client_id: clientId, maintenance_calories: num(form.get("maintenance_calories")), calorie_target: num(form.get("calorie_target")),
     protein_g: num(form.get("protein_g")), fiber_g: num(form.get("fiber_g")), potassium_mg: num(form.get("potassium_mg")),

@@ -18,6 +18,16 @@ export async function updateName(form: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** Her birthday (November 2): Michael's birthday message goes out that morning. */
+export async function updateBirthday(form: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const d = String(form.get("birthday") ?? "").trim();
+  if (!user || (d && !/^\d{4}-\d{2}-\d{2}$/.test(d))) return;
+  await supabase.from("profiles").update({ birthday: d || null }).eq("id", user.id);
+  revalidatePath("/me");
+}
+
 export async function setEmailNotifications(on: boolean) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

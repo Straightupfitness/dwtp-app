@@ -5,6 +5,10 @@ import LiveRefresh from "@/components/LiveRefresh";
 import Avatar from "@/components/Avatar";
 import BackButton from "@/components/BackButton";
 import InboxSearch from "./InboxSearch";
+import BirthdaySettings from "./BirthdaySettings";
+import { adminClient } from "@/lib/supabase/admin";
+import { birthdaySettings } from "@/lib/birthdays";
+import { todayIn } from "@/lib/program";
 
 export default async function Inbox() {
   const supabase = await createClient();
@@ -19,6 +23,21 @@ export default async function Inbox() {
     if (m.sender_id !== user!.id && !m.read_at) t.unread++;
     threads.set(m.client_id, t);
   }
+  // Birthday messages (November 2).
+  let bday = { on: true, message: "", upcoming: [] as { id: string; name: string; when: string; days: number }[], missing: 0 };
+  try {
+    const db = adminClient();
+    const s = await birthdaySettings(db);
+    const { data: bs, error } = await db.from("profiles").select("id, full_name, email, birthday, status").eq("role", "client").neq("status", "cancelled");
+    const today = todayIn("America/Los_Angeles"), y = Number(today.slice(0, 4));
+    const next = (b: string) => { let d = `${y}-${b.slice(5)}`; if (d < today) d = `${y + 1}-${b.slice(5)}`; return d; };
+    const list = error ? [] : (bs ?? []);
+    bday = {
+      on: s.on, message: s.message, missing: list.filter((c) => !c.birthday).length,
+      upcoming: list.filter((c) => c.birthday).map((c) => { const d = next(c.birthday as string); return { id: c.id, name: c.full_name || c.email || "Client", when: new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), days: Math.round((Date.parse(d) - Date.parse(today)) / 86_400_000) }; })
+        .filter((u) => u.days <= 60).sort((a, b) => a.days - b.days),
+    };
+  } catch { /* no service key locally */ }
   const rows = (clients ?? []).filter((c) => c.id !== user!.id || threads.has(c.id))
     .map((c) => ({ c, t: threads.get(c.id) }))
     .sort((a, b) => (b.t?.unread ?? 0) - (a.t?.unread ?? 0) || (b.t?.last.created_at ?? "").localeCompare(a.t?.last.created_at ?? ""));
@@ -31,6 +50,7 @@ export default async function Inbox() {
         <p className="text-xs uppercase tracking-[0.15em] text-accent">Coach</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Inbox</h1>
       </header>
+      <BirthdaySettings {...bday} />
       <InboxSearch clients={(clients ?? []).filter((c) => c.id !== user!.id).map((c) => ({ id: c.id, name: c.full_name || c.email || "Client", email: c.email, avatar: c.avatar_path }))} />
       <ul className="space-y-2">
         {rows.map(({ c, t }) => (

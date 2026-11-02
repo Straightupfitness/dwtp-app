@@ -24,6 +24,7 @@ export function ProfileForm({ clientId, p, t, programs = [] }: {
         {field("full_name", "Name")}
         {field("email", "Email (she signs in with this)", "email")}
         {field("phone", "Phone", "tel")}
+        {field("birthday", "Birthday", "date")}
         <label className="text-sm text-dim">Time zone
           <select name="timezone" defaultValue={String(p.timezone ?? "America/Los_Angeles")} className={input}>
             {[["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Phoenix", "Arizona"], ["America/Chicago", "Central"],

@@ -39,11 +39,16 @@ export type RosterRow = {
   /** November 1: her weigh-ins over the last 7 days (✓/✗) and her most recent check-in. */
   weighins: SeenWeek; weighins7: number;
   lastCheckin: { week: number; at: string; id: string } | null;
+  /** November 2: her last 7 days, oldest first (today last): weigh-ins, steps, and food with nutrient "charges" (0–1+). */
+  weightWeek: { date: string; value: number | null }[];
+  stepsWeek: { date: string; value: number | null }[];
+  foodWeek: { date: string; kcal: number | null; protein: number; fiber: number; potassium: number }[];
+  stepGoal: number; targets: { kcal: number | null; protein: number; fiber: number; potassium: number };
 };
 
 export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]> {
   const { data: clients } = await supabase.from("profiles")
-    .select("id, full_name, email, program_start, status, timezone, avatar_path, goal_weight_lbs, strength_days_per_week, workout_program, workout_start_week")
+    .select("id, full_name, email, program_start, status, timezone, avatar_path, goal_weight_lbs, strength_days_per_week, workout_program, workout_start_week, step_goal")
     .eq("role", "client").order("full_name");
   const list = (clients ?? []).filter((c) => c.status !== "cancelled");
   const ids = list.map((c) => c.id);
@@ -52,10 +57,10 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
 
   const [weights, food, steps, water, { data: targets }, checkins, sessions, { data: cps }, { data: phases }, seen] = await Promise.all([
     all<{ client_id: string; log_date: string; weight_lbs: number }>((a, b) => supabase.from("weight_logs").select("client_id, log_date, weight_lbs").in("client_id", ids).gte("log_date", addDays(since, -110)).order("log_date", { ascending: false }).range(a, b)),
-    all<{ client_id: string; eaten_at: string; calories: number | null; protein_g: number | null }>((a, b) => supabase.from("food_logs").select("client_id, eaten_at, calories, protein_g").in("client_id", ids).gte("eaten_at", addDays(since, -1) + "T00:00:00Z").order("eaten_at").range(a, b)),
+    all<{ client_id: string; eaten_at: string; calories: number | null; protein_g: number | null; fiber_g: number | null; potassium_mg: number | null }>((a, b) => supabase.from("food_logs").select("client_id, eaten_at, calories, protein_g, fiber_g, potassium_mg").in("client_id", ids).gte("eaten_at", addDays(since, -1) + "T00:00:00Z").order("eaten_at").range(a, b)),
     all<{ client_id: string; day: string; steps: number | null }>((a, b) => supabase.from("health_days").select("client_id, day, steps").in("client_id", ids).gte("day", since).order("day").range(a, b)),
     all<{ client_id: string; day: string; oz: number }>((a, b) => supabase.from("water_days").select("client_id, day, oz").in("client_id", ids).gte("day", since).order("day").range(a, b)),
-    supabase.from("nutrition_targets").select("client_id, calorie_target, protein_g").in("client_id", ids),
+    supabase.from("nutrition_targets").select("client_id, calorie_target, protein_g, fiber_g, potassium_mg").in("client_id", ids),
     all<{ id: string; client_id: string; week_number: number; flags: string[] | null; submitted_at: string | null; checkin_replies: unknown }>((a, b) => supabase.from("checkins").select("id, client_id, week_number, flags, submitted_at, checkin_replies(sent_at)").in("client_id", ids).order("week_number", { ascending: false }).range(a, b)),
     all<{ client_id: string; program_week: number }>((a, b) => supabase.from("workout_sessions").select("client_id, program_week, workouts!inner(kind)").in("client_id", ids).not("completed_at", "is", null).eq("workouts.kind", "strength").order("started_at").range(a, b)),
     supabase.from("cp_totals").select("client_id, this_week").in("client_id", ids),
@@ -89,11 +94,11 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
 
     // Food: the last 7 finished days.
     const days7 = Array.from({ length: 7 }, (_, i) => addDays(today, -(i + 1)));
-    const byDay = new Map<string, { kcal: number; protein: number }>();
+    const byDay = new Map<string, { kcal: number; protein: number; fiber: number; potassium: number }>();
     for (const f of food.filter((x) => x.client_id === c.id)) {
       const d = todayIn(tz, new Date(f.eaten_at));
-      const t = byDay.get(d) ?? { kcal: 0, protein: 0 };
-      t.kcal += f.calories ?? 0; t.protein += Number(f.protein_g ?? 0); byDay.set(d, t);
+      const t = byDay.get(d) ?? { kcal: 0, protein: 0, fiber: 0, potassium: 0 };
+      t.kcal += f.calories ?? 0; t.protein += Number(f.protein_g ?? 0); t.fiber += Number(f.fiber_g ?? 0); t.potassium += Number(f.potassium_mg ?? 0); byDay.set(d, t);
     }
     const logged = days7.filter((d) => byDay.has(d));
     const st = steps.filter((x) => x.client_id === c.id && days7.includes(x.day) && (x.steps ?? 0) > 0);
@@ -128,6 +133,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
 
     const lastSeen = seen.get(c.id) ?? null;
     const hoursSinceSeen = lastSeen ? Math.round((now - Date.parse(lastSeen)) / 3_600_000) : null;
+    const week7 = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
     const weighed = new Set(w.map((x) => x.log_date));
     const weighins: SeenWeek = { lastDate: latest?.log_date ?? null, days: Array.from({ length: 7 }, (_, i) => { const date = addDays(today, i - 6); return { date, seen: weighed.has(date) }; }) };
     const latestCheckin = mine.filter((x) => x.submitted_at).sort((a, b) => b.submitted_at!.localeCompare(a.submitted_at!))[0] ?? null;
@@ -150,6 +156,11 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       cpsWeek: (cps ?? []).find((x) => x.client_id === c.id)?.this_week ?? 0,
       flags: ((mine[0]?.flags as string[] | null) ?? []),
       seen: seenWeeks.get(c.id) ?? null,
+      weightWeek: week7.map((date) => { const x = w.find((r) => r.log_date === date); return { date, value: x ? Number(x.weight_lbs) : null }; }),
+      stepsWeek: week7.map((date) => ({ date, value: steps.find((x) => x.client_id === c.id && x.day === date)?.steps ?? null })),
+      foodWeek: week7.map((date) => { const f = byDay.get(date); return f ? { date, kcal: Math.round(f.kcal), protein: Math.round(f.protein), fiber: Math.round(f.fiber), potassium: Math.round(f.potassium) } : { date, kcal: null, protein: 0, fiber: 0, potassium: 0 }; }),
+      stepGoal: c.step_goal ?? 10000,
+      targets: { kcal: t?.calorie_target ?? null, protein: t?.protein_g ?? DAILY_TARGETS.protein_g, fiber: t?.fiber_g ?? DAILY_TARGETS.fiber_g, potassium: t?.potassium_mg ?? DAILY_TARGETS.potassium_mg },
       weighins, weighins7: weighins.days.filter((x) => x.seen).length,
       lastCheckin: latestCheckin ? { week: latestCheckin.week_number, at: latestCheckin.submitted_at!, id: latestCheckin.id } : null,
     };
