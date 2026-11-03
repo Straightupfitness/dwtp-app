@@ -81,7 +81,7 @@ const startLabel = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString(
 export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const [sort, setSortState] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "attention", dir: 1 });
+  const [sort, setSortState] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 }) // November 2: A–Z by default;
   // Tap a column heading to sort by it (November 1: "Client" = A–Z); tap again to flip the order.
   const setSort = (key: SortKey) => setSortState((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : 1 }));
   const [actionMsg, setActionMsg] = useState("");

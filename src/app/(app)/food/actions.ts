@@ -178,3 +178,16 @@ export async function logRecipe(id: number, servings: number, mealSlot: "meal_1"
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** Save a recipe for another time, or take it off her saved list (November 2). */
+export async function toggleSavedRecipe(recipeId: number, save: boolean) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { error } = save
+    ? await supabase.from("recipe_favorites").upsert({ client_id: user.id, recipe_id: recipeId }, { onConflict: "client_id,recipe_id", ignoreDuplicates: true })
+    : await supabase.from("recipe_favorites").delete().eq("client_id", user.id).eq("recipe_id", recipeId);
+  if (error) return { error: "Saving recipes isn't switched on yet." };
+  revalidatePath("/food/recipes");
+  return { ok: true };
+}

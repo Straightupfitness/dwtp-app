@@ -93,3 +93,29 @@ export async function finishWorkout(sessionId: string) {
   revalidatePath("/", "layout");
   return { ok: true, cps };
 }
+
+/**
+ * Substitute (November 2): find any exercise by name, with its video and what she lifted last time on it.
+ * Overview videos ("PSR Phase 1 Day 1") are left out; names show without the program tag.
+ */
+export async function searchExercises(query: string) {
+  const { supabase, user } = await me();
+  const q = query.trim().replace(/[%_,()]/g, " ").replace(/\s+/g, " ");
+  if (!user || q.length < 2) return [];
+  let req = supabase.from("exercises").select("id, name, clip_path, youtube_id, notes").not("name", "ilike", "%phase % day %").limit(60);
+  for (const word of q.split(" ").slice(0, 4)) req = req.ilike("name", `%${word}%`);
+  const { data } = await req;
+  const { clipUrl, posterUrl, lastNumbers } = await import("@/lib/workouts");
+  const clean = (n: string) => n.replace(/\s*\((SLTP|PSR|SLF|DWTP)\)\s*$/i, "").trim();
+  const seen = new Set<string>();
+  const rows = (data ?? [])
+    .sort((a, b) => Number(!!b.clip_path || !!b.youtube_id) - Number(!!a.clip_path || !!a.youtube_id) || clean(a.name).length - clean(b.name).length)
+    .filter((e) => { const k = clean(e.name).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0, 12);
+  const last = await lastNumbers(supabase, user.id, rows.map((e) => e.id as number));
+  return rows.map((e) => ({
+    id: e.id as number, name: clean(e.name), notes: (e.notes as string | null) ?? null,
+    clip: clipUrl(e), poster: posterUrl(e), youtube: (e.youtube_id as string | null) ?? null,
+    last: last.get(e.id as number)?.sets ?? [], lastWhen: last.get(e.id as number)?.when ?? null,
+  }));
+}

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { celebrate, play, primeSounds } from "@/lib/celebrate";
-import { finishWorkout, logSet, startSession } from "../actions";
+import { finishWorkout, logSet, searchExercises, startSession } from "../actions";
 
 type SetVals = { weight?: number | null; reps?: number | null; seconds?: number | null; note?: string | null };
 export type PlayerItem = {
@@ -47,7 +47,25 @@ function describe(s: SetVals) {
   return [s.weight != null ? `${s.weight} lb` : null, s.reps != null ? `${s.reps} reps` : null, s.seconds != null ? mmss(s.seconds) : null, s.note || null].filter(Boolean).join(" × ");
 }
 
-export default function Player({ workout, phase, overview, steps, session, preview }: Props) {
+type Sub = { id: number; name: string; notes: string | null; clip: string | null; poster: string | null; youtube: string | null; last: PlayerItem["last"]; lastWhen: string | null };
+type Original = { name: string };
+
+export default function Player({ workout, phase, overview, steps: baseSteps, session, preview }: Props) {
+  // Substitutes (November 2): she can swap any exercise for another one. Remembered on this phone for this workout;
+  // the sets she logs are saved under the exercise she actually did.
+  const subKey = `dwtp-subs:${session?.id ?? `w${workout.id}`}`;
+  const [subs, setSubs] = useState<Record<number, Sub>>({});
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem(subKey) ?? "{}"); if (v && typeof v === "object") setSubs(v); } catch {} }, [subKey]); // eslint-disable-line react-hooks/set-state-in-effect -- read once
+  const setSub = (position: number, sub: Sub | null) => setSubs((cur) => {
+    const next = { ...cur };
+    if (sub) next[position] = sub; else delete next[position];
+    try { localStorage.setItem(subKey, JSON.stringify(next)); } catch {}
+    return next;
+  });
+  const steps = useMemo(() => baseSteps.map((s): PlayerItem & { original?: Original } => {
+    const x = subs[s.position];
+    return x ? { ...s, exerciseId: x.id, name: x.name, notes: x.notes, clip: x.clip, poster: x.poster, youtube: x.youtube, last: x.last, lastWhen: x.lastWhen, original: { name: s.name } } : s;
+  }), [baseSteps, subs]);
   const [step, setStep] = useState<number>(-1); // -1 = start screen, steps.length = finished
   const [sound, setSound] = useState(false); // clips start muted; one tap turns the sound on (November 1)
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
@@ -296,6 +314,8 @@ export default function Player({ workout, phase, overview, steps, session, previ
 
         <div>
           <h2 className={`${display} text-[26px] leading-tight`}>{s.name}</h2>
+          <Substitute key={s.position} current={s.name} original={(s as { original?: Original }).original ?? null}
+            onPick={(x) => setSub(s.position, x)} onUndo={() => setSub(s.position, null)} />
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Chip strong>{summary(s)}</Chip>
             {s.rest ? <Chip>Rest {s.rest >= 60 ? mmss(s.rest) : `${s.rest} s`}</Chip> : null}
@@ -385,6 +405,66 @@ function Bottom({ children }: { children: React.ReactNode }) {
   return (
     <div className="border-t border-border bg-[#0f0f0f] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-md px-4 pt-3">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * ⇄ Substitute (November 2): type to search every exercise (names come up as she types, like the chat search),
+ * tap one and it replaces this exercise for today.
+ */
+function Substitute({ current, original, onPick, onUndo }: {
+  current: string; original: Original | null; onPick: (s: Sub) => void; onUndo: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<Sub[]>([]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open || q.trim().length < 2) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      setBusy(true);
+      const r = await searchExercises(q).catch(() => []);
+      if (live) { setHits(r); setBusy(false); }
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [q, open]);
+  const shown = q.trim().length >= 2 ? hits : [];
+  return (
+    <div className="mt-1.5">
+      {original
+        ? <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-[#a8a8a8]"><span>⇄ Instead of <b className="text-text">{original.name}</b></span>
+            <button type="button" onClick={onUndo} className="min-h-8 text-accent underline underline-offset-2">Undo</button>
+            <button type="button" onClick={() => setOpen(true)} className="min-h-8 text-accent underline underline-offset-2">Pick another</button></p>
+        : !open && <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#3a3a3a] px-3 text-[13px] font-semibold text-[#cfcfcf]">⇄ Substitute</button>}
+      {open && (
+        <div className="mt-2 space-y-1.5 rounded-[14px] border border-border bg-card p-2.5">
+          <div className="flex gap-2">
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Instead of ${current.slice(0, 28)}… type an exercise`}
+              aria-label="Search exercises" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-[16px] outline-none focus:border-accent" />
+            <button type="button" onClick={() => { setOpen(false); setQ(""); }} className="min-h-11 px-2 text-sm text-dim">Cancel</button>
+          </div>
+          {busy && <p className="px-1 text-[12px] text-dim">Searching…</p>}
+          <ul className="max-h-72 divide-y divide-border overflow-y-auto">
+            {shown.map((x) => (
+              <li key={x.id}>
+                <button type="button" onClick={() => { onPick(x); setOpen(false); setQ(""); }} className="flex w-full items-center gap-3 py-2 text-left">
+                  <span className="block size-11 shrink-0 overflow-hidden rounded-lg bg-[#1b1b1b]">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- storage poster */}
+                    {x.poster && <img src={x.poster} alt="" className="size-full object-cover" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold leading-snug">{x.name}</span>
+                    {x.last.length > 0 && <span className="block text-[11px] text-dim">You&apos;ve done this before</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {q.trim().length >= 2 && !busy && !shown.length && <p className="px-1 text-[12px] text-dim">No exercise matches &ldquo;{q.trim()}&rdquo;.</p>}
+        </div>
+      )}
     </div>
   );
 }

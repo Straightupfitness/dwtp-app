@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import BackButton from "@/components/BackButton";
 import { amountFor, cleanName, recipePhoto, recipeVideo, TAGS, TYPES, type Recipe } from "@/lib/recipes";
 import LogRecipe from "./LogRecipe";
+import SaveRecipe from "./SaveRecipe";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 
@@ -13,6 +14,8 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const { data } = await supabase.from("recipes").select("*").eq("id", Number(id)).maybeSingle();
   if (!data) notFound();
   const r = data as Recipe;
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: fav } = await supabase.from("recipe_favorites").select("recipe_id").eq("client_id", user?.id ?? "").eq("recipe_id", r.id).maybeSingle();
   const photo = recipePhoto(r), video = recipeVideo(r);
   const per = 1 / (Number(r.servings) || 1); // ingredients are for the whole recipe; show one serving
   const stat = (v: number | null, unit: string, label: string) => (
@@ -28,6 +31,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       <header className="space-y-1.5">
         {r.mine && <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-accent">Michael&apos;s recipe</p>}
         <h1 className={`${display} text-[28px] font-semibold leading-tight`}>{cleanName(r.name)}</h1>
+        <SaveRecipe id={r.id} saved={!!fav} />
         <p className="text-[13px] text-[#a8a8a8]">
           {[r.prep_min ? `Prep ${r.prep_min} min` : null, r.cook_min ? `Cook ${r.cook_min} min` : null, Number(r.servings) > 1 ? `Makes ${r.servings} servings` : null].filter(Boolean).join(" · ")}
         </p>

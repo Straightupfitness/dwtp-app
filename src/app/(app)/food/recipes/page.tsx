@@ -10,16 +10,21 @@ const PER = 30;
  * Recipes (October 29): Michael's own first, then the library. Search, filter by meal or style, or show only
  * high-protein ones (40 g+ a serving, his rule). Tap one to see it and log it.
  */
-export default async function RecipesPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; tag?: string; who?: string; p?: string; protein?: string }> }) {
+export default async function RecipesPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; tag?: string; who?: string; p?: string; protein?: string; saved?: string }> }) {
   const sp = await searchParams;
   const supabase = await createClient();
   const page = Math.max(0, Number(sp.p) || 0);
+  // Her saved recipes (November 2).
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: favs } = await supabase.from("recipe_favorites").select("recipe_id").eq("client_id", user?.id ?? "");
+  const savedIds = new Set((favs ?? []).map((f) => Number(f.recipe_id)));
   let q = supabase.from("recipes").select("id, name, mine, calories, protein_g, has_photo, has_video, prep_min, cook_min", { count: "exact" }).eq("active", true);
   if (sp.q?.trim()) q = q.ilike("name", `%${sp.q.trim().replace(/[%_]/g, "")}%`);
   if (sp.type && TYPES[sp.type]) q = q.contains("meal_types", [sp.type]);
   if (sp.tag && TAGS[sp.tag]) q = q.contains("tags", [sp.tag]);
   if (sp.who === "michael") q = q.eq("mine", true);
   if (sp.protein === "40") q = q.gte("protein_g", 40);
+  if (sp.saved === "1") q = q.in("id", savedIds.size ? [...savedIds] : [-1]);
   const { data, count } = await q.order("mine", { ascending: false }).order("sort").range(page * PER, page * PER + PER - 1);
   const rows = (data ?? []) as Pick<Recipe, "id" | "name" | "mine" | "calories" | "protein_g" | "has_photo" | "has_video" | "prep_min" | "cook_min">[];
   const link = (patch: Record<string, string | undefined>) => {
@@ -42,6 +47,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
         <button className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-black">Search</button>
       </form>
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+        <Link href={link({ saved: sp.saved === "1" ? undefined : "1" })} className={chip(sp.saved === "1")}>♥ Saved{savedIds.size ? ` ${savedIds.size}` : ""}</Link>
         <Link href={link({ who: sp.who === "michael" ? undefined : "michael" })} className={chip(sp.who === "michael")}>★ Michael&apos;s</Link>
         <Link href={link({ protein: sp.protein === "40" ? undefined : "40" })} className={chip(sp.protein === "40")}>40 g+ protein</Link>
         {Object.entries(TYPES).map(([k, l]) => <Link key={k} href={link({ type: sp.type === k ? undefined : k })} className={chip(sp.type === k)}>{l}</Link>)}
@@ -60,6 +66,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
                 {/* eslint-disable-next-line @next/next/no-img-element -- storage photo */}
                 {photo && <img src={photo} alt="" loading="lazy" className="size-full object-cover" />}
                 {r.mine && <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-black">Michael&apos;s</span>}
+                {savedIds.has(Number(r.id)) && <span className="absolute bottom-2 right-2 grid size-7 place-items-center rounded-full bg-black/70 text-[#fb7185]" aria-label="Saved">♥</span>}
                 {r.has_video && <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-accent" aria-label="Has a video">▶</span>}
               </span>
               <span className="block space-y-1 px-2.5 py-2">
@@ -70,7 +77,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
           );
         })}
       </div>
-      {!rows.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-6 text-center text-dim">No recipes match. Try fewer filters.</p>}
+      {!rows.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-6 text-center text-dim">{sp.saved === "1" ? "No saved recipes yet. Open a recipe and tap ♡ Save recipe." : "No recipes match. Try fewer filters."}</p>}
       <nav className="flex gap-2">
         {page > 0 && <Link href={link({ p: String(page - 1) })} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border text-sm">← Previous</Link>}
         {(count ?? 0) > (page + 1) * PER && <Link href={link({ p: String(page + 1) })} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border text-sm">More recipes →</Link>}
