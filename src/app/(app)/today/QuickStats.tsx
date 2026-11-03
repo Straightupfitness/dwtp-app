@@ -110,6 +110,10 @@ export default function QuickStats(p: {
           </form>
         )}
         <WeightWeek days={p.weightWeek} />
+        {/* November 3: an easy way to add a weigh-in she missed. */}
+        <Link href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`} className="block text-[13px] text-accent">
+          {p.weightWeek[5]?.value == null ? "Forgot yesterday? Add yesterday's weight ›" : "Add or fix another day's weight ›"}
+        </Link>
       </div>
 
       <div className={`${card} space-y-3`}>
@@ -131,6 +135,7 @@ export default function QuickStats(p: {
           </form>
         )}
         {p.stepsWeek.some((d) => d.value) && <BarsWeek days={p.stepsWeek} goal={p.stepGoal} color="#a3e635" />}
+        <Link href={`/log?d=${p.yesterday}`} className="block text-[13px] text-accent">Add or fix steps for another day ›</Link>
       </div>
 
       <div className={`${card} space-y-3`}>

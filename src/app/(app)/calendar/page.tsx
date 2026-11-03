@@ -45,7 +45,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         {days.map((d) => {
           const isToday = d.date === today, past = d.date < today;
           return (
-            <li key={d.date} className={`rounded-2xl border bg-card p-3 ${isToday ? "border-accent" : "border-border"} ${past ? "opacity-60" : ""}`}>
+            <li key={d.date} className={`rounded-2xl border bg-card p-3 ${isToday ? "border-accent" : "border-border"} ${past ? "opacity-80" : ""}`}>
               <p className={`text-[12px] font-semibold uppercase tracking-[0.1em] ${isToday ? "text-accent" : "text-dim"}`}>{isToday ? "Today · " : ""}{fmtDay(d.date)}</p>
               {d.events.length ? (
                 <ul className="mt-1.5 space-y-1">
@@ -68,6 +68,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   })}
                 </ul>
               ) : <p className="mt-1 text-[13px] text-dim">Your daily habits, food and weigh-in.</p>}
+              {/* November 3: today and past days open "fill in this day" (weight, steps, food, water). */}
+              {d.date <= today && (
+                <Link href={`/log?d=${d.date}`} className="mt-1.5 flex min-h-10 items-center justify-between rounded-lg border border-dashed border-[#3a3a3a] px-3 text-[13px]">
+                  <span>{isToday ? "Log today's weight, steps and water" : "Add or fix this day's weight, steps, food and water"}</span><span className="text-accent">›</span>
+                </Link>
+              )}
             </li>
           );
         })}

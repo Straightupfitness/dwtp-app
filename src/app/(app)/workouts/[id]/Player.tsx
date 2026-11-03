@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { celebrate, play, primeSounds } from "@/lib/celebrate";
-import { finishWorkout, logSet, searchExercises, startSession } from "../actions";
+import { finishWorkout, logSet, searchExercises, startSession, suggestExercises } from "../actions";
 
 type SetVals = { weight?: number | null; reps?: number | null; seconds?: number | null; note?: string | null };
 export type PlayerItem = {
@@ -98,6 +98,22 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     return () => { gone = true; document.removeEventListener("visibilitychange", get); void lock?.release().catch(() => {}); };
   }, [inWorkout]);
 
+  // November 3: a workout clock (time since she tapped Start), kept for this workout on this phone.
+  const clockKey = `dwtp-clock:${session?.id ?? `w${workout.id}`}`;
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  useEffect(() => { try { const v = Number(localStorage.getItem(clockKey)); if (v > 0 && Date.now() - v < 6 * 3_600_000) setStartedAt(v); } catch {} }, [clockKey]); // eslint-disable-line react-hooks/set-state-in-effect -- read once
+  useEffect(() => {
+    if (!inWorkout) return;
+    const t = setInterval(() => setNow(nowMs()), 1000);
+    return () => clearInterval(t);
+  }, [inWorkout]);
+  const startClock = () => {
+    if (startedAt) return;
+    const t = nowMs(); setStartedAt(t);
+    try { localStorage.setItem(clockKey, String(t)); } catch {}
+  };
+  const hms = (secs: number) => { const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = Math.floor(secs % 60); return `${h ? `${h}:` : ""}${h ? String(m).padStart(2, "0") : m}:${String(s).padStart(2, "0")}`; };
+
   // Rest timer tick, and a sound + buzz when it runs out.
   useEffect(() => {
     if (!rest) return;
@@ -117,6 +133,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
 
   async function begin() {
     primeSounds(["set-done", "rest-over"]);
+    startClock();
     if (preview) { setStep(0); return; }
     setBusy(true); setError("");
     const r = await startSession(workout.id);
@@ -152,6 +169,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     setBusy(false);
     if ("error" in r && r.error) { setError(r.error); return; }
     setResult({ cps: ("cps" in r ? r.cps : 0) ?? 0 });
+    try { localStorage.removeItem(clockKey); } catch {}
     setStep(steps.length);
     setTimeout(() => celebrate("quiz-passed", finishRef.current), 150);
   }
@@ -278,6 +296,19 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   return (
     <div className={shell}>
       {header}
+      {/* November 3: workout clock, and a timer she can start any time (for holds, timed sets or her own rest). */}
+      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-2 px-4 pt-1.5 text-[13px]">
+        <span className="tabular-nums text-[#cfcfcf]">⏱ {startedAt ? hms(Math.max(0, (now - startedAt) / 1000)) : "0:00"}<span className="ml-1 text-[11px] text-dim">workout</span></span>
+        {!rest && (
+          <span className="flex items-center gap-1">
+            <span className="text-[11px] text-dim">Timer</span>
+            {[30, 60, 90, 120].map((secs) => (
+              <button key={secs} type="button" onClick={() => { primeSounds(["rest-over"]); setRest({ ends: nowMs() + secs * 1000, total: secs }); }}
+                className="min-h-8 rounded-full border border-[#3a3a3a] px-2.5 text-[12px] font-semibold tabular-nums">{secs < 60 ? `${secs}s` : mmss(secs)}</button>
+            ))}
+          </span>
+        )}
+      </div>
       {/* Rest timer: a ring that empties, with skip and +15 s. Pinned at the top, and it keeps going when she moves to the next exercise. */}
       {rest && (
         <div className="mx-auto mt-2 flex w-[calc(100%-2rem)] max-w-md items-center gap-3 rounded-[18px] border border-accent/60 bg-[#161310] p-2.5" role="timer" aria-live="polite">
@@ -420,6 +451,15 @@ function Substitute({ current, original, onPick, onUndo }: {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Sub[]>([]);
   const [busy, setBusy] = useState(false);
+  // November 3: similar exercises come up right away, before she types.
+  const [ideas, setIdeas] = useState<Sub[] | null>(null);
+  const base = original?.name ?? current;
+  useEffect(() => {
+    if (!open || ideas) return;
+    let live = true;
+    suggestExercises(base).then((r) => { if (live) setIdeas(r.filter((x) => x.name !== current)); }).catch(() => { if (live) setIdeas([]); });
+    return () => { live = false; };
+  }, [open, ideas, base, current]);
   useEffect(() => {
     if (!open || q.trim().length < 2) return;
     let live = true;
@@ -430,7 +470,8 @@ function Substitute({ current, original, onPick, onUndo }: {
     }, 250);
     return () => { live = false; clearTimeout(t); };
   }, [q, open]);
-  const shown = q.trim().length >= 2 ? hits : [];
+  const typing = q.trim().length >= 2;
+  const shown = typing ? hits : ideas ?? [];
   return (
     <div className="mt-1.5">
       {original
@@ -441,11 +482,12 @@ function Substitute({ current, original, onPick, onUndo }: {
       {open && (
         <div className="mt-2 space-y-1.5 rounded-[14px] border border-border bg-card p-2.5">
           <div className="flex gap-2">
-            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Instead of ${current.slice(0, 28)}… type an exercise`}
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type an exercise to search"
               aria-label="Search exercises" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-[16px] outline-none focus:border-accent" />
             <button type="button" onClick={() => { setOpen(false); setQ(""); }} className="min-h-11 px-2 text-sm text-dim">Cancel</button>
           </div>
           {busy && <p className="px-1 text-[12px] text-dim">Searching…</p>}
+          {!typing && <p className="px-1 text-[12px] text-dim">{ideas === null ? "Finding similar exercises…" : ideas.length ? "Similar exercises, or type to search all of them:" : "Type to search every exercise."}</p>}
           <ul className="max-h-72 divide-y divide-border overflow-y-auto">
             {shown.map((x) => (
               <li key={x.id}>
