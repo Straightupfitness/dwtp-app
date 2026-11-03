@@ -38,6 +38,13 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
     supabase.from("assessments").select("answers, ai_summary, submitted_at").eq("client_id", id).maybeSingle(),
   ]);
   const glance = compliance(prog.data);
+  // November 3: ‹ › to the previous / next client (A–Z, same as the overview).
+  const { data: everyone } = await supabase.from("profiles").select("id, full_name, email, status").eq("role", "client").neq("status", "cancelled");
+  const order = (everyone ?? []).map((c) => ({ id: c.id as string, name: (c.full_name || c.email || "") as string })).sort((a, b) => a.name.localeCompare(b.name));
+  const at = order.findIndex((c) => c.id === id);
+  const prevC = order.length > 1 && at >= 0 ? order[(at - 1 + order.length) % order.length] : null;
+  const nextC = order.length > 1 && at >= 0 ? order[(at + 1) % order.length] : null;
+  const arrow = "grid size-10 shrink-0 place-items-center rounded-full border border-border text-xl text-[#cfcfcf] hover:border-accent hover:text-accent";
   // November 1: when she was last in the app, her last 7 days, and her food for the week.
   const [seenMap, foodWeek] = await Promise.all([
     (async () => {
@@ -65,7 +72,11 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : p.program_start ? `Starts ${new Date(p.program_start + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}` : "Not started"} · {p.status}</p>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email} <BadgeRow badges={earned} size={22} /></h1>
+        <div className="flex items-center gap-2">
+          {prevC && <Link href={`/coach/clients/${prevC.id}`} className={arrow} aria-label={`Previous client: ${prevC.name}`} title={prevC.name}>‹</Link>}
+          <h1 className="min-w-0 font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email} <BadgeRow badges={earned} size={22} /></h1>
+          {nextC && <Link href={`/coach/clients/${nextC.id}`} className={arrow} aria-label={`Next client: ${nextC.name}`} title={nextC.name}>›</Link>}
+        </div>
         <p className="text-xs text-dim">{p.email}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
           <span className="text-dim">Last in the app: <b className="text-text">{lastInLabel(seen)}</b></span>

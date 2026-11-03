@@ -118,3 +118,10 @@ export async function signInLinkFor(clientId: string) {
   const { data: p } = await adminClient().from("profiles").select("full_name, phone").eq("id", clientId).single();
   return { link: await createInvite(clientId), first: (p?.full_name ?? "").split(" ")[0] || "", phone: (p?.phone as string | null) ?? null };
 }
+
+/** Her last 7 days of food, for the day pop-up on the client overview (November 3). */
+export async function foodWeekFor(clientId: string) {
+  const { supabase } = await coach();
+  const { loadFoodWeek } = await import("@/lib/food-week");
+  return loadFoodWeek(supabase, clientId);
+}

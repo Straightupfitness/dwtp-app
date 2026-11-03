@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import Avatar from "@/components/Avatar";
 import { sendBulk } from "@/components/chat/actions";
 import SeenStrip, { lastInLabel } from "@/components/SeenStrip";
-import { resendWelcome } from "./clients/[id]/actions";
+import { foodWeekFor, resendWelcome } from "./clients/[id]/actions";
+import { DayPopup } from "@/components/FoodWeek";
+import type { FoodWeekData } from "@/lib/food-week";
 import { TextLink } from "./clients/[id]/WelcomeButton";
 import SeeHerApp from "./clients/[id]/SeeHerApp";
 import type { RosterRow } from "@/lib/roster";
@@ -16,17 +18,21 @@ const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) 
 };
 // November 2: name · last in app · weight · steps · calories (7 days each) · last check-in · alerts.
 const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(215px,1.35fr)_minmax(215px,1.35fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(150px,1fr)]";
+const MID: string[] = ["weighins", "steps", "kcalAvg", "checkin"]; // centered, with a divider (November 3)
 const letter = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
 const kk = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** 7 tiny day cells, oldest to today. */
+/** November 3: a day with nothing logged gets the same red ✕ as "Last in app" (today stays grey until the day is over). */
+const missing = (today: boolean) => (today ? "bg-[#1a1a1a] text-[#4a4a4a]" : "bg-[#3b1219] text-[#fb7185]");
+
 function Week({ days, color, fmt, title }: { days: { date: string; value: number | null }[]; color: string; fmt: (n: number) => string; title: (d: string, v: number | null) => string }) {
   return (
     <span className="grid grid-cols-7 gap-[2px]">
       {days.map((d, i) => (
         <span key={d.date} title={title(d.date, d.value)}
-          className={`rounded-[3px] py-[3px] text-center text-[10px] font-semibold leading-none tabular-nums ${d.value === null ? "bg-[#1a1a1a] text-[#4a4a4a]" : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
-          style={d.value === null ? undefined : { color }}>{d.value === null ? "·" : fmt(d.value)}</span>
+          className={`rounded-[3px] py-[3px] text-center text-[10px] font-semibold leading-none tabular-nums ${d.value === null ? missing(i === 6) : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
+          style={d.value === null ? undefined : { color }}>{d.value === null ? (i === 6 ? "·" : "✕") : fmt(d.value)}</span>
       ))}
     </span>
   );
@@ -41,16 +47,16 @@ function Battery({ pct, label }: { pct: number; label: string }) {
     </span>
   );
 }
-function FoodDays({ r }: { r: RosterRow }) {
+function FoodDays({ r, onOpen }: { r: RosterRow; onOpen: (i: number) => void }) {
   const t = r.targets;
   return (
     <span className="grid grid-cols-7 gap-[2px]">
       {r.foodWeek.map((d, i) => (
-        <span key={d.date} className={`flex flex-col items-center gap-[3px] rounded-[3px] py-[3px] ${d.kcal === null ? "bg-[#1a1a1a]" : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
+        <button type="button" key={d.date} onClick={() => onOpen(i)} className={`flex flex-col items-center gap-[3px] rounded-[3px] py-[3px] hover:ring-1 hover:ring-[#fdba74] ${d.kcal === null ? missing(i === 6) : "bg-[#1d1d1d]"} ${i === 6 ? "ring-1 ring-[#444]" : ""}`}
           title={d.kcal === null ? `${d.date}: nothing logged` : `${d.date}: ${d.kcal} kcal${t.kcal ? ` (target ${t.kcal})` : ""} · protein ${d.protein}/${t.protein} g · fiber ${d.fiber}/${t.fiber} g · potassium ${d.potassium}/${t.potassium} mg`}>
-          <span className={`text-[10px] font-semibold leading-none tabular-nums ${d.kcal === null ? "text-[#4a4a4a]" : "text-[#fdba74]"}`}>{d.kcal === null ? "·" : d.kcal}</span>
+          <span className={`text-[10px] font-semibold leading-none tabular-nums ${d.kcal === null ? "" : "text-[#fdba74]"}`}>{d.kcal === null ? (i === 6 ? "·" : "✕") : d.kcal}</span>
           {d.kcal !== null && <span className="flex gap-[1.5px]"><Battery pct={d.protein / t.protein} label="Protein" /><Battery pct={d.fiber / t.fiber} label="Fiber" /><Battery pct={d.potassium / t.potassium} label="Potassium" /></span>}
-        </span>
+        </button>
       ))}
     </span>
   );
@@ -90,6 +96,14 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const [text, setText] = useState("Hi {first}, ");
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
+  // Tap a calorie number: that day's food in the same pop-up as her page (November 3).
+  const [food, setFood] = useState<{ data: FoodWeekData; index: number } | null>(null);
+  const [foodBusy, setFoodBusy] = useState(false);
+  const openFood = async (clientId: string, index: number) => {
+    setFoodBusy(true);
+    try { setFood({ data: await foodWeekFor(clientId), index }); } catch { /* not loaded */ }
+    setFoodBusy(false);
+  };
 
   const score = (r: RosterRow) => (r.checkin?.state === "needs-reply" ? 8 : 0) + (r.missedCheckin ? 4 : 0) + (r.noFoodYesterday ? 2 : 0) + (r.missedWorkouts ? 2 : 0) + (r.notSeen48 ? 3 : 0) + ((r.daysSinceWeigh ?? 99) >= 4 ? 1 : 0);
   const shown = useMemo(() => {
@@ -140,20 +154,20 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
       <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 hidden gap-2 bg-bg/95 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid ${COLS}`}>
         <span />
         {([["name", "Client"], ["seen", "Last in app"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"]] as [SortKey, string][]).map(([key, label]) => (
-          <span key={key} className="min-w-0">
+          <span key={key} className={`min-w-0 ${MID.includes(key) ? "border-l border-[#2a2a2a] pl-2 text-center" : ""}`}>
             <button type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
-              className={`text-left uppercase ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
+              className={`uppercase ${MID.includes(key) ? "w-full text-center" : "text-left"} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
             {["weighins", "steps", "kcalAvg"].includes(key) && days7 && (
               <span className="mt-0.5 grid grid-cols-7 gap-[2px] text-center normal-case tracking-normal">{days7.map((d) => <span key={d}>{letter(d)}</span>)}</span>
             )}
           </span>
         ))}
-        <span className="text-right">Alerts</span>
+        <span className="border-l border-[#2a2a2a] pl-2 text-right">Alerts</span>
       </div>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {shown.map((r) => {
           const on = picked.has(r.id);
-          const cell = "min-w-0 md:order-3";
+          const cell = "min-w-0 md:order-3 md:self-stretch md:border-l md:border-[#262626] md:pl-2";
           const val = "block truncate text-[14px] font-semibold tabular-nums";
           const sub = "block truncate text-[10px] text-dim";
           const alerts: { text: string; cls: string; href?: string }[] = [];
@@ -177,7 +191,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                 </span>
               </Link>
               {/* Alerts, stacked on the right. */}
-              <span className="flex max-w-[230px] flex-wrap content-center justify-end gap-0.5 justify-self-end md:order-4 md:max-w-none">
+              <span className="flex max-w-[230px] flex-wrap content-center justify-end gap-0.5 justify-self-end md:order-4 md:max-w-none md:self-stretch md:justify-self-stretch md:border-l md:border-[#262626] md:pl-2">
                 {alerts.map((x, i) => x.href
                   ? <Link key={i} href={x.href} className={`whitespace-nowrap rounded px-1.5 py-px text-[11px] ${x.cls}`}>{x.text}</Link>
                   : <span key={i} className={`whitespace-nowrap rounded px-1.5 py-px text-[11px] ${x.cls}`}>{x.text}</span>)}
@@ -199,20 +213,22 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                 </span>
                 <span className={`${cell} flex items-center gap-2`}>
                   <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Food</span>
-                  <span className="min-w-0 flex-1"><FoodDays r={r} /></span>
+                  <span className="min-w-0 flex-1"><FoodDays r={r} onOpen={(i) => openFood(r.id, i)} /></span>
                 </span>
                 {/* Her last check-in: green when it's this week's. */}
                 {(() => {
                   const c = r.lastCheckin, current = !!c && !!r.checkin && c.week === r.checkin.week;
                   return c
-                    ? <Link href={`/coach/checkins/${c.id}`} className={cell}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline md:block ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={`${sub} ml-1 inline md:ml-0 md:block`}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
-                    : <span className={cell}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline text-dim md:block`}>–</span></span>;
+                    ? <Link href={`/coach/checkins/${c.id}`} className={`${cell} md:flex md:flex-col md:justify-center`}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline md:block ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={`${sub} ml-1 inline md:ml-0 md:block`}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
+                    : <span className={`${cell} md:flex md:flex-col md:justify-center`}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline text-dim md:block`}>–</span></span>;
                 })()}
               </span>
             </li>
           );
         })}
       </ul>
+      {food && <DayPopup data={food.data} index={food.index} setIndex={(i) => setFood(i === null ? null : { ...food, index: i })} />}
+      {foodBusy && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40"><span className="rounded-full bg-card px-4 py-2 text-sm">Opening her food…</span></div>}
       {!shown.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-6 text-center text-dim">Nobody here. Nice.</p>}
 
       {/* What to do with the ones he ticked (November 1): chat, her pages, sign-in help, emails. */}

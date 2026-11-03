@@ -72,7 +72,7 @@ export default function FoodWeek({ data, title = "Food · last 7 days", compact 
   );
 }
 
-function DayPopup({ data, index, setIndex }: { data: FoodWeekData; index: number; setIndex: (i: number | null) => void }) {
+export function DayPopup({ data, index, setIndex }: { data: FoodWeekData; index: number; setIndex: (i: number | null) => void }) {
   const d = data.days[index];
   const t = data.targets;
   const touch = useRef<number | null>(null);
