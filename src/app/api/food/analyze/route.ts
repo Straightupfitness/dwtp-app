@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { askClaude, parseJson, type ContentBlock } from "@/lib/ai/anthropic";
 import type { FoodEstimate } from "@/lib/food";
+import { coachIds, notify } from "@/lib/notify";
+import { adminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
 
@@ -43,8 +45,26 @@ export async function POST(req: Request) {
     return NextResponse.json(estimate);
   } catch (e) {
     console.error("food analyze failed", e);
-    return NextResponse.json({ error: explain(String((e as Error).message ?? e)) }, { status: 502 });
+    const why = explain(String((e as Error).message ?? e));
+    // November 5: a setup problem (like no API credit) goes to Michael, once a day; clients get a calm message
+    // and the other ways to log.
+    if (why.startsWith("Setup:")) {
+      await tellMichael(why).catch(() => {});
+      return NextResponse.json({ error: "Calculate isn't working right now. Use Search or Barcode to add this meal. Michael has been told." }, { status: 502 });
+    }
+    return NextResponse.json({ error: why }, { status: 502 });
   }
+}
+
+async function tellMichael(why: string) {
+  const db = adminClient();
+  const day = new Date().toISOString().slice(0, 10);
+  const ids = await coachIds();
+  if (!ids.length) return;
+  const { error } = await db.from("notification_log").insert({ user_id: ids[0], key: `ai-setup:${day}` });
+  if (error) return; // already told today
+  const body = why.replace(/^Setup: /, "");
+  await notify(ids, { title: "Food logging AI is down", body, url: "/coach", email: { subject: "DWTP: food logging AI is down", text: `Clients can't use "Type it" to calculate meals right now.\n\n${body}\n\nSearch and Barcode still work.` } });
 }
 
 /** Turn setup problems into a message that says what to fix; everything else stays friendly. */
