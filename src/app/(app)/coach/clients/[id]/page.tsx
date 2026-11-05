@@ -1,4 +1,4 @@
-import { weekName } from "@/lib/program";
+import { todayIn, trainingWeek, weekName } from "@/lib/program";
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
 import SeeHerApp from "./SeeHerApp";
@@ -27,6 +27,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const { data: p } = await supabase.from("profiles").select("*").eq("id", id).single();
   const { data: progRows } = await supabase.from("programs").select("id, name, weeks").eq("active", true).order("sort").order("name");
   const programs = (progRows ?? []) as { id: string; name: string; weeks: number }[];
+  // November 5: her program's weeks, for "Her workouts this week".
+  const { data: phRows } = await supabase.from("program_phases").select("name, first_week, weeks").eq("program", (p?.workout_program as string | null) ?? "sltp").order("first_week");
+  const phaseWeeks = (phRows ?? []).flatMap((ph) => Array.from({ length: ph.weeks as number }, (_, i) => ({
+    pw: (ph.first_week as number) + i, label: `${ph.name}${(ph.weeks as number) > 1 ? ` · week ${i + 1} of ${ph.weeks}` : ""}`,
+  })));
+  const tweekNow = trainingWeek((p?.program_start as string | null) ?? null, todayIn((p?.timezone as string | null) ?? "America/Los_Angeles"));
   if (!p) notFound();
   const [state, { data: t }, { data: checkins }, { data: focusRows }, prog, { data: purchases }, { data: assessment }] = await Promise.all([
     loadProgram(supabase, id),
@@ -230,7 +236,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
       <div id="details" className="scroll-mt-20 space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Her details and targets</h2>
-        <ProfileForm clientId={id} p={p} t={t} programs={programs} />
+        <ProfileForm clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
       </div>
     </section>
   );

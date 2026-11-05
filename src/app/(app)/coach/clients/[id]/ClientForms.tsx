@@ -4,13 +4,17 @@ import { updateClient, setFocus, openNextRing, signOff, addPurchase, deletePurch
 
 const input = "mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent";
 
-export function ProfileForm({ clientId, p, t, programs = [] }: {
+export function ProfileForm({ clientId, p, t, programs = [], phaseWeeks = [], tweek = 1 }: {
   clientId: string;
   p: Record<string, string | number | null>;
   t: { maintenance_calories: number | null; calorie_target: number | null; protein_g: number | null; fiber_g?: number | null; potassium_mg?: number | null } | null;
   programs?: { id: string; name: string; weeks: number }[];
+  /** November 5: every week of her program ("SLTP Phase 1 · week 2"), and her training week now. */
+  phaseWeeks?: { pw: number; label: string }[]; tweek?: number;
 }) {
   const [msg, setMsg] = useState("");
+  const [wsw, setWsw] = useState<number>(Number(p.workout_start_week ?? 1) || 1);
+  const nowPw = tweek + wsw - 1;
   const [pending, start] = useTransition();
   const field = (name: string, label: string, type = "text", value: unknown = p[name]) => (
     <label className="text-sm text-dim">{label}
@@ -52,7 +56,15 @@ export function ProfileForm({ clientId, p, t, programs = [] }: {
             {programs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.weeks} weeks)</option>)}
           </select>
         </label>
-        {field("workout_start_week", "Start her at program week", "number", p.workout_start_week ?? 1)}
+        {/* November 5: pick where she is this week; the app works out "start her at program week" from it. */}
+        <label className="col-span-2 text-sm text-dim">Her workouts this week
+          <select value={phaseWeeks.some((x) => x.pw === nowPw) ? nowPw : ""} onChange={(e) => { const pw = Number(e.target.value); if (pw) setWsw(pw - tweek + 1); }} className={input}>
+            {!phaseWeeks.some((x) => x.pw === nowPw) && <option value="">{nowPw < 1 ? "Not started yet" : `Program week ${nowPw}`}</option>}
+            {phaseWeeks.map((x) => <option key={x.pw} value={x.pw}>{x.label}</option>)}
+          </select>
+          <input type="hidden" name="workout_start_week" value={wsw} />
+          <span className="mt-1 block text-[11px]">Next week she moves on automatically. (Start her at program week: {wsw}. Change the program above, save, then pick the week.)</span>
+        </label>
         {field("wake_time", "Wake time", "time")}
         {field("bedtime", "Bedtime", "time")}
         {field("maintenance_calories", "Maintenance kcal", "number", t?.maintenance_calories)}
