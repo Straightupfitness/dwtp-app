@@ -44,6 +44,13 @@ export default function ChatComposer({ clientId, unread, wide = false }: { clien
     window.addEventListener(REPLY_EVENT, onReply); window.addEventListener(EDIT_EVENT, onEdit);
     return () => { window.removeEventListener(REPLY_EVENT, onReply); window.removeEventListener(EDIT_EVENT, onEdit); };
   }, []);
+  // November 5: the box grows as she types (up to about 8 lines), and shrinks back after sending.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+  }, [body]);
   // Recording timer.
   useEffect(() => {
     if (!rec) return;
@@ -147,7 +154,7 @@ export default function ChatComposer({ clientId, unread, wide = false }: { clien
             <span className="relative flex-1">
               <textarea ref={box} value={body} onChange={(e) => setBody(e.target.value)} rows={1} placeholder={dictation.listening ? "Listening… speak now" : "Message…"} aria-label="Message"
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && body.trim()) { e.preventDefault(); send(); } }}
-                className={`block max-h-40 min-h-11 w-full resize-none rounded-2xl border border-border bg-card py-2.5 pl-4 pr-11 text-base outline-none focus:border-accent ${wide ? "md:min-h-[7rem]" : ""}`} />
+                className={`block max-h-[220px] min-h-11 w-full resize-none overflow-y-auto rounded-2xl border border-border bg-card py-2.5 pl-4 pr-11 text-base outline-none focus:border-accent ${wide ? "md:min-h-[7rem]" : ""}`} />
               {/* Dictation: speak and it types. */}
               <button type="button" onClick={() => dictation.toggle(body)} aria-label={dictation.listening ? "Stop dictation" : "Dictate (speak to type)"} aria-pressed={dictation.listening}
                 className={`absolute bottom-1 right-1 grid size-9 place-items-center rounded-full ${dictation.listening ? "bg-[#ef4444] text-white" : "text-dim"}`}><Mic /></button>

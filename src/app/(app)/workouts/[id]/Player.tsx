@@ -71,6 +71,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
   // A time box keeps exactly what she types ("1:3" on the way to "1:30") until she leaves it (October 30 fix).
   const [timeText, setTimeText] = useState<Record<string, string>>({});
+  // November 5: what she's typing in weight/reps, as typed, so "27." stays while she types 27.5 (it used to snap back to 27).
+  const [numText, setNumText] = useState<Record<string, string>>({});
   const [vals, setVals] = useState<Record<string, SetVals & { done?: boolean }>>(() => {
     const v: Record<string, SetVals & { done?: boolean }> = {};
     for (const s of steps) for (const l of s.logged) v[key(s.position, l.set_no)] = { ...l, done: true };
@@ -367,18 +369,25 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
                 <span className="w-12 shrink-0 pl-1 text-[12px] uppercase tracking-[0.1em] text-dim">{fields.length ? `Set ${n}` : "Done?"}</span>
                 <div className="flex flex-1 gap-2">
                   {fields.map((f) => (
-                    <label key={f} className="flex min-w-0 flex-1 items-center gap-1.5 rounded-[10px] border border-[#2a2a2a] bg-bg px-2.5">
+                    // November 5: the unit sits above the number, so the box has room for 3+ digits (120, 1:30, 2.5 mi).
+                    <label key={f} className="flex min-w-[4.25rem] flex-1 flex-col rounded-[10px] border border-[#2a2a2a] bg-bg px-2.5 pt-1">
+                      <span className="text-[10px] leading-none text-dim">{LABEL[f]}</span>
                       <input aria-label={`Set ${n} ${LABEL[f]}`} disabled={v.done} inputMode={f === "note" || f === "seconds" ? "text" : f === "weight" ? "decimal" : "numeric"}
-                        value={f === "seconds" ? (timeText[k] ?? (v.seconds != null ? mmss(v.seconds) : "")) : (v[f] ?? "") as string | number}
-                        onBlur={() => { if (f === "seconds") setTimeText((t) => { const n = { ...t }; delete n[k]; return n; }); }}
+                        value={f === "seconds" ? (timeText[k] ?? (v.seconds != null ? mmss(v.seconds) : ""))
+                          : f === "note" ? ((v.note ?? "") as string) : (numText[`${k}:${f}`] ?? (v[f] ?? "")) as string | number}
+                        onBlur={() => {
+                          if (f === "seconds") setTimeText((t) => { const n = { ...t }; delete n[k]; return n; });
+                          if (f === "weight" || f === "reps") setNumText((t) => { const n = { ...t }; delete n[`${k}:${f}`]; return n; });
+                        }}
                         placeholder={f === "seconds" ? (lastSet?.seconds != null ? mmss(lastSet.seconds) : s.seconds ? mmss(s.seconds) : "m:ss") : String(lastSet?.[f] ?? (f === "reps" && s.target && /^\d+$/.test(s.target) ? s.target : "–"))}
                         onChange={(e) => {
                           const raw = e.target.value;
                           if (f === "seconds") setTimeText((t) => ({ ...t, [k]: raw }));
-                          setVals((x) => ({ ...x, [k]: { ...x[k], [f]: f === "note" ? raw : f === "seconds" ? toSeconds(raw) : raw === "" ? null : Number(raw.replace(",", ".")) } }));
+                          if (f === "weight" || f === "reps") setNumText((t) => ({ ...t, [`${k}:${f}`]: raw }));
+                          const num = Number(raw.replace(",", "."));
+                          setVals((x) => ({ ...x, [k]: { ...x[k], [f]: f === "note" ? raw : f === "seconds" ? toSeconds(raw) : raw === "" || Number.isNaN(num) ? null : num } }));
                         }}
-                        className="min-h-11 w-full min-w-0 bg-transparent text-[17px] font-semibold tabular-nums outline-none placeholder:font-normal placeholder:text-[#5a5a5a] disabled:text-[#b7e4c0]" />
-                      <span className="shrink-0 text-[11px] text-dim">{LABEL[f]}</span>
+                        className="min-h-9 w-full min-w-0 bg-transparent text-[17px] font-semibold tabular-nums outline-none placeholder:font-normal placeholder:text-[#5a5a5a] disabled:text-[#b7e4c0]" />
                     </label>
                   ))}
                   {!fields.length && <span className="self-center text-[14px] text-[#a8a8a8]">{s.youtube && !s.clip ? "Follow along, then check it off" : "Check it off when you're done"}</span>}

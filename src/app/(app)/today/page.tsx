@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import CpCount from "@/components/CpCount";
 import { createClient } from "@/lib/supabase/server";
@@ -40,9 +41,11 @@ export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, state] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path, water_goal_oz").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path, water_goal_oz, role").eq("id", user!.id).single(),
     loadProgram(supabase, user!.id),
   ]);
+  // November 5: the Home Screen app opens on Today; Michael goes to his client overview instead.
+  if (profile?.role === "coach") redirect("/coach");
   const { today, week } = state;
   const tz = profile?.timezone ?? "America/Los_Angeles";
   const first = profile?.full_name?.split(" ")[0];
