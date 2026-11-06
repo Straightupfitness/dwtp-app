@@ -34,6 +34,12 @@ export async function submitCheckin(input: { week: number; answers: Record<strin
 
   await supabase.from("cp_ledger").insert({ client_id: user.id, points: 10, reason: "checkin", source_id: row.id });
 
+  // November 6: "This was a bad week." Counts toward her 80%, up to 3; a 4th goes to Michael to handle personally.
+  if (a.bad_week === true) {
+    const { error: bw } = await supabase.from("bad_weeks").insert({ client_id: user.id, week_number: input.week, source: "checkin" });
+    if (bw && bw.code !== "23505") await supabase.from("checkins").update({ flags: [...flagsFor(a, last), "Asked for a 4th bad week: reach out personally"] }).eq("id", row.id);
+  }
+
   // After she sees "Checked in": transcribe her video, draft Michael's reply, and tell him.
   const checkinId = row.id, week = input.week, hasVideo = !!input.videoPath;
   after(async () => {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { KIND_LABEL, type LessonState } from "@/lib/lessons";
 
-const KIND_COLOR: Record<string, string> = { hh: "#f5a623", sbw: "#22c55e", smf: "#c084fc" };
+const KIND_COLOR: Record<string, string> = { hh: "#f5a623", sbw: "#22c55e", smf: "#c084fc", other: "#7c5cff" };
 
 /** One lesson in a list: what kind, its title, and done / new / when it opens. */
 export default function LessonRow({ l }: { l: LessonState }) {

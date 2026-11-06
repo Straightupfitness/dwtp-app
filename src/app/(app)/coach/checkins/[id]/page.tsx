@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { weekData } from "@/lib/coach-data";
 import { questionLabels } from "@/lib/checkin";
 import ReplyEditor from "./ReplyEditor";
+import { loadBadWeeks } from "@/lib/bad-weeks";
 import { loadDaily } from "@/lib/daily";
 import { loadFoodWeek } from "@/lib/food-week";
 import FoodWeek from "@/components/FoodWeek";
@@ -30,6 +31,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   ]);
   // November 1: everything Michael used to have open in Trainerize next to VideoAsk, on this one screen.
   const foodWeek = await loadFoodWeek(supabase, c.client_id, { end: d.end });
+  const badWeeks = await loadBadWeeks(supabase, c.client_id); // November 6
   const weights60 = daily.weights.filter((w) => w.date >= daily.days[0].date);
   const steps28 = daily.days.slice(-28);
   const firstW = weights60[0], lastW = weights60[weights60.length - 1];
@@ -54,7 +56,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(340px,0.95fr)] xl:items-start">
       <div className="space-y-5">
       <header>
-        <p className="text-xs uppercase tracking-[0.15em] text-accent">{weekName(c.week_number)} check-in{d.dietBreak ? " · diet break" : ""}{d.checkinType && d.checkinType !== "standard" ? ` · ${d.checkinType.replace("_", " ")}` : ""}</p>
+        <p className="text-xs uppercase tracking-[0.15em] text-accent">{weekName(c.week_number)} check-in{badWeeks.includes(c.week_number) ? " · BAD WEEK PLAN" : ""}{d.dietBreak ? " · diet break" : ""}{d.checkinType && d.checkinType !== "standard" ? ` · ${d.checkinType.replace("_", " ")}` : ""}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">
           <Link href={`/coach/clients/${c.client_id}`}>{d.profile?.full_name ?? "Client"}</Link>
         </h1>

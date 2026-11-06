@@ -103,9 +103,18 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           )}
 
           <div className="flex items-baseline justify-between">
-            <h2 className={`${display} text-lg`}>This week</h2>
+            <h2 className={`${display} text-lg`}>{asked && asked !== data.current ? (asked > data.current ? "Coming up" : "That week") : "This week"}</h2>
             <p className="text-[13px] text-dim">{done} of {data.strength.length} done</p>
           </div>
+          {/* November 6: look ahead at next week's workouts (and back). */}
+          {!preview && (
+            <div className="flex justify-between text-[13px]">
+              {asked && asked !== data.current
+                ? <Link href="/workouts" className="font-semibold text-accent">‹ Back to this week</Link>
+                : <span className="text-dim">See tomorrow&apos;s workout on your Calendar</span>}
+              {(!asked || asked === data.current) && <Link href={`/workouts?w=${data.week + 1}`} className="font-semibold text-accent">Next week&apos;s workouts ›</Link>}
+            </div>
+          )}
           <div className="space-y-2.5">
             {data.strength.map((w) => <DayCard key={w.id} w={w} next={data.nextUp?.id === w.id} week={data.week} preview={preview || !!asked} />)}
           </div>

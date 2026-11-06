@@ -66,3 +66,31 @@ export async function addWater(delta: number) {
   revalidatePath("/", "layout");
   return { ok: true, oz };
 }
+
+/** She calls this week a bad week (November 6): just three things this week. */
+export async function startBadWeek() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { data: p } = await supabase.from("profiles").select("program_start, timezone").eq("id", user.id).single();
+  const { programWeek, todayIn } = await import("@/lib/program");
+  const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
+  if (week < 1) return { error: "The Bad Week Plan starts with your program." };
+  const { error } = await supabase.from("bad_weeks").insert({ client_id: user.id, week_number: week, source: "today" });
+  if (error) return { error: /3 bad weeks/.test(error.message) ? "You've used all 3 bad weeks. Message Michael and he'll help you through this one." : error.code === "23505" ? "This week is already a bad week." : "That didn't save. Try again." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Changed her mind: this week is a normal week again. */
+export async function undoBadWeek() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { data: p } = await supabase.from("profiles").select("program_start, timezone").eq("id", user.id).single();
+  const { programWeek, todayIn } = await import("@/lib/program");
+  const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
+  await supabase.from("bad_weeks").delete().eq("client_id", user.id).eq("week_number", week);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

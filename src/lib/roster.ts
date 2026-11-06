@@ -6,6 +6,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "./supabase/admin";
 import { loadSeen, type SeenWeek } from "./seen";
+import { loadBadWeeksFor } from "./bad-weeks";
 import { currentWindow, windowFor } from "./checkin";
 import { programWeek, programWeekOf, todayIn, trainingWeek } from "./program";
 import { daysFor } from "./workouts";
@@ -43,6 +44,8 @@ export type RosterRow = {
   weightWeek: { date: string; value: number | null }[];
   stepsWeek: { date: string; value: number | null }[];
   foodWeek: { date: string; kcal: number | null; protein: number; fiber: number; potassium: number }[];
+  /** November 6: Bad Week Plan this week, and how many she has used. */
+  badWeek: boolean; badUsed: number;
   stepGoal: number; targets: { kcal: number | null; protein: number; fiber: number; potassium: number };
 };
 
@@ -79,6 +82,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
   };
 
   const now = Date.now();
+  const bad = await loadBadWeeksFor(supabase, ids);
   let seenWeeks = new Map<string, SeenWeek>();
   try { seenWeeks = await loadSeen(adminClient(), list.map((c) => ({ id: c.id, timezone: c.timezone, lastSeen: seen.get(c.id) ?? null }))); } catch { /* no service key locally */ }
   return list.map((c) => {
@@ -150,8 +154,9 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       proteinAvg: logged.length ? Math.round(avg(logged.map((d) => byDay.get(d)!.protein))!) : null,
       proteinTarget: t?.protein_g ?? DAILY_TARGETS.protein_g,
       foodDays7: logged.length, waterAvg: wa.length ? Math.round(avg(wa.map((x) => x.oz))!) : null,
-      checkin, missedCheckin, noFoodYesterday: active && !byDay.has(yesterday),
-      lastWorkoutWeek, missedWorkouts: !!lastWorkoutWeek && lastWorkoutWeek.planned > 0 && lastWorkoutWeek.done < lastWorkoutWeek.planned,
+      checkin, missedCheckin, noFoodYesterday: active && !byDay.has(yesterday) && !(bad.get(c.id) ?? []).includes(week),
+      lastWorkoutWeek, missedWorkouts: !!lastWorkoutWeek && lastWorkoutWeek.planned > 0 && lastWorkoutWeek.done < lastWorkoutWeek.planned && !(bad.get(c.id) ?? []).includes(week - 1),
+      badWeek: week >= 1 && (bad.get(c.id) ?? []).includes(week), badUsed: (bad.get(c.id) ?? []).length,
       lastSeen, hoursSinceSeen, notSeen48: hoursSinceSeen === null || hoursSinceSeen >= 48,
       cpsWeek: (cps ?? []).find((x) => x.client_id === c.id)?.this_week ?? 0,
       flags: ((mine[0]?.flags as string[] | null) ?? []),

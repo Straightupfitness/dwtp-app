@@ -171,6 +171,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           const val = "block truncate text-[14px] font-semibold tabular-nums";
           const sub = "block truncate text-[10px] text-dim";
           const alerts: { text: string; cls: string; href?: string }[] = [];
+          if (r.badWeek) alerts.push({ text: `Bad week (${r.badUsed}/3)`, cls: "bg-[#1f1838] text-[#b9a6ff]" });
           if (r.checkin?.state === "needs-reply") alerts.push({ text: `Wk ${r.checkin.week}: reply`, cls: "border border-accent text-accent", href: `/coach/checkins/${r.checkin.id}` });
           if (r.missedCheckin) alerts.push({ text: "Missed check-in", cls: "bg-[#2a1218] text-[#fb7185]" });
           if (r.noFoodYesterday) alerts.push({ text: "No food yesterday", cls: "bg-[#2a1a10] text-gold" });

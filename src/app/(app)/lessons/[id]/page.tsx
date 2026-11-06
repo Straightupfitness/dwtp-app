@@ -33,7 +33,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     <section className="space-y-4">
       <Link href="/lessons" className="inline-flex min-h-11 items-center text-sm text-dim">← Lessons</Link>
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Week {l.week} · {KIND_LABEL[l.kind]}{l.kind !== "hh" ? ` ${l.number}` : ""}</p>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Week {l.week} · {KIND_LABEL[l.kind]}{l.kind === "sbw" || l.kind === "smf" ? ` ${l.number}` : ""}</p>
         <h1 className={`${display} mt-1 text-[28px] font-semibold leading-tight`}>{l.title}</h1>
       </header>
 
@@ -41,7 +41,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
         <div className="aspect-video overflow-hidden rounded-2xl border border-border bg-black">
           <iframe src={embed} title={l.title} className="size-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
         </div>
-      ) : l.kind === "hh" ? (
+      ) : l.kind === "hh" || l.kind === "other" ? (
         <p className="rounded-2xl border border-dashed border-[#2a2a2a] p-4 text-center text-sm text-dim">Michael&apos;s video for this week is coming soon. Everything you need is below.</p>
       ) : null}
 

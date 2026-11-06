@@ -6,10 +6,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { programWeek, todayIn } from "./program";
 
-export const KIND_LABEL: Record<string, string> = { hh: "Habits & Homework", sbw: "Strong Body Wednesday", smf: "Strong Mind Friday" };
+export const KIND_LABEL: Record<string, string> = { hh: "Habits & Homework", sbw: "Strong Body Wednesday", smf: "Strong Mind Friday", other: "Bonus" };
 export type QuizQ = { q: string; options: string[]; correct: number };
 export type Lesson = {
-  id: string; kind: "hh" | "sbw" | "smf"; number: number; title: string; video_url: string | null; body: string | null;
+  id: string; kind: "hh" | "sbw" | "smf" | "other"; number: number; title: string; video_url: string | null; body: string | null;
   quiz: QuizQ[] | null; quiz_status: string; week_number: number | null;
 };
 export type LessonState = Lesson & {
@@ -32,7 +32,7 @@ export async function loadLessons(supabase: SupabaseClient, clientId: string, op
   ]);
   const checkedIn = new Set((checkins ?? []).map((c) => c.week_number as number));
   const prog = new Map((progress ?? []).map((r) => [r.lesson_id as string, r]));
-  const order = { hh: 0, sbw: 1, smf: 2 } as const;
+  const order = { hh: 0, sbw: 1, smf: 2, other: 3 } as const;
 
   const all: LessonState[] = ((lessons ?? []) as Lesson[]).map((l) => {
     const week = l.week_number!;

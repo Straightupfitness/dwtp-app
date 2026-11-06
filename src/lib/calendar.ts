@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadProgram } from "./circles";
 import { loadLessons } from "./lessons";
 import { DEADLINE_TZ, zonedInstant } from "./checkin";
-import { programWeek, todayIn } from "./program";
+import { programWeek, todayIn, trainingWeek } from "./program";
 import { loadWorkoutWeek } from "./workouts";
 
 export type CalEvent = {
@@ -55,15 +55,18 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
     on(days[0], { kind: "week", title: `Week ${week} starts`, detail: hh?.open ? "Your Habits & Homework" : hh?.lockedReason ?? undefined, href: hh?.open ? `/lessons/${hh.id}` : "/lessons", locked: !hh?.open });
     if (tw?.is_diet_break) on(days[0], { kind: "break", title: "Diet break week", detail: "Eat at maintenance. Keep logging and 40 g+ protein per meal." });
   }
-  if (start && days[6] >= start) {
-    // Her strength days for this program week, one per chosen workout day, in order (Day 1, Day 2…).
-    const plan = week >= 1 ? await loadWorkoutWeek(supabase, clientId, week) : null;
+  // November 6: workouts show for any week she has them, before her start date too (workouts keep counting),
+  // so she can look ahead at tomorrow's (and next week's) workout.
+  const tweek = start ? trainingWeek(start, days[0]) : 0;
+  const plan = start ? await loadWorkoutWeek(supabase, clientId, tweek) : null;
+  if (plan?.phase) {
+    // Her strength days for this week, one per chosen workout day, in order (Day 1, Day 2…).
     const queue = [...(plan?.strength ?? [])];
-    const slots = days.filter((d) => d >= start && workoutDays.includes(weekday(d)));
+    const slots = days.filter((d) => workoutDays.includes(weekday(d)));
     slots.forEach((d, i) => {
       const extra = i === slots.length - 1 ? queue.splice(0) : queue.splice(0, 1);
       if (!extra.length) { on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
-      for (const w of extra) on(d, { kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${week !== plan?.current ? `?w=${week}` : ""}` });
+      for (const w of extra) on(d, { kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${tweek !== plan?.current ? `?w=${tweek}` : ""}` });
     });
   }
   // Real Talk Tuesday, every week.

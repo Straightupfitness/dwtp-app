@@ -18,6 +18,8 @@ import { progressFor } from "@/lib/badges-server";
 import WaterCard from "./WaterCard";
 import CirclesGlance from "@/components/CirclesGlance";
 import BookCall from "@/components/BookCall";
+import { BadWeekActive, BadWeekOffer } from "./BadWeek";
+import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -76,6 +78,11 @@ export default async function TodayPage() {
       </div>
     </header>
   );
+
+  // November 6: the Bad Week Plan.
+  const badWeeks = await loadBadWeeks(supabase, user!.id);
+  const badNow = week >= 1 && badWeeks.includes(week);
+  const badLeft = Math.max(0, BAD_WEEK_LIMIT - badWeeks.length);
 
   // November 2: before her start date she can still log weight, steps, food and water every day.
   const notStarted = week === 0;
@@ -163,6 +170,7 @@ export default async function TodayPage() {
         : <DoThisFirst userId={user!.id} name={profile?.full_name ?? null} homeDone={!!profile?.home_screen_at} avatarPath={profile?.avatar_path ?? null} />}
 
       {startNote}
+      {badNow && <BadWeekActive left={badLeft} />}
       <QuickStats today={today} yesterday={yesterday}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
         steps={stepsYesterday} stepGoal={goals?.step_goal ?? 10000} stepsWeek={stepsWeek}
@@ -176,7 +184,7 @@ export default async function TodayPage() {
       {all.length > 0 && (
         <>
           <div className="flex items-center justify-between pt-1">
-            <SectionTitle icon={<IconHabits />} as="h2">Today&apos;s habits</SectionTitle>
+            <SectionTitle icon={<IconHabits />} as="h2">{badNow ? "Your other habits (optional this week)" : "Today\u2019s habits"}</SectionTitle>
             <p className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</p>
           </div>
           <div className="-mt-1.5 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>
@@ -211,6 +219,7 @@ export default async function TodayPage() {
         </div>
       )}
       {!circleGroups.length && !notStarted && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
+      {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
       <BookCall />
 
     </section>

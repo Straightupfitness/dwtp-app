@@ -10,7 +10,7 @@ export default async function CoachLessons() {
   const { data } = await supabase.from("lessons").select("id, kind, number, title, video_url, body, quiz, quiz_status, week_number")
     .not("week_number", "is", null).order("week_number");
   const lessons = (data ?? []) as Lesson[];
-  const order = { hh: 0, sbw: 1, smf: 2 };
+  const order = { hh: 0, sbw: 1, smf: 2, other: 3 };
   const weeks = Array.from(new Set(lessons.map((l) => l.week_number!))).sort((a, b) => a - b);
   const missingVideo = lessons.filter((l) => l.kind !== "smf" && !l.video_url).length;
   const toApprove = lessons.filter((l) => l.quiz_status !== "approved").length;

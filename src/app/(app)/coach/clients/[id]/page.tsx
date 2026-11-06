@@ -2,6 +2,8 @@ import { todayIn, trainingWeek, weekName } from "@/lib/program";
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
 import SeeHerApp from "./SeeHerApp";
+import GuaranteeCard from "./GuaranteeCard";
+import { guaranteeFor } from "@/lib/guarantee";
 import ThursdayScript from "./ThursdayScript";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -64,6 +66,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
     loadFoodWeek(supabase, id),
   ]);
   const seen = seenMap?.get(id) ?? null;
+  const guarantee = await guaranteeFor(supabase, id).catch(() => null);
   const labels = questionLabels();
   const money = (n: number | null) => (n === null ? "–" : `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
   const dt = (d: string | null) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "–");
@@ -98,6 +101,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <a href="#progress" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Progress</a>
         </div>
       </header>
+
+      <GuaranteeCard g={guarantee} />
 
       <div className="space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Check-ins</h2>

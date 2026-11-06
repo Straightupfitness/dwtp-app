@@ -1,3 +1,4 @@
+import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
 import { weekName } from "@/lib/program";
 import { createClient } from "@/lib/supabase/server";
 import { currentWindow, questionsFor } from "@/lib/checkin";
@@ -20,6 +21,7 @@ const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") 
 export default async function CheckinPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const badWeeks = await loadBadWeeks(supabase, user!.id); // November 6: the Bad Week Plan
   const { data: profile } = await supabase.from("profiles").select("program_start, plan, timezone").eq("id", user!.id).single();
   const myTz = profile?.timezone ?? "America/Los_Angeles";
   const fmt = fmtIn(myTz);
@@ -63,6 +65,7 @@ export default async function CheckinPage() {
     }
     form = (
       <CheckinForm week={open.week} userId={user!.id} isVideo={!!tw?.checkin_is_video} habits={habits}
+        badWeek={{ already: badWeeks.includes(open.week), left: Math.max(0, BAD_WEEK_LIMIT - badWeeks.length) }}
         closes={new Intl.DateTimeFormat("en-US", { timeZone: myTz, weekday: "short", hour: "numeric", timeZoneName: "short" }).format(open.closes)}
         timeLeft={timeLeft(open.closes)} last={lastScores}
         questions={questionsFor(open.week, tw, { onFullYear: profile.plan === "52_weeks" })} />
