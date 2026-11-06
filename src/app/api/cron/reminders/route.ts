@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   let birthdays = 0;
   try { birthdays = await sendBirthdays(adminClient()); } catch (e) { console.error("birthdays", e); }
 
-  // November 1: nothing from the app before the Nov 9 launch (the Nov 6 check-ins run in VideoAsk and Xperiencify).
+  // Nothing from the app before the launch (moved to Mon Nov 16 on November 6; check-ins until then run in VideoAsk).
   if (todayIn(DEADLINE_TZ) < LAUNCH_DATE) return NextResponse.json({ ok: true, birthdays, skipped: `before launch (${LAUNCH_DATE})` });
 
   const db = adminClient();

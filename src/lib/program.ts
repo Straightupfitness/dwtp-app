@@ -19,9 +19,9 @@ export function programWeek(programStart: string | null, today: string): number 
 
 /**
  * The launch (November 1): the 26-week journey, check-ins, Strong Body Wednesday and Strong Mind Friday start
- * Monday, November 9. Nothing goes out from the app before then.
+ * Monday, November 16 (moved from Nov 9 on November 6). Nothing goes out from the app before then.
  */
-export const LAUNCH_DATE = "2026-11-09";
+export const LAUNCH_DATE = "2026-11-16";
 
 /**
  * Her workout week, counted from her start date like programWeek but it keeps counting before it (0, −1, …),

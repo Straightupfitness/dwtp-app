@@ -69,7 +69,7 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
   const habitAnswers = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[])
     .map((h) => `- ${h.title}: ${h.status}${h.note ? ` (${h.note})` : ""}`).join("\n");
 
-  const context = `CLIENT: ${d.profile?.full_name ?? "(no name)"} · ${c.week_number >= 1 ? `Week ${c.week_number}` : "Pre-launch check-in (before her 26 weeks start Nov 9; no special week)"} · phase ${d.phase ?? "?"} · check-in type ${d.checkinType ?? "standard"}${d.dietBreak ? " · DIET BREAK WEEK" : ""}${d.moments.length ? ` · moments: ${d.moments.join(", ")}` : ""}
+  const context = `CLIENT: ${d.profile?.full_name ?? "(no name)"} · ${c.week_number >= 1 ? `Week ${c.week_number}` : "Pre-launch check-in (before her 26 weeks start Nov 16; no special week)"} · phase ${d.phase ?? "?"} · check-in type ${d.checkinType ?? "standard"}${d.dietBreak ? " · DIET BREAK WEEK" : ""}${d.moments.length ? ` · moments: ${d.moments.join(", ")}` : ""}
 Plan: ${d.profile?.plan ?? "unknown"} · start weight ${d.profile?.start_weight_lbs ?? "?"} lbs · goal ${d.profile?.goal_weight_lbs ?? "?"} lbs · strength ${d.profile?.strength_days_per_week ?? "?"}x/week
 Calorie target: ${d.target?.calorie_target ?? "not set yet"} · maintenance: ${d.target?.maintenance_calories ?? "not set yet"} · protein target: ${d.target?.protein_g ?? "120"} g
 Focus circles: ${d.focus.join(", ")}
