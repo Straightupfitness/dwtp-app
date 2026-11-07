@@ -15,7 +15,7 @@ const CLIENT = [
 ];
 const COACH = [
   { href: "/coach", label: "Clients", Icon: IconClients },
-  { href: "/today", label: "Today", Icon: IconToday },
+  // November 7: no Today tab for Michael. Today is her screen; he lands on Clients (use "See her app" to see hers).
   { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
   { href: "/lessons", label: "Lessons", Icon: IconLessons },
   { href: "/community", label: "Community", Icon: IconCommunity },

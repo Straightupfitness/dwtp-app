@@ -32,7 +32,11 @@ export async function addClient(_: unknown, form: FormData) {
   await db.from("profiles").upsert({
     id, email, full_name: name, role: "client", status: start ? "active" : "onboarding", program_start: start,
     plan: String(form.get("plan") ?? "") || null, start_weight_lbs: num("start_weight_lbs"), goal_weight_lbs: num("goal_weight_lbs"),
+    phone: String(form.get("phone") ?? "").trim() || null,
   });
+  // Date of birth (November 7) saved on its own, like the edit form, so nothing else fails if the column is missing.
+  const birthday = String(form.get("birthday") ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(birthday)) await db.from("profiles").update({ birthday }).eq("id", id);
 
   if (form.get("send_welcome") === "on") {
     const sent = await sendWelcome(id, email, name).catch((e) => { console.error("welcome failed", safeError(e)); return false; });

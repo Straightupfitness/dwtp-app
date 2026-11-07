@@ -17,6 +17,7 @@ type Props = {
   steps: PlayerItem[];
   session: { id: string; completed: boolean } | null;
   preview: boolean;
+  ahead?: number; // next week's training week, when she's starting it early
 };
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -50,7 +51,7 @@ function describe(s: SetVals) {
 type Sub = { id: number; name: string; notes: string | null; clip: string | null; poster: string | null; youtube: string | null; last: PlayerItem["last"]; lastWhen: string | null };
 type Original = { name: string };
 
-export default function Player({ workout, phase, overview, steps: baseSteps, session, preview }: Props) {
+export default function Player({ workout, phase, overview, steps: baseSteps, session, preview, ahead }: Props) {
   // Substitutes (November 2): she can swap any exercise for another one. Remembered on this phone for this workout;
   // the sets she logs are saved under the exercise she actually did.
   const subKey = `dwtp-subs:${session?.id ?? `w${workout.id}`}`;
@@ -138,7 +139,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     startClock();
     if (preview) { setStep(0); return; }
     setBusy(true); setError("");
-    const r = await startSession(workout.id);
+    const r = await startSession(workout.id, ahead);
     setBusy(false);
     if ("error" in r && r.error) { setError(r.error); return; }
     if ("id" in r && r.id) setSessionId(r.id);

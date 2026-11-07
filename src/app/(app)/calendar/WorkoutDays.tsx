@@ -4,7 +4,7 @@ import { setWorkoutDays } from "./actions";
 
 const NAMES = ["S", "M", "T", "W", "T", "F", "S"], FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export default function WorkoutDays({ initial }: { initial: number[] }) {
+export default function WorkoutDays({ initial, perWeek = 0 }: { initial: number[]; perWeek?: number }) {
   const [days, setDays] = useState(initial);
   const [pending, start] = useTransition();
   const toggle = (d: number) => {
@@ -26,6 +26,9 @@ export default function WorkoutDays({ initial }: { initial: number[] }) {
           </button>
         ))}
       </div>
+      {perWeek > 0 && <p className={`px-3.5 pb-3.5 text-[12px] ${days.length < perWeek ? "text-accent" : "text-dim"}`}>
+        {days.length < perWeek ? `You have ${perWeek} workouts a week. Pick ${perWeek} days. Until then, your calendar picks the days for you.` : `You have ${perWeek} workouts a week.${days.length > perWeek ? " Extra days show cardio or catch-up." : ""}`}
+      </p>}
     </details>
   );
 }

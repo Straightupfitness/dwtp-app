@@ -103,6 +103,24 @@ export async function saveGoTo(name: string, items: FoodItem[]) {
   revalidatePath("/food");
 }
 
+/** November 7: rename a favorite, or change its foods. */
+export async function updateGoTo(id: string, change: { name?: string; items?: FoodItem[] }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const row: Record<string, unknown> = {};
+  if (change.name !== undefined) { if (!change.name.trim()) return { error: "Give it a name." }; row.name = change.name.trim().slice(0, 60); }
+  if (change.items) {
+    if (!change.items.length) return { error: "Add at least one food." };
+    const t = totals(change.items);
+    Object.assign(row, { items: change.items, calories: Math.round(t.calories), protein_g: Math.round(t.protein_g * 10) / 10, fiber_g: Math.round(t.fiber_g * 10) / 10, potassium_mg: Math.round(t.potassium_mg) });
+  }
+  const { error } = await supabase.from("saved_meals").update(row).eq("id", id).eq("client_id", user.id);
+  if (error) return { error: error.message };
+  revalidatePath("/food");
+  return { ok: true };
+}
+
 export async function deleteGoTo(id: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -14,10 +14,10 @@ function Check() {
 }
 
 /** A strength day: big picture, what it is, and where she is with it. */
-function DayCard({ w, next, week, preview }: { w: WorkoutCard; next: boolean; week: number; preview: boolean }) {
+function DayCard({ w, next, week, preview, link = preview }: { w: WorkoutCard; next: boolean; week: number; preview: boolean; link?: boolean }) {
   const status = w.done ? "Done" : w.started ? "Continue" : next ? "Start" : "Open";
   return (
-    <Link href={`/workouts/${w.id}${preview ? `?w=${week}` : ""}`}
+    <Link href={`/workouts/${w.id}${preview || link ? `?w=${week}` : ""}`}
       className={`group flex items-stretch gap-3 overflow-hidden rounded-[18px] border bg-card p-2.5 ${next && !preview ? "border-accent" : "border-border"}`}>
       <span className="relative block size-[92px] shrink-0 overflow-hidden rounded-[14px] bg-[#1b1b1b]">
         {/* eslint-disable-next-line @next/next/no-img-element -- storage poster */}
@@ -45,6 +45,9 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const preview = !asked && !first.phase;
   const data = asked || preview ? await loadWorkoutWeek(supabase, user!.id, asked ?? 1) : first;
   const { phase } = data;
+  // November 7: this week's all done, so next week's can start now.
+  const early = !preview && first.phase && first.strength.length > 0 && first.strength.every((s) => s.done) ? first.current + 1 : null;
+  const startable = !asked || asked === data.current || asked === early;
   const stage = stageOf(phase?.stage ?? "DWTP", data.program.name);
   const done = data.strength.filter((s) => s.done).length;
 
@@ -112,14 +115,15 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
               {asked && asked !== data.current
                 ? <Link href="/workouts" className="font-semibold text-accent">‹ Back to this week</Link>
                 : <span className="text-dim">See tomorrow&apos;s workout on your Calendar</span>}
-              {(!asked || asked === data.current) && <Link href={`/workouts?w=${data.week + 1}`} className="font-semibold text-accent">Next week&apos;s workouts ›</Link>}
+              {(!asked || asked === data.current) && <Link href={`/workouts?w=${data.week + 1}`} className="font-semibold text-accent">{early ? "Start next week early ›" : "Next week\u2019s workouts ›"}</Link>}
             </div>
           )}
           <div className="space-y-2.5">
-            {data.strength.map((w) => <DayCard key={w.id} w={w} next={data.nextUp?.id === w.id} week={data.week} preview={preview || !!asked} />)}
+            {asked && asked === early && <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[13px] text-[#b7e4c0]">You finished this week, so you can start next week&apos;s workouts now. They count toward next week.</p>}
+            {data.strength.map((w) => <DayCard key={w.id} w={w} next={asked === early ? !w.done && data.strength.find((x) => !x.done)?.id === w.id : data.nextUp?.id === w.id} week={data.week} preview={preview || (!!asked && !startable)} link={!!asked} />)}
           </div>
           {data.strength.length > 0 && done === data.strength.length && (
-            <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.</p>
+            <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.{early && (!asked || asked === data.current) && <> Want to keep going? <Link href={`/workouts?w=${early}`} className="font-semibold underline">Start next week early</Link>.</>}</p>
           )}
 
           {/* Any workout, any time (October 30): a drop-down of her whole program, and freestyle by equipment. */}

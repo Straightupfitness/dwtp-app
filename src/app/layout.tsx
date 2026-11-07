@@ -5,12 +5,17 @@ import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "./globals.css";
+import splash from "@/lib/splash.json";
 
 export const metadata: Metadata = {
   title: "DWTP",
   description: "The Driven Woman Transformation Program",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "DWTP", statusBarStyle: "black-translucent" },
+  // November 7: a launch screen (logo, or Michael's photo) while the app opens from the Home Screen. Built by scripts/make-splash.mjs.
+  appleWebApp: {
+    capable: true, title: "DWTP", statusBarStyle: "black-translucent",
+    startupImage: splash.map((s) => ({ url: s.href, media: `(device-width: ${s.w}px) and (device-height: ${s.h}px) and (-webkit-device-pixel-ratio: ${s.r}) and (orientation: portrait)` })),
+  },
   icons: { icon: "/brand/icon-192.png", apple: "/brand/apple-touch-icon.png" },
 };
 

@@ -161,3 +161,12 @@ export function logFields(logType: string): ("weight" | "reps" | "seconds" | "no
     default: return [];
   }
 }
+
+/**
+ * November 7 (Sandra): once every strength workout this week is done, she can start next week's workouts early
+ * (a Saturday workout, say). Only one week ahead, and only when this week is finished.
+ */
+export async function earlyWeek(supabase: SupabaseClient, clientId: string): Promise<number | null> {
+  const cur = await loadWorkoutWeek(supabase, clientId);
+  return cur.phase && cur.strength.length > 0 && cur.strength.every((s) => s.done) ? cur.current + 1 : null;
+}

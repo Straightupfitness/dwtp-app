@@ -5,7 +5,7 @@ import MealLogger, { type GoTo } from "./MealLogger";
 import DeleteMeal from "./DeleteMeal";
 import EditMeal from "./EditMeal";
 import Link from "next/link";
-import { CopyMeal, FavoriteMeal } from "./MealButtons";
+import { CopyMeal, CopyMealTo, FavoriteMeal } from "./MealButtons";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const SLOT_LABEL: Record<string, string> = { meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3", other: "Other" };
@@ -131,6 +131,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
                 <p className="text-xs text-[#a8a8a8]">{Math.round(Number(m.protein_g))} g protein · {Math.round(Number(m.fiber_g))} g fiber</p>
                 <span className="flex flex-wrap items-center justify-end gap-x-2">
                   {!isToday && <CopyMeal id={m.id} toDay={today} />}
+                  <CopyMealTo id={m.id} today={today} from={day} />
                   <FavoriteMeal id={m.id} suggest={(m.items as FoodItem[])[0]?.name.slice(0, 40) ?? ""} />
                   <EditMeal meal={{ id: m.id, items: m.items as FoodItem[], slot: (m.meal_slot ?? "other") as "meal_1" | "meal_2" | "meal_3" | "other", eatenAt: m.eaten_at, photoUrl: m.photo_path ? photoUrls.get(m.photo_path) ?? null : null }} />
                   <DeleteMeal id={m.id} />

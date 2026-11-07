@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, trainingWeek } from "@/lib/program";
 import { closeOutRings } from "@/lib/progress";
+import { earlyWeek } from "@/lib/workouts";
 
 const WORKOUT_CPS = 5;
 
@@ -13,11 +14,16 @@ async function me() {
 }
 
 /** Opens (or reopens) this week's session for a workout, so every set she logs is saved as she goes. */
-export async function startSession(workoutId: number) {
+export async function startSession(workoutId: number, ahead?: number) {
   const { supabase, user } = await me();
   if (!user) return { error: "Not signed in" };
   const { data: p } = await supabase.from("profiles").select("program_start, timezone").eq("id", user.id).single();
-  const week = trainingWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
+  let week = trainingWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
+  // Next week's workout, started early (November 7): only once this week's are all done.
+  if (ahead !== undefined && ahead !== week) {
+    if (ahead !== (await earlyWeek(supabase, user.id))) return { error: "Finish this week's workouts first, then you can start next week's." };
+    week = ahead;
+  }
   const { data: existing } = await supabase.from("workout_sessions").select("id, completed_at")
     .eq("client_id", user.id).eq("workout_id", workoutId).eq("program_week", week).maybeSingle();
   if (existing) return { id: existing.id as string, completed: !!existing.completed_at };

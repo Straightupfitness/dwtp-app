@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { photoTakenAt } from "@/lib/exif";
 import { useDictation } from "@/lib/useDictation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { parseQty, totals, type FoodItem } from "@/lib/food";
-import { saveMeal, updateMeal, deleteGoTo } from "./actions";
+import { saveMeal, updateMeal, deleteGoTo, updateGoTo } from "./actions";
 import { EDIT_EVENT, type MealToEdit } from "./EditMeal";
 import FoodSearch from "./FoodSearch";
 import BarcodeScanner from "./BarcodeScanner";
@@ -46,6 +46,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
   const [error, setError] = useState("");
   const [manage, setManage] = useState(false);
   const [editId, setEditId] = useState<string | null>(null); // set when she's changing a meal she already saved
+  const [favEdit, setFavEdit] = useState<GoTo | null>(null); // November 7: changing a favorite's foods
   const voice = useRef(false);
 
   // "Edit" on a saved meal opens it here, with its foods, meal, time and photo.
@@ -61,7 +62,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
 
   function reset() {
     setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
-    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null);
+    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null); setFavEdit(null);
   }
   async function estimate(image: Blob | null, description: string) {
     setMode("review"); setBusy("estimating"); setError("");
@@ -101,6 +102,12 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
   }
   async function save() {
     setBusy("saving"); setError("");
+    if (favEdit) {
+      const r = await updateGoTo(favEdit.id, { items });
+      setBusy("");
+      if (r?.error) setError(r.error); else reset();
+      return;
+    }
     if (editId) {
       const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs });
       setBusy("");
@@ -173,13 +180,14 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
             : <span className="py-2 text-xs text-dim">★ Save a meal as a favorite (like your daily breakfast) to log it again with one tap.</span>}
         </div>
         {manage && (
-          <ul className="divide-y divide-border rounded-xl border border-border">
-            {goTos.map((g) => (
-              <li key={g.id} className="flex items-center justify-between px-3 py-2 text-sm">{g.name}
-                <button type="button" onClick={() => deleteGoTo(g.id)} className="min-h-9 text-xs text-[var(--red)]">Remove</button>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-1.5">
+            <ul className="divide-y divide-border rounded-xl border border-border">
+              {goTos.map((g) => (
+                <FavoriteRow key={g.id} g={g} onFoods={() => { setFavEdit(g); setItems(g.items); setSavedId(null); setText(""); setNotes(""); setSaveAs(null); setEditing(null); setError(""); setAdder("type"); setMode("review"); }} />
+              ))}
+            </ul>
+            <p className="text-[11px] text-dim">To log a favorite on another day, go to that day (the arrows at the top) and tap it there, or tap it here and change &ldquo;Eaten&rdquo;.</p>
+          </div>
         )}
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       </div>
@@ -213,7 +221,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
         <button type="button" onClick={reset} className="flex min-h-11 items-center gap-1 px-2 text-[15px] text-[#a8a8a8]">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back
         </button>
-        <p className="font-[family-name:var(--font-display)] text-lg uppercase">{editId ? "Edit your meal" : "Check your meal"}</p>
+        <p className="font-[family-name:var(--font-display)] text-lg uppercase">{favEdit ? "Edit favorite" : editId ? "Edit your meal" : "Check your meal"}</p>
         <span className="w-16" />
       </div>
 
@@ -221,6 +229,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
         {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
         {preview && <img src={preview} alt="Your meal" className="max-h-44 w-full rounded-[18px] object-cover" />}
 
+        {favEdit ? <p className="rounded-[14px] border border-border bg-card p-3 text-[13px] text-[#a8a8a8]">Changing your favorite <b className="text-text">{favEdit.name}</b>. Add, remove or change foods, then save. Meals you already logged stay the same.</p> : <>
         <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-border bg-card p-1">
           {SLOTS.map((s) => (
             <button key={s.v} type="button" onClick={() => setSlot(s.v)} aria-pressed={slot === s.v}
@@ -229,6 +238,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
         </div>
 
         <WhenPicker when={when} onChange={setWhen} />
+        </>}
 
         {busy === "estimating" && <p className="rounded-[14px] border border-border bg-card p-4 text-center text-sm text-[#a8a8a8]">Estimating your meal…</p>}
         {notes && (
@@ -301,7 +311,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           </div>
         )}
 
-        {items.length > 0 && !savedId && (
+        {items.length > 0 && !savedId && !favEdit && (
           <label className="flex items-center gap-2.5 text-sm">
             <input type="checkbox" checked={saveAs !== null} onChange={(e) => setSaveAs(e.target.checked ? "" : null)} className="size-5 accent-[var(--accent)]" />
             ★ Save as a favorite (log it again with one tap)
@@ -324,7 +334,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           </div>
           <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim())} onClick={save}
             className="min-h-[54px] w-full rounded-[14px] bg-accent text-[17px] font-semibold text-black disabled:opacity-40">
-            {busy === "saving" ? "Saving…" : editId ? "Save changes" : `Save ${slotLabel}`}
+            {busy === "saving" ? "Saving…" : favEdit ? `Save favorite: ${favEdit.name}` : editId ? "Save changes" : `Save ${slotLabel}`}
           </button>
         </div>
       </div>
@@ -393,5 +403,34 @@ function OwnNumbers({ onAdd }: { onAdd: (it: FoodItem) => void }) {
       }} className="min-h-11 w-full rounded-lg border border-accent text-sm font-semibold text-accent disabled:opacity-40">Add to meal</button>
       <p className="text-[11px] text-dim">Leave fiber or potassium blank if the label doesn&apos;t say.</p>
     </div>
+  );
+}
+
+/** November 7: one favorite in "Edit": rename it, change its foods, or remove it (two taps, so it isn't lost by accident). */
+function FavoriteRow({ g, onFoods }: { g: GoTo; onFoods: () => void }) {
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(g.name);
+  const [sure, setSure] = useState(false);
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState("");
+  if (renaming) return (
+    <li className="flex items-center gap-1.5 px-3 py-2">
+      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="New name"
+        className="min-h-10 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2.5 text-[15px] outline-none focus:border-accent" />
+      <button type="button" disabled={pending || !name.trim()} onClick={() => start(async () => { const r = await updateGoTo(g.id, { name }); if (r?.error) setErr(r.error); else setRenaming(false); })}
+        className="min-h-10 rounded-lg bg-accent px-3 text-xs font-semibold text-black disabled:opacity-40">{pending ? "…" : "Save"}</button>
+      <button type="button" onClick={() => { setRenaming(false); setName(g.name); }} className="min-h-10 px-1 text-xs text-dim">Cancel</button>
+      {err && <span className="text-xs text-[var(--red)]">{err}</span>}
+    </li>
+  );
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+      <span className="min-w-0 flex-1 truncate">{g.name}</span>
+      <button type="button" onClick={() => setRenaming(true)} className="min-h-9 text-xs font-semibold text-accent">Rename</button>
+      <button type="button" onClick={onFoods} className="min-h-9 text-xs font-semibold text-accent">Change foods</button>
+      {sure
+        ? <button type="button" disabled={pending} onClick={() => start(async () => { await deleteGoTo(g.id); })} className="min-h-9 text-xs font-semibold text-[var(--red)]">{pending ? "…" : "Yes, delete"}</button>
+        : <button type="button" onClick={() => setSure(true)} className="min-h-9 text-xs text-[var(--red)]">Delete</button>}
+    </li>
   );
 }

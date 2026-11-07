@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { clipUrl, lastNumbers, loadWorkoutWeek, phaseLabel, posterUrl, stageOf, workoutTitle, type Item } from "@/lib/workouts";
+import { clipUrl, earlyWeek, lastNumbers, loadWorkoutWeek, phaseLabel, posterUrl, stageOf, workoutTitle, type Item } from "@/lib/workouts";
 import Player, { type PlayerItem } from "./Player";
 
 export default async function WorkoutPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ w?: string }> }) {
@@ -15,7 +15,9 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
   const items = ((w.workout_items ?? []) as unknown as Item[]).filter((i) => i.exercise).sort((a, b) => a.position - b.position);
 
   const wk = await loadWorkoutWeek(supabase, user!.id, Number(sp.w) || undefined);
-  const preview = !wk.phase || !!sp.w && Number(sp.w) !== wk.current;
+  // Next week, once this week is done (November 7): she can do it now, and it's saved to next week.
+  const early = !!wk.phase && !!sp.w && Number(sp.w) === wk.current + 1 && Number(sp.w) === (await earlyWeek(supabase, user!.id));
+  const preview = !wk.phase || !!sp.w && Number(sp.w) !== wk.current && !early;
   const { data: session } = !!wk.phase && !preview
     ? await supabase.from("workout_sessions").select("id, completed_at").eq("client_id", user!.id).eq("workout_id", w.id).eq("program_week", wk.week).maybeSingle()
     : { data: null };
@@ -44,6 +46,7 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
       steps={steps}
       session={session ? { id: session.id as string, completed: !!session.completed_at } : null}
       preview={preview}
+      ahead={early ? wk.week : undefined}
     />
   );
 }

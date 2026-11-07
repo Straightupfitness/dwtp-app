@@ -16,7 +16,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const offset = Math.max(-30, Math.min(30, Number((await searchParams).w) || 0));
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { today, days, week, start, workoutDays } = await loadWeek(supabase, user!.id, offset);
+  const { today, days, week, start, workoutDays, perWeek } = await loadWeek(supabase, user!.id, offset);
   const nav = "grid size-11 place-items-center rounded-full border border-[#2a2a2a]";
 
   return (
@@ -79,7 +79,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         })}
       </ol>
 
-      {start && <WorkoutDays initial={workoutDays} />}
+      {start && <WorkoutDays initial={workoutDays} perWeek={perWeek} />}
       <p className="text-xs text-dim">Every day: check off your habits, log your food and weigh in. Times are in your time zone.</p>
     </section>
   );

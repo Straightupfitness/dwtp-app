@@ -20,9 +20,10 @@ export const RTT_HOUR = 16, RTT_MINUTE = 30; // Real Talk Tuesday: 4:30 PM Pacif
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 const weekday = (d: string) => new Date(d + "T12:00:00Z").getUTCDay();
 
-/** Default workout days from her strength frequency: 1x Mon, 2x Mon/Thu, 3x Mon/Wed/Fri. */
+/** Default workout days from how many workouts she has: 1x Mon, 2x Mon/Thu, 3x Mon/Wed/Fri, 4x Mon/Tue/Thu/Fri, 5x Mon–Fri. */
 export function defaultWorkoutDays(perWeek: number | null): number[] {
-  return perWeek === 1 ? [1] : perWeek === 2 ? [1, 4] : [1, 3, 5];
+  return perWeek === 1 ? [1] : perWeek === 2 ? [1, 4] : perWeek === 4 ? [1, 2, 4, 5] : perWeek === 5 ? [1, 2, 3, 4, 5]
+    : perWeek && perWeek >= 6 ? [1, 2, 3, 4, 5, 6] : [1, 3, 5];
 }
 
 export async function loadWeek(supabase: SupabaseClient, clientId: string, offset = 0) {
@@ -34,7 +35,8 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const start = p?.program_start ?? null;
   const week = programWeek(start, monday);
-  const workoutDays: number[] = p?.workout_days?.length ? p.workout_days : defaultWorkoutDays(p?.strength_days_per_week ?? null);
+  const chosen: number[] = p?.workout_days?.length ? p.workout_days : [];
+  let workoutDays: number[] = chosen.length ? chosen : defaultWorkoutDays(p?.strength_days_per_week ?? null);
 
   const [{ data: settings }, { data: calls }, { data: tw }, lessons, program] = await Promise.all([
     supabase.from("program_settings").select("key, value").in("key", ["rtt_zoom_url", "trainerize_url"]),
@@ -59,6 +61,10 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   // so she can look ahead at tomorrow's (and next week's) workout.
   const tweek = start ? trainingWeek(start, days[0]) : 0;
   const plan = start ? await loadWorkoutWeek(supabase, clientId, tweek) : null;
+  // November 7 (Sandra): a 4-day program never crams two workouts on one day. If she has fewer days picked than
+  // workouts, she gets the default days for that many (Mon/Tue/Thu/Fri for 4) until she picks enough.
+  const perWeek = plan?.strength.length ?? 0;
+  if (perWeek && workoutDays.length < perWeek) workoutDays = defaultWorkoutDays(perWeek);
   if (plan?.phase) {
     // Her strength days for this week, one per chosen workout day, in order (Day 1, Day 2…).
     const queue = [...(plan?.strength ?? [])];
@@ -101,5 +107,5 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   }
   const order: CalEvent["kind"][] = ["break", "checkin", "week", "medal", "workout", "call", "sbw", "smf"];
   out.forEach((d) => d.events.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)));
-  return { today, days: out, week, start, workoutDays, monday };
+  return { today, days: out, week, start, workoutDays, monday, perWeek };
 }
