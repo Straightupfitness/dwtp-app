@@ -14,10 +14,12 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
   if (!w) notFound();
   const items = ((w.workout_items ?? []) as unknown as Item[]).filter((i) => i.exercise).sort((a, b) => a.position - b.position);
 
-  const wk = await loadWorkoutWeek(supabase, user!.id, Number(sp.w) || undefined);
+  // Week 0 is a real week before launch (November 7), so parse it rather than treating 0 as "none".
+  const askedWeek = sp.w !== undefined && sp.w !== "" && Number.isFinite(Number(sp.w)) ? Math.trunc(Number(sp.w)) : undefined;
+  const wk = await loadWorkoutWeek(supabase, user!.id, askedWeek);
   // Next week, once this week is done (November 7): she can do it now, and it's saved to next week.
-  const early = !!wk.phase && !!sp.w && Number(sp.w) === wk.current + 1 && Number(sp.w) === (await earlyWeek(supabase, user!.id));
-  const preview = !wk.phase || !!sp.w && Number(sp.w) !== wk.current && !early;
+  const early = !!wk.phase && askedWeek !== undefined && askedWeek === wk.current + 1 && askedWeek === (await earlyWeek(supabase, user!.id));
+  const preview = !wk.phase || askedWeek !== undefined && askedWeek !== wk.current && !early;
   const { data: session } = !!wk.phase && !preview
     ? await supabase.from("workout_sessions").select("id, completed_at").eq("client_id", user!.id).eq("workout_id", w.id).eq("program_week", wk.week).maybeSingle()
     : { data: null };

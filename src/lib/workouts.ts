@@ -14,6 +14,7 @@ export type Phase = { id: number; name: string; stage: string; kind: "build" | "
 export type WorkoutCard = {
   id: number; name: string; title: string; day: number | null; minutes: number | null; exercises: number;
   poster: string | null; done: boolean; started: boolean; kind: "strength" | "cardio"; circuit: boolean;
+  doneAt?: string | null; // when she finished it (the calendar shows it on that day)
 };
 export type Exercise = { id: number; name: string; notes: string | null; youtube_id: string | null; clip_path: string | null };
 export type Item = { position: number; sets: number; target: string | null; seconds: number | null; rest_seconds: number | null; log_type: string; exercise: Exercise };
@@ -102,7 +103,7 @@ export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string
     const visual = items.find((i) => i.exercises?.clip_path) ?? items.find((i) => i.exercises?.youtube_id);
     return {
       id: w.id, name: w.name, title: workoutTitle(w.name), day: r.day, minutes: w.minutes, exercises: items.length,
-      poster: visual?.exercises ? posterUrl(visual.exercises) : null, done: !!sess.get(w.id), started: sess.has(w.id) && !sess.get(w.id),
+      poster: visual?.exercises ? posterUrl(visual.exercises) : null, done: !!sess.get(w.id), started: sess.has(w.id) && !sess.get(w.id), doneAt: sess.get(w.id) ?? null,
       kind: w.kind, circuit: w.circuit,
     };
   };

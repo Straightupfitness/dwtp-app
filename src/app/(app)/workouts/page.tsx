@@ -39,15 +39,17 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const sp = await searchParams;
-  const asked = Number(sp.w) || undefined;
+  // November 7: a week can be 0 or negative before launch (next week is week 0 until Nov 16), so never treat 0 as "none".
+  const asked = sp.w !== undefined && sp.w !== "" && Number.isFinite(Number(sp.w)) ? Math.trunc(Number(sp.w)) : undefined;
+  const has = asked !== undefined;
   const first = await loadWorkoutWeek(supabase, user!.id);
   // No workouts on her plan yet (no start date): she sees Week 1 as a preview.
-  const preview = !asked && !first.phase;
-  const data = asked || preview ? await loadWorkoutWeek(supabase, user!.id, asked ?? 1) : first;
+  const preview = !has && !first.phase;
+  const data = has || preview ? await loadWorkoutWeek(supabase, user!.id, asked ?? 1) : first;
   const { phase } = data;
   // November 7: this week's all done, so next week's can start now.
   const early = !preview && first.phase && first.strength.length > 0 && first.strength.every((s) => s.done) ? first.current + 1 : null;
-  const startable = !asked || asked === data.current || asked === early;
+  const startable = !has || asked === data.current || (early !== null && asked === early);
   const stage = stageOf(phase?.stage ?? "DWTP", data.program.name);
   const done = data.strength.filter((s) => s.done).length;
 
@@ -70,7 +72,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
       .map((l) => ({ id: l.workouts!.id, name: l.workouts!.name })),
   })).filter((g) => g.workouts.length);
   const nextIdx = data.nextUp ? data.strength.findIndex((s) => s.id === data.nextUp!.id) : -1;
-  const nextUp = !preview && !asked ? data.nextUp : null;
+  const nextUp = !preview && !has ? data.nextUp : null;
 
   return (
     <section className="space-y-4">
@@ -106,24 +108,24 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           )}
 
           <div className="flex items-baseline justify-between">
-            <h2 className={`${display} text-lg`}>{asked && asked !== data.current ? (asked > data.current ? "Coming up" : "That week") : "This week"}</h2>
+            <h2 className={`${display} text-lg`}>{has && asked !== data.current ? (asked! > data.current ? "Coming up" : "That week") : "This week"}</h2>
             <p className="text-[13px] text-dim">{done} of {data.strength.length} done</p>
           </div>
           {/* November 6: look ahead at next week's workouts (and back). */}
           {!preview && (
             <div className="flex justify-between text-[13px]">
-              {asked && asked !== data.current
+              {has && asked !== data.current
                 ? <Link href="/workouts" className="font-semibold text-accent">‹ Back to this week</Link>
                 : <span className="text-dim">See tomorrow&apos;s workout on your Calendar</span>}
-              {(!asked || asked === data.current) && <Link href={`/workouts?w=${data.week + 1}`} className="font-semibold text-accent">{early ? "Start next week early ›" : "Next week\u2019s workouts ›"}</Link>}
+              {(!has || asked === data.current) && <Link href={`/workouts?w=${data.week + 1}`} className="font-semibold text-accent">{early !== null ? "Start next week early ›" : "Next week\u2019s workouts ›"}</Link>}
             </div>
           )}
           <div className="space-y-2.5">
-            {asked && asked === early && <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[13px] text-[#b7e4c0]">You finished this week, so you can start next week&apos;s workouts now. They count toward next week.</p>}
-            {data.strength.map((w) => <DayCard key={w.id} w={w} next={asked === early ? !w.done && data.strength.find((x) => !x.done)?.id === w.id : data.nextUp?.id === w.id} week={data.week} preview={preview || (!!asked && !startable)} link={!!asked} />)}
+            {has && early !== null && asked === early && <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[13px] text-[#b7e4c0]">You finished this week, so you can start next week&apos;s workouts now. They count toward next week.</p>}
+            {data.strength.map((w) => <DayCard key={w.id} w={w} next={has && early !== null && asked === early ? !w.done && data.strength.find((x) => !x.done)?.id === w.id : data.nextUp?.id === w.id} week={data.week} preview={preview || (has && !startable)} link={has} />)}
           </div>
           {data.strength.length > 0 && done === data.strength.length && (
-            <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.{early && (!asked || asked === data.current) && <> Want to keep going? <Link href={`/workouts?w=${early}`} className="font-semibold underline">Start next week early</Link>.</>}</p>
+            <p className="rounded-[14px] border border-[#1f3a24] bg-[#0f1a11] p-3 text-[14px] text-[#b7e4c0]">Every workout this week is done. That&apos;s how it&apos;s done.{early !== null && (!has || asked === data.current) && <> Want to keep going? <Link href={`/workouts?w=${early}`} className="font-semibold underline">Start next week early</Link>.</>}</p>
           )}
 
           {/* Any workout, any time (October 30): a drop-down of her whole program, and freestyle by equipment. */}

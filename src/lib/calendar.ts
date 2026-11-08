@@ -66,13 +66,32 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   const perWeek = plan?.strength.length ?? 0;
   if (perWeek && workoutDays.length < perWeek) workoutDays = defaultWorkoutDays(perWeek);
   if (plan?.phase) {
-    // Her strength days for this week, one per chosen workout day, in order (Day 1, Day 2…).
-    const queue = [...(plan?.strength ?? [])];
-    const slots = days.filter((d) => workoutDays.includes(weekday(d)));
+    const ev = (w: (typeof plan.strength)[number]): CalEvent => ({ kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${tweek !== plan.current ? `?w=${tweek}` : ""}` });
+    const hasWorkout = (d: string) => !!out.find((x) => x.date === d)?.events.some((e) => e.kind === "workout");
+    const isCurrent = days.includes(today);
+    // November 7 (Sandra): a finished workout shows on the day she actually did it.
+    const placed = new Set<number>();
+    for (const w of plan.strength) {
+      const d = w.done && w.doneAt ? todayIn(tz, new Date(w.doneAt)) : null;
+      if (d && days.includes(d)) { on(d, ev(w)); placed.add(w.id); }
+    }
+    // The rest go on her workout days, one each, in order (Day 1, Day 2…). This week, only today and later:
+    // a day she missed rolls forward instead of sitting in the past.
+    const queue = plan.strength.filter((w) => !placed.has(w.id));
+    let slots = days.filter((d) => workoutDays.includes(weekday(d)) && (!isCurrent || d >= today) && !hasWorkout(d));
+    if (isCurrent && !slots.length && queue.some((w) => !w.done)) slots = [today]; // out of workout days: catch up today
+    // All done this week: offer next week's next workout today, so she can start it early.
+    let early: CalEvent | null = null;
+    if (isCurrent && plan.strength.length && plan.strength.every((w) => w.done)) {
+      const next = await loadWorkoutWeek(supabase, clientId, plan.current + 1);
+      const w = next.phase ? next.strength.find((x) => !x.done) : null;
+      if (w) early = { kind: "workout", title: `Next week · ${w.title}`, detail: `You finished this week. Start it early${w.minutes ? ` · about ${w.minutes} min` : ""}`, href: `/workouts/${w.id}?w=${plan.current + 1}` };
+    }
+    if (early && !hasWorkout(today)) on(today, early);
     slots.forEach((d, i) => {
       const extra = i === slots.length - 1 ? queue.splice(0) : queue.splice(0, 1);
-      if (!extra.length) { on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
-      for (const w of extra) on(d, { kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${tweek !== plan?.current ? `?w=${tweek}` : ""}` });
+      if (!extra.length) { if (!(early && d === today)) on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
+      for (const w of extra) on(d, ev(w));
     });
   }
   // Real Talk Tuesday, every week.
