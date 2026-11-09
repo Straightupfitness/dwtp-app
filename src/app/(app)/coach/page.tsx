@@ -19,10 +19,11 @@ export default async function CoachHome() {
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Clients</h1>
         <p className="text-sm text-dim">{toReply ? `${toReply} check-in${toReply > 1 ? "s" : ""} to reply to` : "All caught up"} · {rows.length} clients</p>
       </header>
-      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-7">
         <Link href="/coach/calendar" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Calendar</Link>
         <Link href="/coach/lessons" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Lessons</Link>
         <Link href="/coach/clips" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Clips &amp; recipes</Link>
+        <Link href="/coach/videos" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm">Videos</Link>
         <Link href="/coach/food" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">Food feedback</Link>
         <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
