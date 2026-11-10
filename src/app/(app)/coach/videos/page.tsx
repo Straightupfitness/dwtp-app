@@ -17,6 +17,7 @@ export default async function VideosPage() {
       <header className="space-y-1">
         <p className="text-xs uppercase tracking-[0.15em] text-accent">Coach</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">Videos</h1>
+        <p className="text-sm"><a href="/coach/checkin-preview" className="font-semibold text-accent">Preview the check-in with your videos ›</a></p>
         <p className="text-sm text-dim">Drop your videos here, a whole folder at once. Each one goes to its place by its file name, like CHK-02.mp4. Uploading a code again replaces it.</p>
       </header>
       {probe.error && <p className="rounded-xl border border-[#3a3020] bg-[#161310] p-3 text-sm text-[#d9c9a8]">Run <b>SQL 16 (program videos)</b> in Supabase before uploading.</p>}

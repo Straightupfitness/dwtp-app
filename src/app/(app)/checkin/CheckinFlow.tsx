@@ -22,10 +22,10 @@ function nudge(id: string, now: number, last?: number | null) {
  * The weekly check-in, VideoAsk style (November 10). Michael's welcome video and a Start button, then one question
  * per screen: his video on top (it plays with sound, because every Next is a tap), the answer fields underneath.
  */
-export default function CheckinFlow({ week, userId, screens, videos, habits, closes, timeLeft, last, circles, badWeek }: {
+export default function CheckinFlow({ week, userId, screens, videos, habits, closes, timeLeft, last, circles, badWeek, preview = false }: {
   week: number; userId: string; screens: Screen[]; videos: Record<string, string>; habits: NewHabit[];
   closes: string; timeLeft: string; last: Record<string, number | null> | null; circles: string[];
-  badWeek: { already: boolean; left: number };
+  badWeek: { already: boolean; left: number }; preview?: boolean;
 }) {
   const [i, setI] = useState(0);
   const [a, setA] = useState<Answers>({});
@@ -75,6 +75,7 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
     go(i + 1);
   }
   async function submit() {
+    if (preview) { setSent(true); video.current?.pause(); return; } // Michael's preview: nothing is saved
     setBusy(true); setError("");
     const first = Object.values(vids)[0] ?? null;
     const r = await submitCheckin({ week, answers: { ...a, videos: vids, habits: habits.map((x) => ({ item_id: x.id, title: x.title, ...h[x.id] })) }, videoPath: first });
@@ -86,7 +87,7 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
     return (
       <div className="space-y-2 rounded-[18px] border border-accent bg-[#1f1708] p-6 text-center">
         <p className={`${display} text-2xl font-semibold`}>Checked in</p>
-        <p className="text-[#c9b48a]">+10 CPs. Michael will reply before Monday is over, and your next Habits &amp; Homework is open.</p>
+        <p className="text-[#c9b48a]">{preview ? "Preview only. Nothing was saved." : <>+10 CPs. Michael will reply before Monday is over, and your next Habits &amp; Homework is open.</>}</p>
       </div>
     );
   }
