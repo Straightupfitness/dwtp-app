@@ -11,6 +11,7 @@ import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
 import { IconCheckin, IconHabits } from "@/components/Icons";
 import MedalVideo from "@/components/MedalVideo";
+import { needsBlueprint } from "@/lib/blueprint";
 import ItemCheck from "../circles/ItemCheck";
 import QuickStats from "./QuickStats";
 import { after } from "next/server";
@@ -44,11 +45,16 @@ export default async function TodayPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, state] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path, water_goal_oz, role").eq("id", user!.id).single(),
+    supabase.from("profiles").select("full_name, timezone, home_screen_at, avatar_path, water_goal_oz, role, status, created_at").eq("id", user!.id).single(),
     loadProgram(supabase, user!.id),
   ]);
   // November 5: the Home Screen app opens on Today; Michael goes to his client overview instead.
   if (profile?.role === "coach") redirect("/coach");
+  // November 10: a new client starts with onboarding (welcome video, then her Driven Woman Blueprint).
+  if (needsBlueprint(profile ?? {}, false)) {
+    const { data: as } = await supabase.from("assessments").select("submitted_at").eq("client_id", user!.id).maybeSingle();
+    if (!as?.submitted_at) redirect("/start");
+  }
   const { today, week } = state;
   const tz = profile?.timezone ?? "America/Los_Angeles";
   const first = profile?.full_name?.split(" ")[0];

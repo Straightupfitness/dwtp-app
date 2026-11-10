@@ -16,10 +16,11 @@
  *   Bad week     CHK-28 (right after the welcome, only when she ticks "bad week")
  * CHK-01 is the welcome screen with the Start button. CHK-27 was never filmed.
  */
-export type FieldKind = "scale" | "choice" | "multi" | "note" | "open" | "circles";
+export type FieldKind = "scale" | "choice" | "multi" | "note" | "open" | "circles" | "date" | "number" | "time" | "short";
 export type Field = {
   id: string; label: string; kind: FieldKind;
   options?: string[]; optional?: boolean; help?: string; placeholder?: string;
+  unit?: string; min?: number; max?: number; video?: boolean; // video: suggest a video answer (open fields)
 };
 export type Screen = { key: string; code: string | null; title: string; fields: Field[]; habits?: boolean };
 

@@ -65,8 +65,8 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
       const v = a[f.id];
       if (f.kind === "open" && (vids[f.id] || (typeof v === "string" && v.trim()))) continue;
       if (f.kind === "circles" && Array.isArray(v) && v.length === Math.min(3, circles.length)) continue;
-      if ((f.kind === "scale" || f.kind === "choice") && v !== undefined && v !== "") continue;
-      return f.kind === "scale" ? "Tap a number." : f.kind === "choice" ? "Pick one." : f.kind === "circles" ? `Pick ${Math.min(3, circles.length)}.` : "Answer this one, or record a quick video.";
+      if (["scale", "choice", "date", "number", "time", "short"].includes(f.kind) && v !== undefined && v !== "") continue;
+      return f.kind === "scale" ? "Tap a number." : f.kind === "choice" ? "Pick one." : ["date", "number", "time", "short"].includes(f.kind) ? `Fill in: ${f.label}` : f.kind === "circles" ? `Pick ${Math.min(3, circles.length)}.` : "Answer this one, or record a quick video.";
     }
     return null;
   }
@@ -211,7 +211,7 @@ function HabitsStep({ habits, h, setH }: { habits: NewHabit[]; h: Record<string,
   );
 }
 
-function FieldInput({ f, value, last, circles, onChange, video, onVideo, folder }: {
+export function FieldInput({ f, value, last, circles, onChange, video, onVideo, folder }: {
   f: Field; value: unknown; last?: number | null; circles: string[]; onChange: (v: unknown) => void;
   video: string | null; onVideo: (path: string | null) => void; folder: string;
 }) {
@@ -266,6 +266,19 @@ function FieldInput({ f, value, last, circles, onChange, video, onVideo, folder 
       </div>
     );
   }
+  // November 10 (Blueprint): dates, numbers, times and one-line answers.
+  if (f.kind === "date" || f.kind === "number" || f.kind === "time" || f.kind === "short") return (
+    <label className="block space-y-1.5">
+      <span className="text-[14px] text-[#cfcfcf]">{f.label}{f.optional ? <span className="text-dim"> (optional)</span> : null}</span>
+      <span className="flex items-center gap-2">
+        <input type={f.kind === "short" ? "text" : f.kind} value={String(value ?? "")} placeholder={f.placeholder}
+          inputMode={f.kind === "number" ? "decimal" : undefined} min={f.min} max={f.max} step={f.kind === "number" ? "any" : undefined}
+          onChange={(e) => onChange(f.kind === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+          className="min-h-12 w-full min-w-0 rounded-xl border border-[#2a2a2a] bg-bg px-3 text-base outline-none [color-scheme:dark] focus:border-accent" />
+        {f.unit && <span className="shrink-0 text-sm text-dim">{f.unit}</span>}
+      </span>
+    </label>
+  );
   if (f.kind === "note") return (
     <label className="block space-y-1.5">
       <span className="text-[13px] text-dim">{f.label}</span>
@@ -277,6 +290,7 @@ function FieldInput({ f, value, last, circles, onChange, video, onVideo, folder 
   return (
     <div className={box}>
       <p className="text-[14px] text-[#cfcfcf]">{f.label}{f.optional ? <span className="text-dim"> (optional)</span> : null}</p>
+      {f.video && !video && !recording && <p className="text-[12px] text-accent">A quick video is perfect here, like you&apos;re talking to me.</p>}
       {!video && (
         <textarea rows={4} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} placeholder="Type here, or tap the 🎤 on your keyboard and just talk"
           className="w-full rounded-xl border border-[#2a2a2a] bg-bg p-3 text-base outline-none focus:border-accent" />

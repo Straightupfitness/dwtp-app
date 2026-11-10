@@ -1,3 +1,4 @@
+import { blueprintLabels } from "@/lib/blueprint";
 import { todayIn, trainingWeek, weekName } from "@/lib/program";
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
@@ -46,6 +47,11 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
     supabase.from("assessments").select("answers, ai_summary, submitted_at").eq("client_id", id).maybeSingle(),
   ]);
   const glance = compliance(prog.data);
+  // November 10: Driven Woman Blueprint labels and video answers.
+  const bpLabels = blueprintLabels();
+  const bpPaths = Object.entries(((assessment?.answers as Record<string, unknown> | null)?.videos ?? {}) as Record<string, string>);
+  const bpSigned = bpPaths.length ? (await supabase.storage.from("checkin-videos").createSignedUrls(bpPaths.map(([, p]) => p), 3600)).data ?? [] : [];
+  const bpVideos = bpPaths.map(([k, path]) => [k, bpSigned.find((x) => x.path === path)?.signedUrl] as [string, string | undefined]).filter((x): x is [string, string] => !!x[1]);
   // November 3: ‹ › to the previous / next client (A–Z, same as the overview).
   const { data: everyone } = await supabase.from("profiles").select("id, full_name, email, status").eq("role", "client").neq("status", "cancelled");
   const order = (everyone ?? []).map((c) => ({ id: c.id as string, name: (c.full_name || c.email || "") as string })).sort((a, b) => a.name.localeCompare(b.name));
@@ -186,11 +192,15 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             <h2 className="text-sm uppercase tracking-widest text-dim">Assessment</h2>
             {assessment?.submitted_at || assessment?.ai_summary || Object.keys((assessment?.answers as object) ?? {}).length ? (
               <details className="rounded-xl border border-border bg-card p-3 text-sm" open>
-                <summary className="cursor-pointer font-semibold">Initial assessment{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
+                <summary className="cursor-pointer font-semibold">Driven Woman Blueprint{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
                 {assessment?.ai_summary && <p className="mt-2 whitespace-pre-line text-[#d4d4d4]">{assessment.ai_summary}</p>}
                 <dl className="mt-2 space-y-1.5">
-                  {Object.entries((assessment?.answers as Record<string, unknown>) ?? {}).map(([k, v]) => (
-                    <div key={k}><dt className="text-xs text-dim">{labels[k] ?? k.replace(/_/g, " ")}</dt><dd>{typeof v === "string" ? v : JSON.stringify(v)}</dd></div>
+                  {Object.entries((assessment?.answers as Record<string, unknown>) ?? {}).filter(([k]) => k !== "videos").map(([k, v]) => (
+                    <div key={k}><dt className="text-xs text-dim">{bpLabels[k] ?? labels[k] ?? k.replace(/_/g, " ")}</dt><dd className="whitespace-pre-line">{typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : JSON.stringify(v)}</dd></div>
+                  ))}
+                  {/* November 10: her video answers from the Blueprint. */}
+                  {bpVideos.map(([k, url]) => (
+                    <div key={k}><dt className="text-xs text-dim">{bpLabels[k] ?? k} (video)</dt><dd><video src={url} controls playsInline preload="metadata" className="mt-1 max-h-[420px] rounded-xl bg-black" /></dd></div>
                   ))}
                 </dl>
               </details>
