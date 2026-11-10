@@ -11,7 +11,7 @@ function smsHref(phone: string, body: string) {
 
 /**
  * November 10: Michael's food note right inside the day pop-up. Draft with AI (one win, one fix, a push for
- * tomorrow), edit, then text her or send it in the app. Only shown to the coach.
+ * tomorrow), edit, then text her or send it in the app. Only shown to the coach. Keyed by day, so it starts fresh each day.
  */
 export default function FoodFeedbackBox({ clientId, day, hasFood }: { clientId: string; day: string; hasFood: boolean }) {
   const [info, setInfo] = useState<Info | null>(null);
@@ -23,7 +23,6 @@ export default function FoodFeedbackBox({ clientId, day, hasFood }: { clientId: 
 
   useEffect(() => {
     let live = true;
-    setInfo(null); setText(""); setError(""); setSent(null);
     feedbackFor(clientId, day).then((r) => { if (!live || !r) return; setInfo(r); setText(r.sentText ?? r.draft ?? ""); setSent(r.sentVia === "skipped" ? null : r.sentVia); });
     return () => { live = false; };
   }, [clientId, day]);

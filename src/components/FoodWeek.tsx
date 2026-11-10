@@ -119,7 +119,7 @@ export function DayPopup({ data, index, setIndex, coachClientId }: { data: FoodW
             ))}
           </div>
           {/* November 10: Michael's AI food note for this day, right here (coach only). */}
-          {coachClientId && <FoodFeedbackBox clientId={coachClientId} day={d.date} hasFood={d.meals.length > 0} />}
+          {coachClientId && <FoodFeedbackBox key={d.date} clientId={coachClientId} day={d.date} hasFood={d.meals.length > 0} />}
           {d.meals.map((m) => (
             <article key={m.id} className="space-y-2 rounded-[16px] border border-border bg-card p-3">
               <div className="flex items-baseline justify-between gap-2">
