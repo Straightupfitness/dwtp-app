@@ -210,7 +210,7 @@ export default async function TodayPage() {
                 <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
                   {cg.items.map((it) => (
                     <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
-                      progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} />
+                      progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} howTo={it.howTo} />
                   ))}
                 </div>
               </details>

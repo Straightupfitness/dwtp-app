@@ -48,7 +48,7 @@ function OpenRing({ r }: { r: RingState }) {
           </div>
         ) : (
           <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail}
-            progress={it.progress} target={it.target} cadence={it.cadence} color={r.color} alsoIn={it.alsoIn} auto={it.auto} />
+            progress={it.progress} target={it.target} cadence={it.cadence} color={r.color} alsoIn={it.alsoIn} auto={it.auto} howTo={it.howTo} />
         ))}
       </div>
     </div>

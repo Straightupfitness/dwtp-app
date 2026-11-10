@@ -36,8 +36,12 @@ export function circleColor(slug: string): string {
   return CIRCLE_COLORS[slug] ?? FIXIT_COLOR;
 }
 
+/** November 10: a "How to do it" card for habits that are a whole technique (the Blinking Method, NSDR…). */
+export type HowTo = { title: string; why: string; steps: string[] };
+
 export type ItemState = {
   id: string; title: string; detail: string | null; type: string; cadence: string; habitKey: string | null;
+  howTo?: HowTo | null;
   complete: boolean;
   doneNow: boolean;       // daily: done today · weekly: done this week · once: done
   progress: number;       // days (daily) or weeks (weekly) toward the target
@@ -148,6 +152,10 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
   const weekIdx = (d: string) => (P ? Math.floor(daysBetween(P, d) / 7) : 0);
   const thisWeek = weekIdx(today);
 
+  // How-to cards (SQL 17). A separate read, so the app still works before the column exists.
+  const howRes = await supabase.from("ring_items").select("id, how_to").not("how_to", "is", null);
+  const howTo = new Map<string, HowTo>(howRes.error ? [] : (howRes.data ?? []).map((h) => [h.id as string, h.how_to as HowTo]));
+
   function itemState(i: Row, circleName: string): ItemState {
     const id = i.id as string, cadence = i.cadence as string, type = i.item_type as string;
     const key = (i.habit_key as string) ?? null;
@@ -155,6 +163,7 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
     const base = {
       auto: key ? AUTO_HABITS[key] ?? null : null,
       id, title: i.title as string, detail: (i.detail as string) ?? null, type, cadence, habitKey: (i.habit_key as string) ?? null,
+      howTo: howTo.get(id) ?? null,
       alsoIn: i.habit_key ? [...(circlesOfKey.get(i.habit_key as string) ?? [])].filter((n) => n !== circleName) : [],
     };
     if (type === "hit") return { ...base, complete: ciDone.has(id), doneNow: ciDone.has(id), progress: ciDone.has(id) ? 1 : 0, target: 1 };
