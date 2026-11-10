@@ -317,9 +317,14 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
             ★ Save as a favorite (log it again with one tap)
           </label>
         )}
+        {/* November 10: the name is required to save a favorite, so say so and point at the box. */}
         {saveAs !== null && (
-          <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder="Name it, e.g. Daily breakfast" aria-label="Favorite meal name"
-            className="min-h-11 w-full rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
+          <label className="block space-y-1.5 rounded-xl border border-accent/60 bg-[#161310] p-3">
+            <span className="block text-[14px] font-semibold text-accent">★ Name your favorite to save it</span>
+            <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} autoFocus placeholder="e.g. Daily breakfast" aria-label="Favorite meal name"
+              className={`min-h-12 w-full rounded-xl border bg-bg px-4 text-[16px] outline-none focus:border-accent ${saveAs.trim() ? "border-[#2a2a2a]" : "border-accent"}`} />
+            <span className="block text-[12px] text-[#a8a8a8]">{saveAs.trim() ? `It will show as “${saveAs.trim()}” in your ★ Favorites.` : "Type a name you'll recognize. Your meal saves once it has a name."}</span>
+          </label>
         )}
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       </div>
@@ -334,7 +339,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           </div>
           <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim())} onClick={save}
             className="min-h-[54px] w-full rounded-[14px] bg-accent text-[17px] font-semibold text-black disabled:opacity-40">
-            {busy === "saving" ? "Saving…" : favEdit ? `Save favorite: ${favEdit.name}` : editId ? "Save changes" : `Save ${slotLabel}`}
+            {busy === "saving" ? "Saving…" : favEdit ? `Save favorite: ${favEdit.name}` : saveAs !== null && !saveAs.trim() ? "Name your favorite first ↑" : editId ? "Save changes" : `Save ${slotLabel}${saveAs !== null ? " + favorite" : ""}`}
           </button>
         </div>
       </div>

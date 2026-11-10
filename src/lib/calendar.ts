@@ -88,11 +88,23 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
       if (w) early = { kind: "workout", title: `Next week · ${w.title}`, detail: `You finished this week. Start it early${w.minutes ? ` · about ${w.minutes} min` : ""}`, href: `/workouts/${w.id}?w=${plan.current + 1}` };
     }
     if (early && !hasWorkout(today)) on(today, early);
-    slots.forEach((d, i) => {
-      const extra = i === slots.length - 1 ? queue.splice(0) : queue.splice(0, 1);
-      if (!extra.length) { if (!(early && d === today)) on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
-      for (const w of extra) on(d, ev(w));
+    // One workout per day (November 10, Claudia). Workouts that don't fit her workout days (say she missed Monday)
+    // go on the next free days after her last workout day, then any free day left; only if the week runs out do two share a day.
+    const lastSlot = slots[slots.length - 1] ?? "";
+    const free = days.filter((d) => (!isCurrent || d >= today) && !slots.includes(d) && !hasWorkout(d));
+    const spill = [...free.filter((d) => d > lastSlot), ...free.filter((d) => d <= lastSlot)];
+    slots.forEach((d) => {
+      const w = queue.shift();
+      if (!w) { if (!(early && d === today)) on(d, { kind: "workout", title: "Cardio or catch-up", detail: "Pick from your cardio menu", href: "/workouts" }); return; }
+      on(d, ev(w));
     });
+    for (const d of spill) {
+      const w = queue.shift();
+      if (!w) break;
+      on(d, w.done ? ev(w) : { ...ev(w), detail: `Catch-up · ${ev(w).detail}` });
+    }
+    const end = slots[slots.length - 1] ?? days[days.length - 1];
+    for (const w of queue.splice(0)) on(end, ev(w));
   }
   // Real Talk Tuesday, every week.
   const tue = days[1], call = calls?.find((c) => c.call_date === tue);

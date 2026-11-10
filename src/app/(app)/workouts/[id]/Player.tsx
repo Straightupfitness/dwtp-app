@@ -79,6 +79,9 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     for (const s of steps) for (const l of s.logged) v[key(s.position, l.set_no)] = { ...l, done: true };
     return v;
   });
+  // November 10 (Esmeralda): extra sets beyond the program's, per exercise. A resumed workout keeps any she logged.
+  const [extra, setExtra] = useState<Record<number, number>>(() =>
+    Object.fromEntries(steps.map((s) => [s.position, Math.max(0, ...s.logged.map((l) => l.set_no - s.sets))])));
   const [rest, setRest] = useState<{ ends: number; total: number } | null>(null);
   const [now, setNow] = useState(nowMs);
   const [busy, setBusy] = useState(false);
@@ -293,8 +296,9 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   // ── One exercise ─────────────────────────────────────────
   const s = steps[step];
   const fields = fieldsFor(s.logType);
-  const rows = fields.length ? s.sets : 1;
+  const rows = fields.length ? s.sets + (extra[s.position] ?? 0) : 1;
   const last = step === steps.length - 1;
+  const extraLast = (extra[s.position] ?? 0) > 0 && !vals[key(s.position, rows)]?.done;
   const left = rest ? Math.max(0, (rest.ends - now) / 1000) : 0;
   return (
     <div className={shell}>
@@ -400,6 +404,17 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
               </div>
             );
           })}
+          {/* November 10: one more set whenever she wants it (it doesn't change the program, just this workout). */}
+          {fields.length > 0 && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setExtra((x) => ({ ...x, [s.position]: (x[s.position] ?? 0) + 1 }))}
+                className="min-h-11 flex-1 rounded-[12px] border border-dashed border-[#3a3a3a] text-[14px] font-semibold text-accent">+ Add a set</button>
+              {extraLast && (
+                <button type="button" onClick={() => setExtra((x) => ({ ...x, [s.position]: Math.max(0, (x[s.position] ?? 0) - 1) }))}
+                  className="min-h-11 rounded-[12px] border border-[#3a3a3a] px-4 text-[14px] text-dim">Remove</button>
+              )}
+            </div>
+          )}
         </div>
 
         {s.notes && (

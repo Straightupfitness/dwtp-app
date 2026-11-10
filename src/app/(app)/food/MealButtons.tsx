@@ -49,13 +49,20 @@ export function FavoriteMeal({ id, suggest }: { id: string; suggest: string }) {
   const [pending, start] = useTransition();
   if (done) return <span className="min-h-9 px-1 text-xs text-[#7ee2a8]">★ Saved</span>;
   if (!open) return <button type="button" onClick={() => setOpen(true)} className="min-h-9 px-1 text-xs font-semibold text-accent">★ Favorite</button>;
+  // November 10: say plainly that a favorite needs a name, and what to tap.
   return (
-    <span className="flex w-full items-center gap-1.5 pt-1">
-      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Name this favorite" placeholder="Name it, e.g. Daily breakfast"
-        className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2.5 text-[14px] outline-none focus:border-accent" />
-      <button type="button" disabled={pending || !name.trim()} onClick={() => start(async () => { const r = await favoriteMeal(id, name); if (!r?.error) setDone(true); })}
-        className="min-h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-black disabled:opacity-40">{pending ? "…" : "Save"}</button>
-      <button type="button" onClick={() => setOpen(false)} className="min-h-9 px-1 text-xs text-dim">Cancel</button>
+    <span className="block w-full space-y-1.5 rounded-xl border border-accent/60 bg-[#161310] p-2.5">
+      <span className="block text-[13px] font-semibold text-accent">★ Name your favorite to save it</span>
+      <span className="flex items-center gap-1.5">
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Name this favorite" placeholder="e.g. Daily breakfast"
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2.5 text-[15px] outline-none focus:border-accent" />
+        <button type="button" disabled={pending || !name.trim()} onClick={() => start(async () => { const r = await favoriteMeal(id, name); if (!r?.error) setDone(true); })}
+          className="min-h-11 rounded-lg bg-accent px-3 text-[13px] font-semibold text-black disabled:opacity-40">{pending ? "…" : "Save favorite"}</button>
+      </span>
+      <span className="flex items-center justify-between text-[11px] text-dim">
+        <span>{name.trim() ? "Then tap Save favorite." : "Type a name first. Then tap Save favorite."}</span>
+        <button type="button" onClick={() => setOpen(false)} className="min-h-8 px-1 text-xs text-dim underline">Cancel</button>
+      </span>
     </span>
   );
 }
