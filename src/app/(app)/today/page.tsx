@@ -10,6 +10,7 @@ import { DAILY_TARGETS } from "@/lib/food";
 import NotificationSettings from "@/components/NotificationSettings";
 import DoThisFirst from "@/components/DoThisFirst";
 import { IconCheckin, IconHabits } from "@/components/Icons";
+import MedalVideo from "@/components/MedalVideo";
 import ItemCheck from "../circles/ItemCheck";
 import QuickStats from "./QuickStats";
 import { after } from "next/server";
@@ -131,7 +132,8 @@ export default async function TodayPage() {
 
   // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
-  const circleGroups: { name: string; color: string; items: (ItemState & { medal: string })[] }[] = [];
+  const circleGroups: { name: string; color: string; items: (ItemState & { medal: string })[]; videos: { name: string; url: string; seconds: number | null }[] }[] = [];
+  const weekAgo = new Date(Date.parse(today + "T00:00:00Z") - 6 * 86_400_000).toISOString().slice(0, 10);
   for (const c of state.circles) {
     for (const r of c.rings) {
       if (r.status !== "open") continue;
@@ -140,8 +142,10 @@ export default async function TodayPage() {
         .sort((a, b) => (a.cadence === "daily" ? 0 : 1) - (b.cadence === "daily" ? 0 : 1));
       if (!its.length) continue;
       let cg = circleGroups.find((x) => x.name === c.name);
-      if (!cg) { cg = { name: c.name, color: c.color, items: [] }; circleGroups.push(cg); }
+      if (!cg) { cg = { name: c.name, color: c.color, items: [], videos: [] }; circleGroups.push(cg); }
       cg.items.push(...its.map((i) => ({ ...i, medal: r.name })));
+      // November 10: a medal that opened this week shows Michael's video above its habits.
+      if (r.video && r.opensOn && r.opensOn >= weekAgo) cg.videos.push({ name: r.name, ...r.video });
     }
   }
   const all = circleGroups.flatMap((g) => g.items);
@@ -208,6 +212,7 @@ export default async function TodayPage() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
                 </summary>
                 <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
+                  {cg.videos.map((v) => <div key={v.name} className="py-2"><MedalVideo compact url={v.url} seconds={v.seconds} color={cg.color} name={v.name} /></div>)}
                   {cg.items.map((it) => (
                     <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
                       progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} howTo={it.howTo} />

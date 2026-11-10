@@ -1,0 +1,56 @@
+-- November 10: Michael's medal videos. MED-01 … MED-50 in the order clients open them (02_trajectory),
+-- the same numbering as "DWTP Video Scripts - Batch 2: Core Medals".
+alter table public.rings add column if not exists video_code text;
+update public.rings set video_code = 'MED-01' where id = '9a3e8c4e-6bb2-56bd-8f85-bd3bdda6959c';
+update public.rings set video_code = 'MED-02' where id = '92c3f5ee-47ef-59e6-b53b-e5982b849ec3';
+update public.rings set video_code = 'MED-03' where id = 'd0ed56a1-4d64-566c-82c3-a27d36ef3dea';
+update public.rings set video_code = 'MED-04' where id = 'db1fbde6-cd3f-5e03-a35c-840c3026d00f';
+update public.rings set video_code = 'MED-05' where id = '200cbae3-89df-59db-81df-3508e6f8eccf';
+update public.rings set video_code = 'MED-06' where id = 'e5f0e0d4-91da-56b3-8898-44d5b0ec8633';
+update public.rings set video_code = 'MED-07' where id = '98fa0f5c-0658-51ff-b339-9112f735c0d0';
+update public.rings set video_code = 'MED-08' where id = 'a64da852-0a8d-5c1d-b78f-756fe922061a';
+update public.rings set video_code = 'MED-09' where id = 'fbd0ffa4-f406-5951-b123-0a3ab6ad9335';
+update public.rings set video_code = 'MED-10' where id = '38b9f5cb-dfab-57b7-9001-19305d94f47a';
+update public.rings set video_code = 'MED-11' where id = 'df0d20c3-dfd4-5153-a5d1-7653f88535fa';
+update public.rings set video_code = 'MED-12' where id = '665e0ead-370e-51d6-bbbb-688b5b484cc6';
+update public.rings set video_code = 'MED-13' where id = '8c004e26-422d-53b1-bc5e-5f790a0726dc';
+update public.rings set video_code = 'MED-14' where id = 'c3d972f1-ba35-52d1-b44b-b434b2c10c23';
+update public.rings set video_code = 'MED-15' where id = '973ac12a-da9d-540c-aca8-3b1ebe8d4e9e';
+update public.rings set video_code = 'MED-16' where id = 'ebe6a6b1-dac9-529e-910b-5c884e6c80c0';
+update public.rings set video_code = 'MED-17' where id = '85025f60-48ff-5d76-bacd-929b7d4d0a3b';
+update public.rings set video_code = 'MED-18' where id = '558eded8-e3c1-5f17-93db-bb1f8611c8b1';
+update public.rings set video_code = 'MED-19' where id = '4010f7f7-ecfc-54b3-8f8c-0b58dddbef56';
+update public.rings set video_code = 'MED-20' where id = '48cae10d-5082-5307-96f0-2bffa714603c';
+update public.rings set video_code = 'MED-21' where id = '7c980c49-98a3-5240-98aa-c70f99b138af';
+update public.rings set video_code = 'MED-22' where id = '80440c6e-8cc4-55b7-8ef8-9ef6016fa4be';
+update public.rings set video_code = 'MED-23' where id = 'dba8feac-e929-5342-a9a0-7685906d0a91';
+update public.rings set video_code = 'MED-24' where id = '357d7314-a692-55ba-bae0-90075f0b17ae';
+update public.rings set video_code = 'MED-25' where id = '991ae2b0-9f65-5dc6-ab05-084faa6a08ac';
+update public.rings set video_code = 'MED-26' where id = '1ea6afde-aef0-54f8-b3ac-5dc3af12d61a';
+update public.rings set video_code = 'MED-27' where id = 'b3e6e67a-3a75-58ad-85dd-045938ea4f79';
+update public.rings set video_code = 'MED-28' where id = '5fecadba-aede-5c50-8ef5-b51e654b1d78';
+update public.rings set video_code = 'MED-29' where id = 'b8ba378d-8cad-5964-9535-4fee1d889076';
+update public.rings set video_code = 'MED-30' where id = '5d22d33d-d58c-5755-90c3-1732a81cb66b';
+update public.rings set video_code = 'MED-31' where id = '4f52222a-4821-5a5e-97a2-cc5de7fa1152';
+update public.rings set video_code = 'MED-32' where id = '0d24b7e8-3eef-5e1b-92cc-d82c1dcdbd1f';
+update public.rings set video_code = 'MED-33' where id = '8fbacca7-bbab-5d1a-81c3-dbacb28510f4';
+update public.rings set video_code = 'MED-34' where id = '6f693e9d-3a09-5d66-976b-dac9b1643444';
+update public.rings set video_code = 'MED-35' where id = 'fd2ff797-a58a-529a-9fd5-ffd0d67b228f';
+update public.rings set video_code = 'MED-36' where id = 'b81b378e-0e1a-5c29-bdb9-fdeadbc5c9fe';
+update public.rings set video_code = 'MED-37' where id = 'cf5c3e07-38ea-5aa8-b658-5c2a8fb3d2f7';
+update public.rings set video_code = 'MED-38' where id = '93a668d6-aacf-5b0f-91a6-2267d7c59900';
+update public.rings set video_code = 'MED-39' where id = 'f823efce-04f2-51c2-9e96-a1b864945a34';
+update public.rings set video_code = 'MED-40' where id = 'bd068057-85c4-5ff1-808b-778955a179bf';
+update public.rings set video_code = 'MED-41' where id = 'fff7e180-252c-5790-9847-6c79c8cc4ed3';
+update public.rings set video_code = 'MED-42' where id = '7e81e984-9ce7-533f-b87b-e4032e80744a';
+update public.rings set video_code = 'MED-43' where id = 'f8cfb55d-fccf-53a0-8a96-0e133518ecbf';
+update public.rings set video_code = 'MED-44' where id = 'e294e387-38a4-52af-9140-1e4edbbbbae1';
+update public.rings set video_code = 'MED-45' where id = '609ace7d-dda0-59c9-bc4c-e414f8b585f3';
+update public.rings set video_code = 'MED-46' where id = 'd76f4d67-3392-5973-8784-b17786d8bca2';
+update public.rings set video_code = 'MED-47' where id = '4c5fb2b6-f324-5a5f-84b7-71d02ebde4ce';
+update public.rings set video_code = 'MED-48' where id = 'dc36278c-fa2e-5d98-8bec-239e8edc8886';
+update public.rings set video_code = 'MED-49' where id = 'a959a28a-87c5-5091-b95b-0030d274a4df';
+update public.rings set video_code = 'MED-50' where id = 'a727ea99-a8d7-5e99-80c8-0553f333ec1a';
+
+-- Check: 50 rows.
+select video_code, name from public.rings where video_code is not null order by video_code;

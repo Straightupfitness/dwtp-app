@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadProgram, daysUntil, type ItemState, type RingState } from "@/lib/circles";
 import { CIRCLE_CPS, inDays } from "@/lib/program";
 import MedalCircle from "@/components/MedalCircle";
+import MedalVideo from "@/components/MedalVideo";
 import ItemCheck from "../ItemCheck";
 
 const Check = () => (
@@ -35,6 +36,7 @@ function OpenRing({ r }: { r: RingState }) {
         <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">{r.name}</h2>
       </div>
       {r.outcome && <p className="text-sm text-dim">{r.outcome}</p>}
+      {r.video && <MedalVideo url={r.video.url} seconds={r.video.seconds} color={r.color} name={r.name} />}
       <div className="h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full" style={{ width: `${Math.round(r.fraction * 100)}%`, background: r.color }} /></div>
       <div className="divide-y divide-border">
         {r.items.map((it) => it.type === "hit" ? (
@@ -121,6 +123,7 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
                     ? <span className="shrink-0 text-xs text-gold">+{r.cps} CPs</span>
                     : <span className="shrink-0 text-xs text-dim group-open:hidden">Preview</span>}
                 </summary>
+                {r.status === "complete" && r.video && <div className="mt-2"><MedalVideo compact url={r.video.url} seconds={r.video.seconds} color={r.color} name={r.name} /></div>}
                 <ul className="mt-1">
                   {r.items.map((it) => <PreviewItem key={it.id} it={it} color={r.color} />)}
                 </ul>

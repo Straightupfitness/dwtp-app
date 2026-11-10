@@ -13,6 +13,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STREAK_DAYS, STREAK_WEEKS, dailyStreak, programWeek, todayIn } from "./program";
+import { loadVideos } from "./videos";
 
 export const DEFAULT_FOCUS = ["circadian-reset", "food-philosophy", "cardio"];
 /** Habits the app checks off by itself, and what it says instead of a checkbox. */
@@ -56,6 +57,7 @@ export type RingState = {
   halfwayOf: number | null; // upcoming: opens once she's halfway through this ring
   planWeek: number | null;
   saved: boolean;         // has a client_rings row
+  video?: { url: string; seconds: number | null } | null; // November 10: Michael explains the medal (MED-xx)
   day: number;            // day of the ring since it opened (open rings)
   fraction: number;       // 0–1, for the target drawing
   items: ItemState[];
@@ -152,6 +154,14 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
   const weekIdx = (d: string) => (P ? Math.floor(daysBetween(P, d) / 7) : 0);
   const thisWeek = weekIdx(today);
 
+  // Medal videos (SQL 18): rings.video_code → the uploaded MED-xx file. Separate reads, so nothing breaks before the SQL.
+  const [codeRes, medVideos] = await Promise.all([
+    supabase.from("rings").select("id, video_code").not("video_code", "is", null),
+    loadVideos(supabase, "MED"),
+  ]);
+  const ringVideo = new Map<string, { url: string; seconds: number | null }>();
+  for (const r of codeRes.error ? [] : codeRes.data ?? []) { const v = medVideos.get(r.video_code as string); if (v) ringVideo.set(r.id as string, { url: v.url, seconds: v.seconds }); }
+
   // How-to cards (SQL 17). A separate read, so the app still works before the column exists.
   const howRes = await supabase.from("ring_items").select("id, how_to").not("how_to", "is", null);
   const howTo = new Map<string, HowTo>(howRes.error ? [] : (howRes.data ?? []).map((h) => [h.id as string, h.how_to as HowTo]));
@@ -219,7 +229,7 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
       const fraction = status === "complete" ? 1 : status === "open" && parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
       const ring: RingState = {
         id: rid, number: n, name: r.name as string, outcome: (r.outcome as string) ?? null, cps: (r.cps as number) ?? 50,
-        color: circleColor(slug), status, opensOn, halfwayOf, planWeek, saved: !!row,
+        color: circleColor(slug), status, opensOn, halfwayOf, planWeek, saved: !!row, video: ringVideo.get(rid) ?? null,
         day: status === "open" && opensOn ? daysBetween(opensOn, today) + 1 : 0, fraction, items: its,
       };
       ringStates.push(ring);
