@@ -127,7 +127,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       </div>
 
       {/* Her food, the last 7 days (November 1): tap a day for every meal, swipe between days. */}
-      <div id="food" className="scroll-mt-20"><FoodWeek data={foodWeek} /></div>
+      <div id="food" className="scroll-mt-20"><FoodWeek data={foodWeek} coachClientId={id} /></div>
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="space-y-6">

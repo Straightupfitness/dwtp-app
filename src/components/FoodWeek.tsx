@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { FoodDay, FoodWeekData } from "@/lib/food-week";
+import FoodFeedbackBox from "./FoodFeedbackBox";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const wd = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
@@ -20,7 +21,7 @@ function Bar({ value, goal, color }: { value: number; goal: number; color: strin
  * Her last 7 days of food on one screen (November 1). Tap a day for every meal, food and photo in a pop-up,
  * then swipe (or use the arrows, or ← → on the keyboard) to go from day to day.
  */
-export default function FoodWeek({ data, title = "Food · last 7 days", compact = false }: { data: FoodWeekData; title?: string; compact?: boolean }) {
+export default function FoodWeek({ data, title = "Food · last 7 days", compact = false, coachClientId }: { data: FoodWeekData; title?: string; compact?: boolean; coachClientId?: string }) {
   const [open, setOpen] = useState<number | null>(null);
   const { days, targets: t } = data;
   const logged = days.filter((d) => d.meals.length);
@@ -67,12 +68,12 @@ export default function FoodWeek({ data, title = "Food · last 7 days", compact 
           </button>
         ))}
       </div>
-      {open !== null && <DayPopup data={data} index={open} setIndex={setOpen} />}
+      {open !== null && <DayPopup data={data} index={open} setIndex={setOpen} coachClientId={coachClientId} />}
     </div>
   );
 }
 
-export function DayPopup({ data, index, setIndex }: { data: FoodWeekData; index: number; setIndex: (i: number | null) => void }) {
+export function DayPopup({ data, index, setIndex, coachClientId }: { data: FoodWeekData; index: number; setIndex: (i: number | null) => void; coachClientId?: string }) {
   const d = data.days[index];
   const t = data.targets;
   const touch = useRef<number | null>(null);
@@ -117,6 +118,8 @@ export function DayPopup({ data, index, setIndex }: { data: FoodWeekData; index:
               <div key={l}><p className={`${display} text-xl leading-none ${i === 0 ? kcalTone(d.kcal, t.kcal) : ""}`}>{v}</p><p className="mt-1 text-[11px] text-dim">{l}</p></div>
             ))}
           </div>
+          {/* November 10: Michael's AI food note for this day, right here (coach only). */}
+          {coachClientId && <FoodFeedbackBox clientId={coachClientId} day={d.date} hasFood={d.meals.length > 0} />}
           {d.meals.map((m) => (
             <article key={m.id} className="space-y-2 rounded-[16px] border border-border bg-card p-3">
               <div className="flex items-baseline justify-between gap-2">

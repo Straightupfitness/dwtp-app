@@ -63,3 +63,18 @@ export async function undoFeedback(clientId: string, day: string) {
   await supabase.from("food_feedback").update({ sent_text: null, sent_via: null, sent_at: null }).eq("client_id", clientId).eq("day", day);
   return { ok: true };
 }
+
+/** November 10: what the day pop-up needs: any saved draft or sent note for that day, and her phone. */
+export async function feedbackFor(clientId: string, day: string) {
+  const supabase = await coach();
+  if (!supabase) return null;
+  const [{ data: p }, fb] = await Promise.all([
+    supabase.from("profiles").select("full_name, phone").eq("id", clientId).single(),
+    supabase.from("food_feedback").select("draft, sent_text, sent_via, sent_at").eq("client_id", clientId).eq("day", day).maybeSingle(),
+  ]);
+  return {
+    first: ((p?.full_name as string | null) ?? "").split(/\s+/)[0] || "her", phone: (p?.phone as string | null) ?? null,
+    draft: (fb.data?.draft as string | null) ?? null, sentText: (fb.data?.sent_text as string | null) ?? null,
+    sentVia: (fb.data?.sent_via as "chat" | "text" | "skipped" | null) ?? null, sentAt: (fb.data?.sent_at as string | null) ?? null,
+  };
+}

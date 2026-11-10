@@ -141,7 +141,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
             ? <DayBars days={steps28.map((x) => ({ date: x.date, value: x.steps }))} color="#a3e635" unit="steps" goal={daily.goals.steps} />
             : <p className="text-[13px] text-dim">No steps synced.{(c.answers as Record<string, unknown> | null)?.steps_avg ? ` She reported ${String((c.answers as Record<string, unknown>).steps_avg)} a day in her check-in.` : ""}</p>}
         </div>
-        <FoodWeek data={foodWeek} title="Food · her check-in week" compact />
+        <FoodWeek data={foodWeek} title="Food · her check-in week" compact coachClientId={c.client_id} />
       <details className="rounded-xl border border-border bg-card p-3">
         <summary className="cursor-pointer text-sm uppercase tracking-widest text-dim">{name}&apos;s week in numbers</summary>
         <div className="mt-3 space-y-3 text-sm">

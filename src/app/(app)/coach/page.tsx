@@ -24,7 +24,6 @@ export default async function CoachHome() {
         <Link href="/coach/lessons" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Lessons</Link>
         <Link href="/coach/clips" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Clips &amp; recipes</Link>
         <Link href="/coach/videos" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm">Videos</Link>
-        <Link href="/coach/food" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">Food feedback</Link>
         <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
       </div>

@@ -11,16 +11,17 @@ import { TextLink } from "./clients/[id]/WelcomeButton";
 import SeeHerApp from "./clients/[id]/SeeHerApp";
 import type { RosterRow } from "@/lib/roster";
 
-type SortKey = "attention" | "name" | "seen" | "weighins" | "checkin" | "kcalAvg" | "steps";
+type SortKey = "attention" | "name" | "seen" | "goal" | "weighins" | "checkin" | "kcalAvg" | "steps";
 const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) => number | null> = {
-  seen: (r) => r.hoursSinceSeen ?? 1e9, weighins: (r) => r.weighins7, checkin: (r) => (r.lastCheckin ? Date.parse(r.lastCheckin.at) : null), kcalAvg: (r) => r.kcalAvg,
+  seen: (r) => r.hoursSinceSeen ?? 1e9, goal: (r) => r.goalWeight, weighins: (r) => r.weighins7, checkin: (r) => (r.lastCheckin ? Date.parse(r.lastCheckin.at) : null), kcalAvg: (r) => r.kcalAvg,
   steps: (r) => r.stepsAvg,
 };
 // November 2: name · last in app · weight · steps · calories (7 days each) · last check-in · alerts.
-const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(215px,1.35fr)_minmax(215px,1.35fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(150px,1fr)]";
-const MID: string[] = ["weighins", "steps", "kcalAvg", "checkin"]; // centered, with a divider (November 3)
+const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(56px,0.35fr)_minmax(190px,1.2fr)_minmax(190px,1.2fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(150px,1fr)]";
+const MID: string[] = ["goal", "weighins", "steps", "kcalAvg", "checkin"]; // centered, with a divider (November 3)
 const letter = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
-const kk = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+// November 10: whole numbers only (8k, not 8.4k), so each day has room to breathe.
+const kk = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
 
 /** 7 tiny day cells, oldest to today. */
 /** November 3: a day with nothing logged gets the same red ✕ as "Last in app" (today stays grey until the day is over). */
@@ -97,11 +98,11 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   // Tap a calorie number: that day's food in the same pop-up as her page (November 3).
-  const [food, setFood] = useState<{ data: FoodWeekData; index: number } | null>(null);
+  const [food, setFood] = useState<{ data: FoodWeekData; index: number; clientId: string } | null>(null);
   const [foodBusy, setFoodBusy] = useState(false);
   const openFood = async (clientId: string, index: number) => {
     setFoodBusy(true);
-    try { setFood({ data: await foodWeekFor(clientId), index }); } catch { /* not loaded */ }
+    try { setFood({ data: await foodWeekFor(clientId), index, clientId }); } catch { /* not loaded */ }
     setFoodBusy(false);
   };
 
@@ -153,7 +154,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
       {/* One row per client (November 2): her last 7 days of weight, steps and calories side by side. */}
       <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 hidden gap-2 bg-bg/95 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid ${COLS}`}>
         <span />
-        {([["name", "Client"], ["seen", "Last in app"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"]] as [SortKey, string][]).map(([key, label]) => (
+        {([["name", "Client"], ["seen", "Last in app"], ["goal", "Goal"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"]] as [SortKey, string][]).map(([key, label]) => (
           <span key={key} className={`min-w-0 ${MID.includes(key) ? "border-l border-[#2a2a2a] pl-2 text-center" : ""}`}>
             <button type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
               className={`uppercase ${MID.includes(key) ? "w-full text-center" : "text-left"} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
@@ -203,10 +204,14 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                   <span className="block truncate text-[13px] font-semibold">{lastInLabel(r.seen)}</span>
                   <SeenStrip seen={r.seen} size={14} />
                 </span>
+                {/* Her goal weight (November 10), between "Last in app" and her weigh-ins. */}
+                <span className={`${cell} hidden md:flex md:items-center md:justify-center`} title={r.goalWeight ? `Goal: ${r.goalWeight} lbs` : "No goal weight set"}>
+                  <span className={`${val} ${r.goalWeight ? "text-[#7dd3fc]" : "text-dim"}`}>{r.goalWeight ? Math.round(r.goalWeight) : "–"}</span>
+                </span>
                 {/* Weight, steps and calories: the last 7 days (November 2). */}
                 <span className={`${cell} flex items-center gap-2`}>
-                  <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Weight</span>
-                  <span className="min-w-0 flex-1"><Week days={r.weightWeek} color="#7dd3fc" fmt={(n) => n.toFixed(1)} title={(d, v) => `${d}: ${v === null ? "no weigh-in" : `${v} lbs`}`} /></span>
+                  <span className="w-12 shrink-0 text-[10px] uppercase leading-tight text-dim md:hidden">Weight{r.goalWeight ? <span className="block normal-case">goal {Math.round(r.goalWeight)}</span> : null}</span>
+                  <span className="min-w-0 flex-1"><Week days={r.weightWeek} color="#7dd3fc" fmt={(n) => String(Math.round(n))} title={(d, v) => `${d}: ${v === null ? "no weigh-in" : `${v} lbs`}`} /></span>
                 </span>
                 <span className={`${cell} flex items-center gap-2`}>
                   <span className="w-12 shrink-0 text-[10px] uppercase text-dim md:hidden">Steps</span>
@@ -228,7 +233,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           );
         })}
       </ul>
-      {food && <DayPopup data={food.data} index={food.index} setIndex={(i) => setFood(i === null ? null : { ...food, index: i })} />}
+      {food && <DayPopup data={food.data} index={food.index} coachClientId={food.clientId} setIndex={(i) => setFood(i === null ? null : { ...food, index: i })} />}
       {foodBusy && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40"><span className="rounded-full bg-card px-4 py-2 text-sm">Opening her food…</span></div>}
       {!shown.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-6 text-center text-dim">Nobody here. Nice.</p>}
 
