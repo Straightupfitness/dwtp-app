@@ -1,9 +1,12 @@
 import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
 import { weekName } from "@/lib/program";
 import { createClient } from "@/lib/supabase/server";
-import { currentWindow, questionsFor } from "@/lib/checkin";
+import { currentWindow } from "@/lib/checkin";
+import { screensFor } from "@/lib/checkin-screens";
+import { loadVideos } from "@/lib/videos";
 import { loadProgram } from "@/lib/circles";
-import CheckinForm, { type NewHabit } from "./CheckinForm";
+import type { NewHabit } from "./CheckinForm";
+import CheckinFlow from "./CheckinFlow";
 import BackButton from "@/components/BackButton";
 
 export const maxDuration = 120;
@@ -47,10 +50,7 @@ export default async function CheckinPage() {
 
   let form = null;
   if (open && !thisOne && profile?.program_start) {
-    const [{ data: tw }, state] = await Promise.all([
-      supabase.from("trajectory_weeks").select("checkin_type, checkin_is_video, is_diet_break, moments").eq("week_number", Math.min(open.week, 52)).maybeSingle(),
-      loadProgram(supabase, user!.id),
-    ]);
+    const [state, videos] = await Promise.all([loadProgram(supabase, user!.id), loadVideos(supabase, "CHK")]);
     const weekStart = addDays(profile.program_start, (open.week - 1) * 7);
     const weekEnd = addDays(weekStart, 6);
     const habits: NewHabit[] = [];
@@ -63,12 +63,15 @@ export default async function CheckinPage() {
         habits.push({ id: i.id, title: i.title, circle: `${c.name} · ${r.name}`, color: r.color, prefill });
       }
     }
+    // November 10: the VideoAsk-style check-in, one question per screen with Michael's video.
     form = (
-      <CheckinForm week={open.week} userId={user!.id} isVideo={!!tw?.checkin_is_video} habits={habits}
+      <CheckinFlow week={open.week} userId={user!.id} habits={habits}
+        screens={screensFor(open.week, { onFullYear: profile.plan === "52_weeks" })}
+        videos={Object.fromEntries([...videos.values()].map((v) => [v.code, v.url]))}
+        circles={state.circles.filter((c) => c.kind === "growth").map((c) => c.name)}
         badWeek={{ already: badWeeks.includes(open.week), left: Math.max(0, BAD_WEEK_LIMIT - badWeeks.length) }}
         closes={new Intl.DateTimeFormat("en-US", { timeZone: myTz, weekday: "short", hour: "numeric", timeZoneName: "short" }).format(open.closes)}
-        timeLeft={timeLeft(open.closes)} last={lastScores}
-        questions={questionsFor(open.week, tw, { onFullYear: profile.plan === "52_weeks" })} />
+        timeLeft={timeLeft(open.closes)} last={lastScores} />
     );
   }
 

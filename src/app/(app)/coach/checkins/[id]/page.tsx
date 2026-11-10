@@ -37,14 +37,19 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   const firstW = weights60[0], lastW = weights60[weights60.length - 1];
   const last = d.previous[0] ?? null;
   const sleepShots = ((c.answers?.sleep_photos ?? []) as string[]);
-  const paths = [c.video_path, reply?.video_path, ...sleepShots].filter(Boolean) as string[];
+  // November 10: a video can come with any answer in the new check-in.
+  const answerVideos = ((c.answers?.videos ?? {}) as Record<string, string>);
+  const paths = [c.video_path, reply?.video_path, ...sleepShots, ...Object.values(answerVideos)].filter(Boolean) as string[];
   const signed = new Map<string, string>();
   if (paths.length) {
     const { data } = await supabase.storage.from("checkin-videos").createSignedUrls(paths, 3600);
     data?.forEach((x) => x.path && x.signedUrl && signed.set(x.path, x.signedUrl));
   }
   const labels = questionLabels();
-  const answers = Object.entries((c.answers ?? {}) as Record<string, unknown>).filter(([k]) => !SCORES.includes(k as never) && k !== "habits" && k !== "sleep_photos");
+  const answerMap = (c.answers ?? {}) as Record<string, unknown>;
+  const answerKeys = [...new Set([...Object.keys(answerMap), ...Object.keys(answerVideos)])]
+    .filter((k) => !SCORES.includes(k as never) && !["habits", "sleep_photos", "videos"].includes(k));
+  const answers = answerKeys.map((k) => [k, answerMap[k]] as [string, unknown]);
   const habits = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[]);
   const logged = d.days.filter((x) => x.meals > 0);
   const avg = (k: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, x) => s + x[k], 0) / logged.length) : null;
@@ -93,7 +98,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
           </div>
         </div>
       )}
-      {c.video_path && signed.get(c.video_path) && (
+      {c.video_path && signed.get(c.video_path) && !Object.values(answerVideos).includes(c.video_path) && (
         <div className="space-y-1"><p className="text-sm text-dim">Her video</p>
           <video src={signed.get(c.video_path)} controls playsInline className="w-full rounded-xl bg-black" /></div>
       )}
@@ -113,7 +118,10 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
 
       <div className="space-y-3">
         {answers.map(([k, v]) => (
-          <div key={k}><p className="text-xs uppercase tracking-wider text-dim">{labels[k] ?? k}</p><p className="whitespace-pre-line">{String(v)}</p></div>
+          <div key={k} className="space-y-1"><p className="text-xs uppercase tracking-wider text-dim">{labels[k] ?? k}</p>
+            {v !== undefined && v !== "" && <p className="whitespace-pre-line">{Array.isArray(v) ? v.join(" · ") : String(v)}</p>}
+            {answerVideos[k] && signed.get(answerVideos[k]) && <video src={signed.get(answerVideos[k])} controls playsInline preload="metadata" className="max-h-[480px] rounded-xl bg-black" />}
+          </div>
         ))}
         {habits.length > 0 && (
           <div><p className="text-xs uppercase tracking-wider text-dim">This week&apos;s new habits</p>

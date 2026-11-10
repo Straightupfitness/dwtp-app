@@ -64,8 +64,8 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
   if (!c) throw new Error("Check-in not found");
   const d = await weekData(supabase, c.client_id, c.week_number);
   const labels = questionLabels();
-  const answers = Object.entries(c.answers ?? {}).filter(([k]) => k !== "habits" && k !== "sleep_photos")
-    .map(([k, v]) => `- ${labels[k] ?? k}: ${v}`).join("\n");
+  const answers = Object.entries(c.answers ?? {}).filter(([k]) => !["habits", "sleep_photos", "videos"].includes(k))
+    .map(([k, v]) => `- ${labels[k] ?? k}: ${Array.isArray(v) ? v.join("; ") : v}`).join("\n");
   const habitAnswers = ((c.answers?.habits ?? []) as { title: string; status: string; note?: string }[])
     .map((h) => `- ${h.title}: ${h.status}${h.note ? ` (${h.note})` : ""}`).join("\n");
 

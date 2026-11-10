@@ -4,6 +4,8 @@
  * - Video weeks: 4, 8, 12, 16, 20, 26, 32, 36, 40, 44, 48, 52 (from trajectory_weeks.checkin_is_video).
  * - The same core every week, plus extra questions for that week's moment.
  */
+import { screenLabels } from "./checkin-screens";
+
 export const DEADLINE_TZ = "America/Los_Angeles";
 
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -144,5 +146,9 @@ export function questionLabels(): Record<string, string> {
     [13, { checkin_type: "halfway", checkin_is_video: false, is_diet_break: false, moments: [] }],
     [24, { checkin_type: "last_chance", checkin_is_video: false, is_diet_break: true, moments: [] }],
   ];
-  return { ...Object.fromEntries(weeks.flatMap(([w, t]) => questionsFor(w, t)).map((q) => [q.id, q.label])), sleep_hours: "Hours of sleep a night", steps_avg: "Average steps a day" };
+  return {
+    ...Object.fromEntries(weeks.flatMap(([w, t]) => questionsFor(w, t)).map((q) => [q.id, q.label])),
+    ...screenLabels(), // November 10: the VideoAsk-style check-in's fields
+    sleep_hours: "Hours of sleep a night", steps_avg: "Average steps a day",
+  };
 }
