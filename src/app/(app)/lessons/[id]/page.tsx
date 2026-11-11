@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { embedUrl, KIND_LABEL, loadLessons, weekMedals } from "@/lib/lessons";
 import { circleColor } from "@/lib/circles";
 import LessonActions from "./LessonActions";
+import { loadVideos } from "@/lib/videos";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 
@@ -26,7 +27,10 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     );
   }
   const medals = l.kind === "hh" ? await weekMedals(supabase, l.week) : [];
-  const embed = embedUrl(l.video_url);
+  // November 11: Michael's newly filmed lesson videos (HH-01, SBW-01 …, uploaded in Coach → Videos) replace the old links.
+  const code = l.kind === "hh" ? `HH-${String(l.week).padStart(2, "0")}` : (l.kind === "sbw" || l.kind === "smf") && l.number ? `${l.kind.toUpperCase()}-${String(l.number).padStart(2, "0")}` : null;
+  const own = code ? (await loadVideos(supabase, code.split("-")[0])).get(code) ?? null : null;
+  const embed = own ? null : embedUrl(l.video_url);
   const quiz = l.quiz_status === "approved" ? l.quiz ?? [] : [];
 
   return (
@@ -37,7 +41,10 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
         <h1 className={`${display} mt-1 text-[28px] font-semibold leading-tight`}>{l.title}</h1>
       </header>
 
-      {embed ? (
+      {own ? (
+        <video src={own.url} controls playsInline preload="metadata" title={l.title}
+          className={own.portrait ? "mx-auto block max-h-[75dvh] w-auto max-w-full rounded-2xl border border-border bg-black" : "aspect-video w-full rounded-2xl border border-border bg-black"} />
+      ) : embed ? (
         <div className="aspect-video overflow-hidden rounded-2xl border border-border bg-black">
           <iframe src={embed} title={l.title} className="size-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
         </div>
