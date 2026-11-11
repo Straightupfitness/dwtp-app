@@ -16,7 +16,7 @@ export const VIDEO_SETS: { title: string; prefix: string; codes: string[] }[] = 
   { title: "Check-ins", prefix: "CHK", codes: Array.from({ length: 28 }, (_, i) => `CHK-${String(i + 1).padStart(2, "0")}`).filter((c) => c !== "CHK-27") },
   { title: "Medals", prefix: "MED", codes: Array.from({ length: 50 }, (_, i) => `MED-${String(i + 1).padStart(2, "0")}`) },
   { title: "Habits & Homework", prefix: "HH", codes: Array.from({ length: 26 }, (_, i) => `HH-${String(i + 1).padStart(2, "0")}`) },
-  { title: "Strong Body Wednesday", prefix: "SBW", codes: Array.from({ length: 52 }, (_, i) => `SBW-${String(i + 1).padStart(2, "0")}`) },
+  { title: "Strong Body Wednesday (by week)", prefix: "SBW", codes: Array.from({ length: 26 }, (_, i) => `SBW-${String(i + 1).padStart(2, "0")}`) },
 ];
 
 /** "chk 2.mp4", "CHK-02 final.mov" → "CHK-02". Null when the name has no code. */

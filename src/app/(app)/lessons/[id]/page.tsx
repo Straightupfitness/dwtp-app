@@ -27,8 +27,9 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     );
   }
   const medals = l.kind === "hh" ? await weekMedals(supabase, l.week) : [];
-  // November 11: Michael's newly filmed lesson videos (HH-01, SBW-01 …, uploaded in Coach → Videos) replace the old links.
-  const code = l.kind === "hh" ? `HH-${String(l.week).padStart(2, "0")}` : (l.kind === "sbw" || l.kind === "smf") && l.number ? `${l.kind.toUpperCase()}-${String(l.number).padStart(2, "0")}` : null;
+  // November 11: Michael's newly filmed lesson videos replace the old links. Files are named by the week the lesson
+  // shows in the app (HH-08 = Week 8 Habits & Homework, SBW-08 = Week 8 Strong Body Wednesday), not the old SBW numbers.
+  const code = l.kind === "hh" || l.kind === "sbw" || l.kind === "smf" ? `${l.kind.toUpperCase()}-${String(l.week).padStart(2, "0")}` : null;
   const own = code ? (await loadVideos(supabase, code.split("-")[0])).get(code) ?? null : null;
   const embed = own ? null : embedUrl(l.video_url);
   const quiz = l.quiz_status === "approved" ? l.quiz ?? [] : [];
