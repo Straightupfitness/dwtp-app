@@ -97,7 +97,11 @@ export const UNLOCK = [
   { q: "Where do you message Michael with a question?", options: ["Chat in the app", "Email", "Instagram"] },
 ];
 
-/** New clients (added November 10 or later, or still "onboarding") fill in the Blueprint; clients who started before don't. */
+/**
+ * Who fills in the Blueprint (November 11): every client, current ones included, so everyone starts fresh on Monday
+ * Nov 16 with circles picked for her. An assessment sent before BLUEPRINT_SINCE (the old 7X) doesn't count.
+ */
 export const BLUEPRINT_SINCE = "2026-11-10";
-export const needsBlueprint = (p: { role?: string | null; status?: string | null; created_at?: string | null }, submitted: boolean) =>
-  p.role === "client" && !submitted && (p.status === "onboarding" || (!!p.created_at && p.created_at.slice(0, 10) >= BLUEPRINT_SINCE));
+export const blueprintDone = (submittedAt: string | null | undefined) => !!submittedAt && submittedAt.slice(0, 10) >= BLUEPRINT_SINCE;
+export const needsBlueprint = (p: { role?: string | null; status?: string | null }, submittedAt: string | null | undefined) =>
+  p.role === "client" && p.status !== "cancelled" && !blueprintDone(submittedAt);

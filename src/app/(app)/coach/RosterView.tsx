@@ -64,7 +64,7 @@ function FoodDays({ r, onOpen }: { r: RosterRow; onOpen: (i: number) => void }) 
 }
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric" });
 const at = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
-type Filter = "all" | "open" | "reply" | "checkin" | "food" | "workout" | "seen";
+type Filter = "all" | "open" | "reply" | "checkin" | "food" | "workout" | "seen" | "blueprint";
 const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[] = [
   { key: "all", label: "All clients", test: () => true },
   // November 1: check-ins are open (Fri–Mon noon) and she hasn't sent hers yet: who to remind.
@@ -72,6 +72,7 @@ const FILTERS: { key: Filter; label: string; test: (r: RosterRow) => boolean }[]
   { key: "reply", label: "Needs a reply", test: (r) => r.checkin?.state === "needs-reply" },
   { key: "checkin", label: "Missed check-in", test: (r) => r.missedCheckin },
   { key: "food", label: "No food logged yesterday", test: (r) => r.noFoodYesterday },
+  { key: "blueprint", label: "Blueprint not done", test: (r) => r.blueprint !== "done" },
   { key: "workout", label: "Missed last week's workouts", test: (r) => r.missedWorkouts },
   { key: "seen", label: "Not in the app 48h+", test: (r) => r.notSeen48 },
 ];
@@ -176,6 +177,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           if (r.checkin?.state === "needs-reply") alerts.push({ text: `Wk ${r.checkin.week}: reply`, cls: "border border-accent text-accent", href: `/coach/checkins/${r.checkin.id}` });
           if (r.missedCheckin) alerts.push({ text: "Missed check-in", cls: "bg-[#2a1218] text-[#fb7185]" });
           if (r.noFoodYesterday) alerts.push({ text: "No food yesterday", cls: "bg-[#2a1a10] text-gold" });
+          if (r.blueprint !== "done") alerts.push({ text: r.blueprint === "started" ? "Blueprint started" : "No Blueprint yet", cls: "bg-[#1f1708] text-accent" });
           if (r.missedWorkouts) alerts.push({ text: "Missed workouts", cls: "bg-[#2a1a10] text-gold" });
           if (r.notSeen48 && r.week > 0) alerts.push({ text: `Away ${ago(r.hoursSinceSeen)}`, cls: "bg-[#1d1d2a] text-[#a5b4fc]" });
           if ((r.daysSinceWeigh ?? 99) >= 4 && r.week > 0) alerts.push({ text: r.weighedOn ? `No weigh-in ${r.daysSinceWeigh}d` : "No weigh-ins", cls: "bg-[#2a1218] text-[#fb7185]" });

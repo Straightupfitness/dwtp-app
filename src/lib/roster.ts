@@ -3,6 +3,7 @@
  * whole roster (not one set per client).
  */
 import "server-only";
+import { blueprintDone } from "./blueprint";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "./supabase/admin";
 import { loadSeen, type SeenWeek } from "./seen";
@@ -33,6 +34,7 @@ export type RosterRow = {
   foodDays7: number; waterAvg: number | null;
   checkin: { week: number; state: "needs-reply" | "replied" | "missed" | "open" | "none"; id: string | null } | null;
   missedCheckin: boolean; noFoodYesterday: boolean;
+  blueprint: "done" | "started" | "not-started"; // November 11: her Driven Woman Blueprint
   lastWorkoutWeek: { week: number; planned: number; done: number } | null; missedWorkouts: boolean;
   lastSeen: string | null; hoursSinceSeen: number | null; notSeen48: boolean;
   cpsWeek: number; flags: string[];
@@ -70,6 +72,9 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
     supabase.from("program_phases").select("program, weeks, first_week, phase_workouts(day, from_week, to_week, workouts(kind))"),
     lastSeenMap(),
   ]);
+  // November 11: who has done her Driven Woman Blueprint (an old pre-November 10 assessment doesn't count).
+  const { data: bps } = await supabase.from("assessments").select("client_id, submitted_at, answers").in("client_id", ids);
+  const bpOf = new Map((bps ?? []).map((b) => [b.client_id as string, blueprintDone(b.submitted_at as string | null) ? "done" as const : Object.keys((b.answers as object) ?? {}).some((k) => k !== "previous") && !b.submitted_at ? "started" as const : "not-started" as const]));
 
   type PW = { day: number | null; from_week: number | null; to_week: number | null; workouts: { kind: string } | null };
   const plannedFor = (programId: string, pweek: number, perWeek: number | null) => {
@@ -154,6 +159,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       proteinAvg: logged.length ? Math.round(avg(logged.map((d) => byDay.get(d)!.protein))!) : null,
       proteinTarget: t?.protein_g ?? DAILY_TARGETS.protein_g,
       foodDays7: logged.length, waterAvg: wa.length ? Math.round(avg(wa.map((x) => x.oz))!) : null,
+      blueprint: bpOf.get(c.id) ?? "not-started",
       checkin, missedCheckin, noFoodYesterday: active && !byDay.has(yesterday) && !(bad.get(c.id) ?? []).includes(week),
       lastWorkoutWeek, missedWorkouts: !!lastWorkoutWeek && lastWorkoutWeek.planned > 0 && lastWorkoutWeek.done < lastWorkoutWeek.planned && !(bad.get(c.id) ?? []).includes(week - 1),
       badWeek: week >= 1 && (bad.get(c.id) ?? []).includes(week), badUsed: (bad.get(c.id) ?? []).length,

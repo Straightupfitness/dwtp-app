@@ -51,9 +51,9 @@ export default async function TodayPage() {
   // November 5: the Home Screen app opens on Today; Michael goes to his client overview instead.
   if (profile?.role === "coach") redirect("/coach");
   // November 10: a new client starts with onboarding (welcome video, then her Driven Woman Blueprint).
-  if (needsBlueprint(profile ?? {}, false)) {
+  if (profile?.role === "client") {
     const { data: as } = await supabase.from("assessments").select("submitted_at").eq("client_id", user!.id).maybeSingle();
-    if (!as?.submitted_at) redirect("/start");
+    if (needsBlueprint(profile, as?.submitted_at)) redirect("/start");
   }
   const { today, week } = state;
   const tz = profile?.timezone ?? "America/Los_Angeles";

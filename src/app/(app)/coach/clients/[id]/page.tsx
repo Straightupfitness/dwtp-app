@@ -49,6 +49,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const glance = compliance(prog.data);
   // November 10: Driven Woman Blueprint labels and video answers.
   const bpLabels = blueprintLabels();
+  const assigned = ((assessment?.answers as Record<string, unknown> | null)?.assigned ?? null) as { focus: string[]; fixits: string[]; skipped: string[]; reasons: string[]; at: string } | null;
   const bpPaths = Object.entries(((assessment?.answers as Record<string, unknown> | null)?.videos ?? {}) as Record<string, string>);
   const bpSigned = bpPaths.length ? (await supabase.storage.from("checkin-videos").createSignedUrls(bpPaths.map(([, p]) => p), 3600)).data ?? [] : [];
   const bpVideos = bpPaths.map(([k, path]) => [k, bpSigned.find((x) => x.path === path)?.signedUrl] as [string, string | undefined]).filter((x): x is [string, string] => !!x[1]);
@@ -195,9 +196,22 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
                 <summary className="cursor-pointer font-semibold">Driven Woman Blueprint{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
                 {assessment?.ai_summary && <p className="mt-2 whitespace-pre-line text-[#d4d4d4]">{assessment.ai_summary}</p>}
                 <dl className="mt-2 space-y-1.5">
-                  {Object.entries((assessment?.answers as Record<string, unknown>) ?? {}).filter(([k]) => k !== "videos").map(([k, v]) => (
+                  {Object.entries((assessment?.answers as Record<string, unknown>) ?? {}).filter(([k]) => !["videos", "previous", "assigned"].includes(k)).map(([k, v]) => (
                     <div key={k}><dt className="text-xs text-dim">{bpLabels[k] ?? labels[k] ?? k.replace(/_/g, " ")}</dt><dd className="whitespace-pre-line">{typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : JSON.stringify(v)}</dd></div>
                   ))}
+                  {/* November 11: what the app picked for her from the Blueprint. */}
+                  {assigned && (
+                    <div className="rounded-xl border border-accent/50 bg-[#161310] p-3 sm:col-span-2">
+                      <dt className="text-xs uppercase tracking-wider text-accent">Picked for her automatically · {new Date(assigned.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</dt>
+                      <dd className="mt-1 space-y-1 text-sm">
+                        <p><b>Focus:</b> {assigned.focus.join(", ")}</p>
+                        {assigned.fixits.length > 0 && <p><b>Fix-its opened:</b> {assigned.fixits.join(", ")}</p>}
+                        {assigned.skipped.length > 0 && <p><b>Already doing (marked done):</b> {assigned.skipped.join("; ")}</p>}
+                        {assigned.reasons.length > 0 && <p className="text-dim">Why: {assigned.reasons.join(" · ")}</p>}
+                        <p className="text-xs text-dim">Change any of it under Circles and Focus circles below.</p>
+                      </dd>
+                    </div>
+                  )}
                   {/* November 10: her video answers from the Blueprint. */}
                   {bpVideos.map(([k, url]) => (
                     <div key={k}><dt className="text-xs text-dim">{bpLabels[k] ?? k} (video)</dt><dd><video src={url} controls playsInline preload="metadata" className="mt-1 max-h-[420px] rounded-xl bg-black" /></dd></div>
