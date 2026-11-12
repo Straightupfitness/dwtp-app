@@ -209,3 +209,32 @@ export async function toggleSavedRecipe(recipeId: number, save: boolean) {
   revalidatePath("/food/recipes");
   return { ok: true };
 }
+
+/** November 11 (Imelda): her meals on any day, to copy one onto the day she's logging. */
+export async function mealsOn(day: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return [];
+  const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+  const tz = profile?.timezone ?? "America/Los_Angeles";
+  const next = new Date(Date.parse(day + "T00:00:00Z") + 2 * 86_400_000).toISOString().slice(0, 10);
+  const prev = new Date(Date.parse(day + "T00:00:00Z") - 86_400_000).toISOString().slice(0, 10);
+  const { data } = await supabase.from("food_logs").select("id, eaten_at, meal_slot, items, calories, protein_g")
+    .eq("client_id", user.id).gte("eaten_at", prev + "T00:00:00Z").lt("eaten_at", next + "T00:00:00Z").order("eaten_at");
+  return (data ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === day).map((m) => ({
+    id: m.id as string, slot: (m.meal_slot ?? "other") as string, calories: m.calories as number, protein: Math.round(Number(m.protein_g ?? 0)),
+    foods: (m.items as FoodItem[]).map((i) => i.name).join(", "),
+  }));
+}
+
+/** The photo upload's backup route (November 11): through the server, with her sign-in from the cookie. */
+export async function uploadFoodPhoto(fd: FormData): Promise<{ path?: string; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const f = fd.get("photo");
+  if (!(f instanceof Blob) || f.size === 0 || f.size > 4_000_000) return { error: "No photo" };
+  const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from("food-photos").upload(path, f, { contentType: "image/jpeg" });
+  return error ? { error: error.message } : { path };
+}

@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { celebrate, play, primeSounds } from "@/lib/celebrate";
-import { finishWorkout, logSet, searchExercises, startSession, suggestExercises } from "../actions";
+import { finishWorkout, logSet, reopenWorkout, searchExercises, startSession, suggestExercises } from "../actions";
 
 type SetVals = { weight?: number | null; reps?: number | null; seconds?: number | null; note?: string | null };
 export type PlayerItem = {
@@ -88,6 +89,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ cps: number } | null>(session?.completed ? { cps: 0 } : null);
   const finishRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // November 2: keep the screen on during a workout (it kept going dark between sets). The phone lets go of it
   // when she leaves the app, so ask again when she comes back.
@@ -178,6 +180,17 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     try { localStorage.removeItem(clockKey); } catch {}
     setStep(steps.length);
     setTimeout(() => celebrate("quiz-passed", finishRef.current), 150);
+  }
+
+  async function reopen() {
+    if (!sessionId) return;
+    setBusy(true);
+    const r = await reopenWorkout(sessionId);
+    setBusy(false);
+    if ("error" in r && r.error) { setError(r.error); return; }
+    setResult(null);
+    setStep(-1);
+    router.refresh();
   }
 
   // Personal bests: heavier than anything she logged last time on that exercise.
@@ -288,6 +301,13 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
             </div>
           )}
           <Link href="/workouts" className="mt-2 min-h-[52px] w-full rounded-[16px] bg-accent py-3.5 text-[17px] font-semibold text-black">Back to workouts</Link>
+          {/* November 11: marked done by mistake? Take it back. */}
+          {!preview && sessionId && (
+            <button type="button" disabled={busy} onClick={reopen} className="min-h-11 px-3 text-[14px] text-[#a8a8a8] underline disabled:opacity-50">
+              {busy ? "Reopening…" : "Marked done by mistake? Reopen this workout"}
+            </button>
+          )}
+          {error && <p className="text-sm text-[var(--red)]">{error}</p>}
         </div>
       </div>
     );

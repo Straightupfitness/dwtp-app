@@ -5,7 +5,7 @@ import { useDictation } from "@/lib/useDictation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { parseQty, totals, type FoodItem } from "@/lib/food";
-import { saveMeal, updateMeal, deleteGoTo, updateGoTo } from "./actions";
+import { saveMeal, updateMeal, deleteGoTo, updateGoTo, uploadFoodPhoto, saveGoTo } from "./actions";
 import { EDIT_EVENT, type MealToEdit } from "./EditMeal";
 import FoodSearch from "./FoodSearch";
 import BarcodeScanner from "./BarcodeScanner";
@@ -48,6 +48,9 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
   const [editId, setEditId] = useState<string | null>(null); // set when she's changing a meal she already saved
   const [favEdit, setFavEdit] = useState<GoTo | null>(null); // November 7: changing a favorite's foods
   const voice = useRef(false);
+  // November 11: a big batch (soup, chili, casserole): she adds everything that went in the pot, says how many
+  // servings it makes and how much she ate; her portion is logged, and one serving is saved as a favorite.
+  const [batch, setBatch] = useState<{ name: string; servings: string; ate: number } | null>(null);
 
   // "Edit" on a saved meal opens it here, with its foods, meal, time and photo.
   useEffect(() => {
@@ -62,7 +65,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
 
   function reset() {
     setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
-    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null); setFavEdit(null);
+    setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null); setFavEdit(null); setBatch(null);
   }
   async function estimate(image: Blob | null, description: string) {
     setMode("review"); setBusy("estimating"); setError("");
@@ -100,8 +103,48 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
     } catch (e) { setError((e as Error).message); }
     setBusy("");
   }
+  const potServings = batch ? Math.max(1, Number(batch.servings) || 0) : 1;
+  const batchReady = !batch || (batch.name.trim() !== "" && Number(batch.servings) >= 1);
+  const potItem = (k: number, amount: string): FoodItem => {
+    const t0 = totals(items);
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    return { name: batch!.name.trim(), amount, calories: Math.round(t0.calories * k), protein_g: r1(t0.protein_g * k), fiber_g: r1(t0.fiber_g * k), potassium_mg: Math.round(t0.potassium_mg * k) };
+  };
+  const servingsText = (n: number) => `${fmtQty(n)} serving${n === 1 ? "" : "s"}`;
+  async function saveBatchFavorite() {
+    if (!batch) return;
+    await saveGoTo(`${batch.name.trim()} (1 serving)`, [potItem(1 / potServings, "1 serving")]);
+  }
+
+  /**
+   * November 11 (Claudia: "sometimes my meal pictures don't show, even though the meal is logged"): the upload used to
+   * fail silently (often an expired sign-in after the app sat in the background). Now it refreshes her sign-in, tries
+   * three times, then goes through the server; and if it still can't, she's told instead of the photo vanishing.
+   */
+  async function uploadPhoto(p: Blob): Promise<string | null> {
+    const sb = createClient();
+    const path = `${userId}/${crypto.randomUUID()}.jpg`;
+    for (let i = 0; i < 3; i++) {
+      try {
+        await sb.auth.getSession(); // refreshes an expired token before the upload
+        const { error: e } = await sb.storage.from("food-photos").upload(path, p, { contentType: "image/jpeg", upsert: true });
+        if (!e) return path;
+      } catch {}
+      await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+    }
+    try {
+      const fd = new FormData();
+      fd.append("photo", p, "meal.jpg");
+      const r = await uploadFoodPhoto(fd);
+      if (r.path) return r.path;
+    } catch {}
+    return null;
+  }
+  const [notice, setNotice] = useState("");
+  const alert0 = (m: string) => setNotice(m);
+
   async function save() {
-    setBusy("saving"); setError("");
+    setBusy("saving"); setError(""); setNotice("");
     if (favEdit) {
       const r = await updateGoTo(favEdit.id, { items });
       setBusy("");
@@ -114,16 +157,15 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
       if (r?.error) setError(r.error); else reset();
       return;
     }
-    let photoPath: string | null = null;
-    if (photo) {
-      photoPath = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error: e } = await createClient().storage.from("food-photos").upload(photoPath, photo, { contentType: "image/jpeg" });
-      if (e) photoPath = null;
-    }
-    const r = await saveMeal({ items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
-      description: text, photoPath, savedMealId: savedId, saveAs });
+    const photoPath = photo ? await uploadPhoto(photo) : null;
+    const logItems = batch ? [potItem(batch.ate / potServings, `${servingsText(batch.ate)} (the pot makes ${potServings})`)] : items;
+    const r = await saveMeal({ items: logItems, mealSlot: slot, eatenAt: when ? when.toISOString() : null, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
+      description: batch ? `${batch.name.trim()}: ${items.map((i) => `${i.amount} ${i.name}`).join(", ")}` : text, photoPath, savedMealId: savedId, saveAs: batch ? null : saveAs });
     setBusy("");
-    if (r?.error) setError(r.error); else reset();
+    if (r?.error) { setError(r.error); return; }
+    if (batch) await saveBatchFavorite();
+    reset();
+    if (photo && !photoPath) alert0("Your meal is saved, but the photo didn't upload. Check your connection and use Edit to add it again if you'd like.");
   }
   // The food as it was when she opened it to edit: amount changes scale from this, so numbers never drift.
   const base = useRef<FoodItem | null>(null);
@@ -190,6 +232,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           </div>
         )}
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+        {notice && <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-2.5 text-[13px] text-[#e7d3a8]">{notice}</p>}
       </div>
     );
   }
@@ -214,7 +257,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
     );
   }
 
-  const t = totals(items);
+  const t = batch && Number(batch.servings) >= 1 ? totals([potItem(batch.ate / potServings, "")]) : totals(items);
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-bg">
       <div className="mx-auto flex w-full max-w-md items-center justify-between px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
@@ -311,7 +354,36 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           </div>
         )}
 
-        {items.length > 0 && !savedId && !favEdit && (
+        {!favEdit && !editId && !savedId && (
+          <div className={`space-y-2.5 rounded-xl border p-3 ${batch ? "border-accent/60 bg-[#161310]" : "border-border bg-card"}`}>
+            <label className="flex items-center gap-2.5 text-sm">
+              <input type="checkbox" checked={!!batch} onChange={(e) => { setBatch(e.target.checked ? { name: "", servings: "", ate: 1 } : null); if (e.target.checked) setSaveAs(null); }} className="size-5 accent-[var(--accent)]" />
+              <span><b>Big batch?</b> Soup, chili, a casserole… Add everything that went in the pot, and log just your bowl.</span>
+            </label>
+            {batch && (
+              <div className="space-y-2.5">
+                <input value={batch.name} onChange={(e) => setBatch({ ...batch, name: e.target.value })} placeholder="Name it, e.g. Chicken tortilla soup" aria-label="Name of the dish"
+                  className={`min-h-11 w-full rounded-lg border bg-bg px-3 text-base outline-none focus:border-accent ${batch.name.trim() ? "border-[#2a2a2a]" : "border-accent"}`} />
+                <label className="flex items-center gap-2 text-[14px]">The whole pot makes
+                  <input type="number" inputMode="numeric" min={1} value={batch.servings} onChange={(e) => setBatch({ ...batch, servings: e.target.value })} aria-label="Servings in the whole pot"
+                    placeholder="6" className={`min-h-11 w-20 rounded-lg border bg-bg px-2 text-center text-base outline-none focus:border-accent ${Number(batch.servings) >= 1 ? "border-[#2a2a2a]" : "border-accent"}`} />
+                  servings
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[13px] text-[#a8a8a8]">I ate</span>
+                  {([[0.5, "½"], [1, "1"], [1.5, "1½"], [2, "2"]] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => setBatch({ ...batch, ate: k })} aria-pressed={batch.ate === k}
+                      className={`min-h-10 flex-1 rounded-lg border text-[14px] ${batch.ate === k ? "border-accent bg-accent font-semibold text-black" : "border-[#2a2a2a]"}`}>{l}</button>
+                  ))}
+                  <span className="text-[13px] text-[#a8a8a8]">serving{batch.ate === 1 ? "" : "s"}</span>
+                </div>
+                <p className="text-[12px] text-dim">Not sure how many servings? Count the bowls or containers you&apos;ll get out of it. Next time, tap <b>★ {batch.name.trim() || "it"} (1 serving)</b> in your favorites.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {items.length > 0 && !savedId && !favEdit && !batch && (
           <label className="flex items-center gap-2.5 text-sm">
             <input type="checkbox" checked={saveAs !== null} onChange={(e) => setSaveAs(e.target.checked ? "" : null)} className="size-5 accent-[var(--accent)]" />
             ★ Save as a favorite (log it again with one tap)
@@ -331,15 +403,16 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
 
       <div className="border-t border-border bg-[#0f0f0f] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-md space-y-2.5 px-4 pt-3">
+          {batch && Number(batch.servings) >= 1 && <p className="text-[12px] text-dim">Your {servingsText(batch.ate)} of {potServings} (the whole pot is {Math.round(totals(items).calories)} kcal)</p>}
           <div className="flex justify-between text-[13px] text-[#a8a8a8]">
             <span><b className="text-base text-text">{Math.round(t.calories)}</b> kcal</span>
             <span><b className="text-text">{Math.round(t.protein_g)} g</b> protein</span>
             <span><b className="text-text">{Math.round(t.fiber_g)} g</b> fiber</span>
             <span><b className="text-text">{(t.potassium_mg / 1000).toFixed(1)}k</b> mg K</span>
           </div>
-          <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim())} onClick={save}
+          <button type="button" disabled={busy !== "" || !items.length || (saveAs !== null && !saveAs.trim()) || !batchReady} onClick={save}
             className="min-h-[54px] w-full rounded-[14px] bg-accent text-[17px] font-semibold text-black disabled:opacity-40">
-            {busy === "saving" ? "Saving…" : favEdit ? `Save favorite: ${favEdit.name}` : saveAs !== null && !saveAs.trim() ? "Name your favorite first ↑" : editId ? "Save changes" : `Save ${slotLabel}${saveAs !== null ? " + favorite" : ""}`}
+            {busy === "saving" ? "Saving…" : batch ? (batchReady ? `Save my ${servingsText(batch.ate)}` : "Name it and add the servings ↑") : favEdit ? `Save favorite: ${favEdit.name}` : saveAs !== null && !saveAs.trim() ? "Name your favorite first ↑" : editId ? "Save changes" : `Save ${slotLabel}${saveAs !== null ? " + favorite" : ""}`}
           </button>
         </div>
       </div>

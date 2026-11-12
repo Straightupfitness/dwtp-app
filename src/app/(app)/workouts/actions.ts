@@ -100,6 +100,42 @@ export async function finishWorkout(sessionId: string) {
   return { ok: true, cps };
 }
 
+/**
+ * November 11 (Silvia: "I marked Day 2 done by accident"): take a finished workout back to not done. Her sets stay,
+ * the +5 CPs come back off, and a Strength habit it ticked comes off again if she no longer has enough workouts.
+ */
+export async function reopenWorkout(sessionId: string) {
+  const { supabase, user } = await me();
+  if (!user) return { error: "Not signed in" };
+  const { data: s } = await supabase.from("workout_sessions").select("id, program_week, completed_at, workouts(kind)")
+    .eq("id", sessionId).eq("client_id", user.id).single();
+  if (!s) return { error: "Workout not found" };
+  if (!s.completed_at) return { ok: true };
+  const { data: p } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
+  const day = todayIn(p?.timezone ?? "America/Los_Angeles", new Date(s.completed_at as string));
+  const { error } = await supabase.from("workout_sessions").update({ completed_at: null }).eq("id", sessionId).eq("client_id", user.id);
+  if (error) return { error: error.message };
+  await supabase.from("cp_ledger").delete().eq("client_id", user.id).eq("reason", "workout").eq("source_id", sessionId);
+  const w = s.workouts as unknown as { kind: string } | null;
+  if (w?.kind === "strength") {
+    const { count } = await supabase.from("workout_sessions").select("id, workouts!inner(kind)", { count: "exact", head: true })
+      .eq("client_id", user.id).eq("program_week", s.program_week).not("completed_at", "is", null).eq("workouts.kind", "strength");
+    const n = count ?? 0;
+    const { data: items } = await supabase.from("ring_items").select("id, title, rings!inner(circles!inner(slug))")
+      .eq("cadence", "weekly").eq("rings.circles.slug", "strength");
+    const undo = (items ?? []).filter((i) => {
+      const t = String(i.title);
+      return (/Do 1 full-body/i.test(t) && n < 1) || (/Do 2 full-body/i.test(t) && n < 2) || (/Train 3x/i.test(t) && n < 3);
+    }).map((i) => i.id as string);
+    if (undo.length) {
+      await supabase.from("habit_logs").delete().eq("client_id", user.id).eq("log_date", day).in("item_id", undo);
+      await supabase.from("cp_ledger").delete().eq("client_id", user.id).eq("reason", `habit:${day}`).in("source_id", undo);
+    }
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 type ExRow = { id: number; name: string; clip_path: string | null; youtube_id: string | null; notes: string | null };
 const cleanEx = (n: string) => n.replace(/\s*\((SLTP|PSR|SLF|DWTP)\)\s*$/i, "").trim();
 

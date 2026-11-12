@@ -6,6 +6,7 @@ import DeleteMeal from "./DeleteMeal";
 import EditMeal from "./EditMeal";
 import Link from "next/link";
 import { CopyMeal, CopyMealTo, FavoriteMeal } from "./MealButtons";
+import CopyFromDay from "./CopyFromDay";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const SLOT_LABEL: Record<string, string> = { meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3", other: "Other" };
@@ -43,8 +44,6 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
     supabase.from("saved_meals").select("id, name, items, last_used_at").eq("client_id", user!.id).order("last_used_at", { ascending: false, nullsFirst: false }).limit(20),
   ]);
   const meals = (rows ?? []).filter((r) => todayIn(tz, new Date(r.eaten_at)) === day);
-  // Under today: the day before's meals, to copy over with one tap.
-  const before = isToday ? (rows ?? []).filter((r) => todayIn(tz, new Date(r.eaten_at)) === prev) : [];
   const dayName = isToday ? "Today" : day === addDays(today, -1) ? "Yesterday"
     : new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
   const foods = (m: { items: unknown }) => (m.items as FoodItem[]).map((i) => i.name).join(", ");
@@ -149,22 +148,8 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
         {!isToday && !meals.length && <p className="rounded-2xl border border-dashed border-[#2f2f2f] p-4 text-center text-[13px] text-dim">Nothing logged this day. Add it above.</p>}
       </div>
 
-      {before.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="pt-1 text-[11px] uppercase tracking-[0.15em] text-accent">Copy from yesterday</p>
-          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-            {before.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 px-3.5 py-2">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] uppercase tracking-[0.12em] text-dim">{SLOT_LABEL[m.meal_slot ?? "other"]} · {m.calories} kcal</span>
-                  <span className="block truncate text-[14px]">{foods(m)}</span>
-                </span>
-                <CopyMeal id={m.id} toDay={today} label="+ Add" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* November 11: copy from any day, not only yesterday. */}
+      <CopyFromDay toDay={day} today={today} />
     </section>
   );
 }
