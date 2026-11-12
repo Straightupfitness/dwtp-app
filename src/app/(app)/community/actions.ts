@@ -77,3 +77,15 @@ export async function setPinned(postId: string, pinned: boolean) {
   await supabase.from("posts").update({ pinned }).eq("id", postId);
   done();
 }
+
+/** November 11: fix a typo or add to a post after it's up. Her own posts (Michael: his own too). */
+export async function editPost(postId: string, body: string) {
+  const { supabase, id } = await me();
+  const { data: post } = await supabase.from("posts").select("author_id, photo_path").eq("id", postId).single();
+  if (!post || post.author_id !== id) return { error: "You can only edit your own posts." };
+  if (!body.trim() && !post.photo_path) return { error: "Write something, or delete the post instead." };
+  const { error } = await supabase.from("posts").update({ body: body.trim() }).eq("id", postId);
+  if (error) return { error: error.message };
+  done();
+  return { ok: true };
+}

@@ -6,6 +6,7 @@ import LiveRefresh from "@/components/LiveRefresh";
 import Avatar from "@/components/Avatar";
 import { BadgeRow } from "@/components/BadgeIcon";
 import Composer from "./Composer";
+import PostBody from "./PostBody";
 import { CommentBox, CommentLike, DeleteButton, LikeButton, PinButton } from "./PostActions";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -144,7 +145,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
               {coach && <PinButton id={p.id} pinned={p.pinned} />}
               {(p.author_id === me || coach) && <DeleteButton kind="post" id={p.id} />}
             </div>
-            {p.body && <p className="whitespace-pre-line text-[15px] leading-relaxed"><Linkify text={p.body} /></p>}
+            {(p.body || p.author_id === me) && <PostBody key={p.body} id={p.id} body={p.body ?? ""} canEdit={p.author_id === me} />}
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
             {p.photo_path && photos.get(p.photo_path) && <img src={photos.get(p.photo_path)} alt="" className="w-full rounded-[14px]" />}
             <div className="flex items-center gap-4 border-t border-border pt-1">
