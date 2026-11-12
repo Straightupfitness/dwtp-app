@@ -17,8 +17,8 @@ function Btn({ href, label, icon, badge, aria }: { href: string; label: string; 
 }
 
 /** Top of every screen: the lion (home) on the left; Calendar, FAQ, Chat and Account (her picture) on the right. */
-export default function TopBar({ coach, unread, name, avatarPath }: {
-  coach: boolean; unread: number; name: string | null; avatarPath: string | null;
+export default function TopBar({ coach, unread, alerts = 0, name, avatarPath }: {
+  coach: boolean; unread: number; alerts?: number; name: string | null; avatarPath: string | null;
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur">
@@ -28,6 +28,8 @@ export default function TopBar({ coach, unread, name, avatarPath }: {
         </Link>
         <div className="flex items-center gap-0.5">
           <Btn href={coach ? "/coach/calendar" : "/calendar"} label="Calendar" icon={<IconCalendar />} />
+          {/* November 11: her notifications, so the number on the app icon means something. */}
+          <Btn href="/notifications" label="Alerts" icon={<Bell />} badge={alerts} aria={alerts ? `Notifications, ${alerts} new` : "Notifications"} />
           <Btn href="/faq" label="FAQ" icon={<IconFaq />} />
           <Btn href={coach ? "/coach/inbox" : "/chat"} label={coach ? "Inbox" : "Chat"} icon={<IconChat />} badge={unread}
             aria={unread ? `${coach ? "Inbox" : "Chat with Michael"}, ${unread} unread` : coach ? "Inbox" : "Chat with Michael"} />
@@ -36,4 +38,8 @@ export default function TopBar({ coach, unread, name, avatarPath }: {
       </div>
     </header>
   );
+}
+
+function Bell() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2.2 2.2 0 0 0 4 0" /></svg>;
 }

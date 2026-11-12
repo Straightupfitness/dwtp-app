@@ -1,4 +1,6 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import ProgressPhotos from "@/components/ProgressPhotos";
+import { loadProgressPhotos } from "@/lib/progress-photos";
 import { todayIn, trainingWeek, weekName } from "@/lib/program";
 import Link from "next/link";
 import WelcomeButton from "./WelcomeButton";
@@ -61,7 +63,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const nextC = order.length > 1 && at >= 0 ? order[(at + 1) % order.length] : null;
   const arrow = "grid size-10 shrink-0 place-items-center rounded-full border border-border text-xl text-[#cfcfcf] hover:border-accent hover:text-accent";
   // November 1: when she was last in the app, her last 7 days, and her food for the week.
-  const [seenMap, foodWeek] = await Promise.all([
+  const [seenMap, foodWeek, photos] = await Promise.all([
     (async () => {
       try {
         const db = adminClient();
@@ -71,6 +73,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       } catch { return null; }
     })(),
     loadFoodWeek(supabase, id),
+    loadProgressPhotos(supabase, id), // November 11
   ]);
   const seen = seenMap?.get(id) ?? null;
   const guarantee = await guaranteeFor(supabase, id).catch(() => null);
@@ -188,6 +191,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             })}
             <details><summary className="cursor-pointer text-sm text-accent">+ Add a purchase</summary><div className="mt-2"><PurchaseForm clientId={id} /></div></details>
           </div>
+
+          {photos.length > 0 && <ProgressPhotos photos={photos} today={prog.data.today} readOnly />}
 
           <div className="space-y-2">
             <h2 className="text-sm uppercase tracking-widest text-dim">Assessment</h2>

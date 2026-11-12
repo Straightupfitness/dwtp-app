@@ -50,11 +50,20 @@ async function notifyOne(userId: string, note: Note) {
     db.from("profiles").select("email, full_name, email_notifications").eq("id", userId).single(),
   ]);
 
+  // November 11: keep it in her Notifications list too, and send how many she hasn't read, so the number on the
+  // app icon matches that list. (Before migration 0040 the table isn't there: skipped quietly.)
+  let unread: number | undefined;
+  const { error: kept } = await db.from("notifications").insert({ user_id: userId, title: note.title.slice(0, 200), body: note.body.slice(0, 1000), url: note.url });
+  if (!kept) {
+    const { count } = await db.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null);
+    unread = count ?? undefined;
+  }
+
   let pushed = 0;
   if (subs?.length) {
     const keys = await vapidKeys();
     webpush.setVapidDetails("mailto:michael@straightupfitness.com", keys.publicKey, keys.privateKey);
-    const payload = JSON.stringify({ title: note.title, body: note.body, url: note.url });
+    const payload = JSON.stringify({ title: note.title, body: note.body, url: note.url, badge: unread });
     await Promise.all(subs.map(async (s) => {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 86400 });

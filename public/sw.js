@@ -1,10 +1,14 @@
 // DWTP service worker: shows push notifications and opens the right screen when tapped.
+// November 11: the number on the app icon is how many notifications she hasn't read in the app (Alerts).
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { title: "DWTP", body: event.data && event.data.text() }; }
-  event.waitUntil(self.registration.showNotification(data.title || "DWTP", {
+  const badge = typeof data.badge === "number" && self.navigator && "setAppBadge" in self.navigator
+    ? (data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()).catch(() => {})
+    : Promise.resolve();
+  event.waitUntil(Promise.all([badge, self.registration.showNotification(data.title || "DWTP", {
     body: data.body || "", icon: "/brand/icon-192.png", badge: "/brand/icon-192.png", data: { url: data.url || "/today" },
-  }));
+  })]));
 });
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
