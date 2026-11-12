@@ -68,7 +68,7 @@ export default function ProgressPhotos({ photos, userId, today, readOnly = false
   }
 
   return (
-    <div className="space-y-3 rounded-[18px] border border-border bg-card p-4">
+    <div id="photos" className="scroll-mt-20 space-y-3 rounded-[18px] border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Before &amp; after</p>
