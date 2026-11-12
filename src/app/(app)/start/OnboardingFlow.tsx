@@ -34,6 +34,7 @@ export default function OnboardingFlow({ first, userId, videos, saved, preview =
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [hh, setHh] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   // Shuffle each question's options once, so the right answer isn't always first.
@@ -64,14 +65,20 @@ export default function OnboardingFlow({ first, userId, videos, saved, preview =
     setBusy(true);
     const r = await submitBlueprint({ ...a, videos: vids });
     setBusy(false);
-    if (r?.error) setError(r.error); else { setDone(true); video.current?.pause(); }
+    if (r?.error) setError(r.error); else { setHh(("hh" in r && r.hh) || null); setDone(true); video.current?.pause(); }
   }
 
   if (done) return (
     <div className="space-y-3 rounded-[22px] border border-accent bg-[#1f1708] p-6 text-center">
       <p className={`${display} text-3xl font-semibold`}>You did it, {first}</p>
-      <p className="text-[#d9c9a8]">Your Driven Woman Blueprint is in. Michael reads every answer and builds your plan from it. Next up: your onboarding call.</p>
-      {preview ? <p className="text-sm text-dim">Preview only. Nothing was saved.</p> : <Link href="/today" className="inline-grid min-h-12 place-items-center rounded-xl bg-accent px-6 font-semibold text-black">Go to your app</Link>}
+      <p className="text-[#d9c9a8]">Your Driven Woman Blueprint is in. Michael reads every answer and builds your plan from it.</p>
+      <p className="text-[#d9c9a8]">Here&apos;s your head start: <b className="text-text">your Week 1 Habits &amp; Homework is open now</b>, so you&apos;re ready to go on day one. (We&apos;ve emailed you the link too.)</p>
+      {preview ? <p className="text-sm text-dim">Preview only. Nothing was saved.</p> : (
+        <div className="flex flex-col items-center gap-1.5">
+          <Link href={hh ? `/lessons/${hh}` : "/lessons"} className="inline-grid min-h-12 w-full max-w-xs place-items-center rounded-xl bg-accent px-6 font-semibold text-black">Open my Week 1 Habits &amp; Homework</Link>
+          <Link href="/today" className="min-h-11 px-3 py-2.5 text-sm text-[#d9c9a8] underline">Go to your app</Link>
+        </div>
+      )}
     </div>
   );
 

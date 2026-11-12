@@ -1,11 +1,11 @@
-/** The Strong Body Wednesday and Strong Mind Friday emails: the full lesson, in Michael's words, with a button into the app. */
+/** The Strong Body Wednesday and Strong Mind Friday emails (and, since November 12, Week 1 Habits & Homework): the full lesson, in Michael's words, with a button into the app. */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export function lessonEmail(o: {
-  kind: "sbw" | "smf"; week: number; title: string; body: string | null; firstName?: string | null;
+  kind: "sbw" | "smf" | "hh"; week: number; title: string; body: string | null; firstName?: string | null;
   button: { label: string; url: string }; secondary?: { label: string; url: string };
 }) {
-  const name = o.kind === "sbw" ? "Strong Body Wednesday" : "Strong Mind Friday";
+  const name = o.kind === "sbw" ? "Strong Body Wednesday" : o.kind === "hh" ? "Habits & Homework" : "Strong Mind Friday";
   const subject = `${name} · Week ${o.week}: ${o.title}`;
   const paras = (o.body ?? "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const text = [

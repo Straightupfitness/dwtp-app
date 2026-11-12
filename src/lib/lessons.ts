@@ -2,9 +2,11 @@
  * Weekly lessons (decided October 25): Habits & Homework, Strong Body Wednesday, Strong Mind Friday.
  * Week 1 opens on her start date. Each next week's H&H opens once she submits the previous week's check-in.
  * That week's SBW opens on its Wednesday and SMF on its Friday (both only once the week's H&H is open).
+ * November 12: Week 1's H&H also opens the moment she sends her Driven Woman Blueprint, before her start date.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { programWeek, todayIn } from "./program";
+import { blueprintDone } from "./blueprint";
 
 export const KIND_LABEL: Record<string, string> = { hh: "Habits & Homework", sbw: "Strong Body Wednesday", smf: "Strong Mind Friday", other: "Bonus" };
 export type QuizQ = { q: string; options: string[]; correct: number };
@@ -25,11 +27,13 @@ export async function loadLessons(supabase: SupabaseClient, clientId: string, op
   const today = todayIn(p?.timezone ?? "America/Los_Angeles");
   const start = p?.program_start ?? null;
   const current = programWeek(start, today);
-  const [{ data: lessons }, { data: checkins }, { data: progress }] = await Promise.all([
+  const [{ data: lessons }, { data: checkins }, { data: progress }, { data: bp }] = await Promise.all([
     supabase.from("lessons").select("id, kind, number, title, video_url, body, quiz, quiz_status, week_number").not("week_number", "is", null).eq("retired", false),
     supabase.from("checkins").select("week_number").eq("client_id", clientId),
     supabase.from("lesson_progress").select("lesson_id, watched_at, quiz_passed_at").eq("client_id", clientId),
+    supabase.from("assessments").select("submitted_at").eq("client_id", clientId).maybeSingle(),
   ]);
+  const headStart = blueprintDone(bp?.submitted_at as string | null | undefined); // her Blueprint is in: Week 1 H&H is open
   const checkedIn = new Set((checkins ?? []).map((c) => c.week_number as number));
   const prog = new Map((progress ?? []).map((r) => [r.lesson_id as string, r]));
   const order = { hh: 0, sbw: 1, smf: 2, other: 3 } as const;
@@ -37,11 +41,13 @@ export async function loadLessons(supabase: SupabaseClient, clientId: string, op
   const all: LessonState[] = ((lessons ?? []) as Lesson[]).map((l) => {
     const week = l.week_number!;
     const weekStart = start ? addDays(start, (week - 1) * 7) : null;
-    const hhOpen = !!weekStart && (week === 1 ? today >= weekStart : checkedIn.has(week - 1));
+    const early = week === 1 && l.kind === "hh" && headStart;
+    const hhOpen = early || (!!weekStart && (week === 1 ? today >= weekStart || headStart : checkedIn.has(week - 1)));
     const opensOn = !weekStart ? null : l.kind === "sbw" ? addDays(weekStart, 2) : l.kind === "smf" ? addDays(weekStart, 4) : week === 1 ? weekStart : null;
-    let open = hhOpen && (!opensOn || today >= opensOn);
+    let open = early || (hhOpen && (!opensOn || today >= opensOn));
     if (opts.coach) open = true;
     const lockedReason = open ? null
+      : week === 1 && l.kind === "hh" ? "Opens as soon as you finish your Driven Woman Blueprint"
       : !start ? "Opens when your program starts"
       : !hhOpen ? (week === 1 ? `Opens ${dayName(weekStart!)}` : `Unlocks after your Week ${week - 1} check-in`)
       : `Opens ${dayName(opensOn!)}`;

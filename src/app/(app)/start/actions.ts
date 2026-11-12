@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { coachIds, notify } from "@/lib/notify";
+import { lessonEmail } from "@/lib/lesson-email";
 import { blueprintLabels } from "@/lib/blueprint";
 import { summarizeBlueprint } from "@/lib/ai/blueprint-summary";
 import { assignFromBlueprint } from "@/lib/assign";
@@ -76,6 +77,26 @@ export async function submitBlueprint(answers: Answers) {
     await db.from("assessments").update({ answers: { ...full, assigned } }).eq("client_id", user.id);
   } catch (e) { console.error("blueprint assign", e); }
 
+  const APP_URL = () => (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.straightupfitness.com").replace(/\/$/, "");
+  // November 12: her head start. Week 1 Habits & Homework opens now (lib/lessons), in the app and by email.
+  const { data: hh1 } = await db.from("lessons").select("id, title").eq("kind", "hh").eq("week_number", 1).eq("retired", false).maybeSingle();
+  const { data: when } = await db.from("profiles").select("program_start").eq("id", user.id).single();
+  const startDay = (when?.program_start as string | null) ?? null;
+  const first = ((p?.full_name as string | null) ?? "").trim().split(/\s+/)[0] || null;
+  if (hh1) {
+    const url = `${APP_URL()}/lessons/${hh1.id}`;
+    const onDay = startDay ? new Date(startDay + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }) : null;
+    const email = lessonEmail({
+      kind: "hh", week: 1, title: (hh1.title as string) || "Your first habits", firstName: first,
+      body: `You did it! Your Driven Woman Blueprint is in, so I'm giving you a head start: your Week 1 Habits & Homework is open in the app right now.\n\nWatch the video and read through your first habits, so you're ready to hit the ground running${onDay ? ` on ${onDay}` : " when your program starts"}.\n\nI'm going through your answers now and building your plan around them. Can't wait to get started with you!`,
+      button: { label: "Open my Week 1 Habits & Homework", url },
+    });
+    after(() => notify(user.id, {
+      title: "Your Week 1 Habits & Homework is ready", body: "Your Blueprint is in, so here's your head start. Tap to open it.",
+      url: `/lessons/${hh1.id}`, email, dedupeKey: "hh-ready:1",
+    }).catch((e) => console.error("hh1 notify", e)));
+  }
+
   // After she sees "done": transcribe her videos, write Michael's summary, and tell him.
   const name = (p?.full_name as string | null) ?? "A new client";
   after(async () => {
@@ -92,6 +113,6 @@ export async function submitBlueprint(answers: Answers) {
       email: { subject: `DWTP: ${name} finished her Driven Woman Blueprint`, text: `${name} just finished her Driven Woman Blueprint.\n\nHer answers and a summary for your onboarding call are on her client page.` },
     }).catch(() => {});
   });
-  revalidatePath("/today");
-  return { ok: true };
+  revalidatePath("/", "layout");
+  return { ok: true, hh: (hh1?.id as string | undefined) ?? null };
 }
