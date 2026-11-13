@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notifyLater, coachIds } from "@/lib/notify";
 
 export async function sendMessage(clientId: string, body: string, attachmentPath: string | null,
-  opts: { kind?: "image" | "audio"; replyTo?: string | null; seconds?: number | null } = {}) {
+  opts: { kind?: "image" | "audio" | "video"; replyTo?: string | null; seconds?: number | null } = {}) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in" };
@@ -17,7 +17,7 @@ export async function sendMessage(clientId: string, body: string, attachmentPath
   if (error) return { error: error.message };
   const fromClient = user.id === clientId;
   const { data: me } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-  const preview = body.trim() ? body.trim().slice(0, 120) : kind === "audio" ? "Sent a voice note" : "Sent a photo";
+  const preview = body.trim() ? body.trim().slice(0, 120) : kind === "audio" ? "Sent a voice note" : kind === "video" ? "Sent you a video 🎥" : "Sent a photo";
   notifyLater(fromClient ? coachIds() : clientId, {
     title: fromClient ? (me?.full_name ?? "New message") : "Michael", body: preview,
     url: fromClient ? `/coach/inbox/${clientId}` : "/chat", email: "push-fallback",

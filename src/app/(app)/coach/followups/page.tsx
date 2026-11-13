@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadRoster } from "@/lib/roster";
 import BriefPanel from "@/components/BriefPanel";
+import BlueprintReply from "@/components/BlueprintReply";
 import BackButton from "@/components/BackButton";
 import type { Brief } from "@/lib/ai/client-brief";
 
@@ -10,7 +11,7 @@ const display = "font-[family-name:var(--font-display)] uppercase";
 const TABS = [
   { key: "not-started", label: "Not started", blurb: "Hasn't opened her Blueprint yet. Get her to do it before Sunday night." },
   { key: "started", label: "Stuck", blurb: "Started her Blueprint and stopped partway. Help her finish." },
-  { key: "done", label: "Done", blurb: "Sent her Blueprint. Give her your feedback on it." },
+  { key: "done", label: "Done", blurb: "Sent her Blueprint. Record your video reply (talking points on screen), or send a quick message." },
 ] as const;
 const seenText = (h: number | null) => h === null ? "not seen yet" : h < 1 ? "in the app just now" : h < 48 ? `in the app ${h} h ago` : `in the app ${Math.round(h / 24)} days ago`;
 
@@ -29,12 +30,14 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   const roster = (await loadRoster(supabase)).filter((r) => r.status !== "cancelled");
   const ids = roster.map((r) => r.id);
-  const [{ data: phones }, { data: fu, error: fuErr }] = await Promise.all([
+  const [{ data: phones }, { data: fu, error: fuErr }, { data: replies }] = await Promise.all([
     supabase.from("profiles").select("id, phone").in("id", ids),
     supabase.from("coach_followups").select("client_id, brief, done_at").eq("topic", "blueprint").in("client_id", ids),
+    supabase.from("coach_followups").select("client_id, brief, done_at").eq("topic", "blueprint-reply").in("client_id", ids),
   ]);
   const phone = new Map((phones ?? []).map((p) => [p.id as string, (p.phone as string | null) ?? null]));
   const f = new Map((fu ?? []).map((x) => [x.client_id as string, x]));
+  const rp = new Map((replies ?? []).map((x) => [x.client_id as string, x]));
   const count = (k: string) => roster.filter((r) => r.blueprint === k && !f.get(r.id)?.done_at).length;
   const list = roster.filter((r) => r.blueprint === tab.key)
     .sort((a, b) => (a.hoursSinceSeen ?? 9999) - (b.hoursSinceSeen ?? 9999));
@@ -52,7 +55,11 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
           {x?.brief ? <span className="text-[11px] text-accent">bullets ready</span> : null}
           <span className="text-dim transition-transform group-open:rotate-90" aria-hidden="true">›</span>
         </summary>
-        <div className="border-t border-border px-3.5 pb-3.5 pt-3">
+        <div className="space-y-3 border-t border-border px-3.5 pb-3.5 pt-3">
+          {tab.key === "done" && (
+            <BlueprintReply clientId={r.id} first={r.first} initial={(rp.get(r.id)?.brief as { groups: { h: string; items: string[] }[]; at: string } | null) ?? null}
+              sentAt={(rp.get(r.id)?.done_at as string | null) ?? null} />
+          )}
           <BriefPanel compact clientId={r.id} first={r.first} phone={phone.get(r.id) ?? null} topic="blueprint"
             initial={(x?.brief as Brief | null) ?? null} doneAt={(x?.done_at as string | null) ?? null} />
           <Link href={`/coach/clients/${r.id}`} className="mt-2 block text-center text-[12px] text-dim underline">Her full page</Link>

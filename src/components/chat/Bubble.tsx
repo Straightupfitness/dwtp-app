@@ -9,7 +9,7 @@ export type ReplyTo = { id: string; who: string; snippet: string };
 export type EditMsg = { id: string; body: string };
 
 export type BubbleMsg = {
-  id: string; mine: boolean; body: string | null; photo: string | null; audio: string | null; seconds: number | null;
+  id: string; mine: boolean; body: string | null; photo: string | null; audio: string | null; video?: string | null; seconds: number | null;
   edited: boolean; hearted: boolean; quote: { who: string; snippet: string } | null; senderName: string;
 };
 
@@ -21,7 +21,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).
  */
 export default function Bubble({ m }: { m: BubbleMsg }) {
   const [open, setOpen] = useState(false);
-  const snippet = m.body ? m.body.slice(0, 90) : m.audio ? "🎤 Voice note" : "📷 Photo";
+  const snippet = m.body ? m.body.slice(0, 90) : m.audio ? "🎤 Voice note" : m.video ? "🎥 Video" : "📷 Photo";
   const act = "min-h-9 rounded-full border border-border bg-card px-3 text-[13px] font-semibold";
   return (
     <div className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
@@ -37,6 +37,7 @@ export default function Bubble({ m }: { m: BubbleMsg }) {
           )}
           {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
           {m.photo && <img src={m.photo} alt="" className="rounded-[14px]" />}
+          {m.video && <video src={m.video} controls playsInline preload="metadata" onClick={(e) => e.stopPropagation()} className="max-h-[70dvh] w-full rounded-[14px] bg-black" />}
           {m.audio && (
             <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <audio controls preload="metadata" src={m.audio} className="h-10 w-[230px] max-w-full" />

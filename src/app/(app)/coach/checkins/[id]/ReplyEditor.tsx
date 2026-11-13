@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import VideoRecorder from "@/components/VideoRecorder";
+import PrompterRecorder, { groupsFromText } from "@/components/PrompterRecorder";
 import { saveReply } from "./actions";
 
 type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
@@ -86,9 +86,11 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
       <p className="text-xs text-dim">{text.trim().split(/\s+/).filter(Boolean).length} words · about {Math.max(1, Math.round(text.trim().split(/\s+/).length / 150))} min spoken</p>
 
       <div className="space-y-2">
-        <p className="text-sm">Add your video reply (optional)</p>
+        <p className="text-sm">Your video reply</p>
         {videoUrl && !video && <video src={videoUrl} controls playsInline className="w-full rounded-lg bg-black" />}
-        <VideoRecorder folder={`${clientId}/replies`} onUploaded={setVideo} label={videoUrl ? "Record a new video" : "Record your reply"} />
+        {/* November 13: record with the talking points on screen, like a teleprompter. */}
+        <PrompterRecorder points={groupsFromText(points)} bucket="checkin-videos" folder={`${clientId}/replies`} onUploaded={setVideo}
+          label={videoUrl ? "🎥 Record a new video (talking points on screen)" : "🎥 Record with your talking points"} />
       </div>
 
       <div className="flex gap-2">

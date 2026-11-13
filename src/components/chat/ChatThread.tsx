@@ -25,7 +25,7 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
   const quoteOf = (id: string | null) => {
     const q = id ? byId.get(id) : null;
     if (!q) return id ? { who: "", snippet: "Message no longer here" } : null;
-    return { who: q.sender_id === viewerId ? "You" : otherName, snippet: q.body ? q.body.slice(0, 120) : q.attachment_kind === "audio" ? "🎤 Voice note" : "📷 Photo" };
+    return { who: q.sender_id === viewerId ? "You" : otherName, snippet: q.body ? q.body.slice(0, 120) : q.attachment_kind === "audio" ? "🎤 Voice note" : q.attachment_kind === "video" ? "🎥 Video" : "📷 Photo" };
   };
   const unread = list.filter((m) => m.sender_id !== viewerId && !m.read_at).length;
   // Times in the viewer's own time zone.
@@ -45,7 +45,8 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
               {showTime && <p className="py-2 text-center text-xs text-dim">{fmt(m.created_at)}</p>}
               <Bubble m={{
                 id: m.id, mine, body: m.body, seconds: m.audio_seconds, edited: !!m.edited_at, hearted: !!m.hearted_at, senderName: mine ? "You" : otherName,
-                photo: m.attachment_path && m.attachment_kind !== "audio" ? photos.get(m.attachment_path) ?? null : null,
+                photo: m.attachment_path && !m.attachment_kind?.match(/audio|video/) ? photos.get(m.attachment_path) ?? null : null,
+                video: m.attachment_path && m.attachment_kind === "video" ? photos.get(m.attachment_path) ?? null : null,
                 audio: m.attachment_path && m.attachment_kind === "audio" ? photos.get(m.attachment_path) ?? null : null,
                 quote: quoteOf(m.reply_to),
               }} />

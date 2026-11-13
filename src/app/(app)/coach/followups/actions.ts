@@ -20,3 +20,18 @@ export async function sendInApp(clientId: string, text: string) {
   const r = await sendMessage(clientId, text.trim(), null);
   return r?.error ? { error: r.error } : { ok: true };
 }
+
+/** November 13: his Blueprint reply video (and a line of text) goes to her chat; she's marked done in the queue. */
+export async function sendBlueprintReply(clientId: string, videoPath: string, note: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  if (!videoPath.startsWith(`chat/${clientId}/`)) return { error: "Record the video first." };
+  const { sendMessage } = await import("@/components/chat/actions");
+  const r = await sendMessage(clientId, note.trim(), videoPath, { kind: "video" });
+  if (r?.error) return { error: /check constraint|attachment_kind/i.test(r.error) ? "Run the chat video SQL file first." : r.error };
+  await supabase.from("coach_followups").upsert({ client_id: clientId, topic: "blueprint", done_at: new Date().toISOString() }, { onConflict: "client_id,topic" });
+  await supabase.from("coach_followups").upsert({ client_id: clientId, topic: "blueprint-reply", done_at: new Date().toISOString() }, { onConflict: "client_id,topic" });
+  revalidatePath("/coach/followups");
+  return { ok: true };
+}

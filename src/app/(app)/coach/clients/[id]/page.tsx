@@ -1,4 +1,6 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import BlueprintReply from "@/components/BlueprintReply";
+import { blueprintDone } from "@/lib/blueprint";
 import BriefPanel from "@/components/BriefPanel";
 import ProgressPhotos from "@/components/ProgressPhotos";
 import { loadProgressPhotos } from "@/lib/progress-photos";
@@ -50,6 +52,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
     supabase.from("assessments").select("answers, ai_summary, submitted_at").eq("client_id", id).maybeSingle(),
   ]);
   const glance = compliance(prog.data);
+  const { data: bpReply } = await supabase.from("coach_followups").select("brief, done_at").eq("client_id", id).eq("topic", "blueprint-reply").maybeSingle();
   // November 10: Driven Woman Blueprint labels and video answers.
   const bpLabels = blueprintLabels();
   const assigned = ((assessment?.answers as Record<string, unknown> | null)?.assigned ?? null) as { focus: string[]; fixits: string[]; skipped: string[]; reasons: string[]; at: string } | null;
@@ -199,6 +202,11 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
           <div className="space-y-2">
             <h2 className="text-sm uppercase tracking-widest text-dim">Assessment</h2>
+            {/* November 13: his video reply to her Blueprint, with AI talking points on screen while he records. */}
+            {blueprintDone(assessment?.submitted_at as string | null) && (
+              <BlueprintReply clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]}
+                initial={(bpReply?.brief as { groups: { h: string; items: string[] }[]; at: string } | null) ?? null} sentAt={(bpReply?.done_at as string | null) ?? null} />
+            )}
             {assessment?.submitted_at || assessment?.ai_summary || Object.keys((assessment?.answers as object) ?? {}).length ? (
               <details className="rounded-xl border border-border bg-card p-3 text-sm" open>
                 <summary className="cursor-pointer font-semibold">Driven Woman Blueprint{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
