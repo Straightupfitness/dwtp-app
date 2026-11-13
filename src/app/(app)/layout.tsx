@@ -2,6 +2,7 @@ import BottomNav from "@/components/BottomNav";
 import TopBar from "@/components/TopBar";
 import TimezoneSync from "@/components/TimezoneSync";
 import AppBadge from "@/components/AppBadge";
+import StillHere from "@/components/StillHere";
 import { InstallCatcher } from "@/components/InstallHelp";
 import { after } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -44,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {user && !viewing && <TimezoneSync saved={me?.timezone ?? null} />}
       <InstallCatcher />
       {user && !viewing && <AppBadge count={alerts ?? 0} />}
+      {user && !coach && !viewing && <StillHere />}
     </>
   );
 }

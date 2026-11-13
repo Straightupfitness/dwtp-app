@@ -25,6 +25,7 @@ export default async function CoachHome() {
         <Link href="/coach/clips" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm font-semibold">Clips &amp; recipes</Link>
         <Link href="/coach/videos" className="flex min-h-11 items-center justify-center rounded-xl border border-border text-sm">Videos</Link>
         <Link href="/coach/activity" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">Activity</Link>
+        <Link href="/coach/followups" className="flex min-h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-black">✨ Follow-ups</Link>
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
       </div>
       <RosterView rows={rows} />

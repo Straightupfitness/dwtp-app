@@ -1,4 +1,5 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import BriefPanel from "@/components/BriefPanel";
 import ProgressPhotos from "@/components/ProgressPhotos";
 import { loadProgressPhotos } from "@/lib/progress-photos";
 import { todayIn, trainingWeek, weekName } from "@/lib/program";
@@ -111,6 +112,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <a href="#progress" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Progress</a>
         </div>
       </header>
+      {/* November 13: what she's been doing lately, and the flow for a personal message. */}
+      <BriefPanel clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
 
       <GuaranteeCard g={guarantee} />
 
