@@ -7,7 +7,7 @@ import { adminClient } from "@/lib/supabase/admin";
  * by last name + first name overlap ("Patricia Gil" → "Tricia Gil"), then by first name + last initial ("Daisy I.").
  * Never overwrites a number that's already there; reports it instead. `dryRun` shows the matches without saving.
  */
-type Row = { name: string; phone: string };
+type Row = { name: string; phone: string; replace?: boolean }; // replace: Michael confirmed the new number is the right one
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
 const e164 = (p: string) => { const d = p.replace(/\D/g, ""); return d.length === 10 ? `+1${d}` : d.length === 11 && d.startsWith("1") ? `+${d}` : null; };
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const c = m[0];
     const label = r.name === c.full_name ? r.name : `${r.name} → ${c.full_name}`;
     if (c.phone && e164(c.phone as string) === phone) { out.already.push(label); continue; }
-    if (c.phone) { out.different.push(`${label} (app has ${c.phone})`); continue; }
+    if (c.phone && !r.replace) { out.different.push(`${label} (app has ${c.phone})`); continue; }
     if (!dryRun) { const { error } = await db.from("profiles").update({ phone }).eq("id", c.id); if (error) { out.badNumber.push(`${label}: ${error.message}`); continue; } }
     out.set.push(label);
   }
