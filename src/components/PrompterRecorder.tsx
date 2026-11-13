@@ -47,14 +47,20 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
     window.addEventListener("keydown", key);
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", key); };
   }, [full, flat.length]);
+  // November 13 (Michael: black screen while recording): connect the camera to the preview after it's rendered.
+  useEffect(() => {
+    const v = live.current;
+    if (!full || !v || !stream.current) return;
+    if (v.srcObject !== stream.current) v.srcObject = stream.current;
+    v.play().catch(() => {});
+  }, [full, mode]);
   useEffect(() => { document.getElementById(`pp-${at}`)?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [at]);
 
   async function openCamera() {
     setError("");
     try {
       stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
-      setAt(0); setMode("preview");
-      setTimeout(() => { if (live.current) { live.current.srcObject = stream.current; live.current.play().catch(() => {}); } }, 0);
+      setAt(0); setMode("preview"); // the effect below connects the camera once the full-screen view is on the page
     } catch {
       setError("I couldn't open your camera. Allow camera and microphone access in your browser, then try again.");
     }
@@ -113,7 +119,7 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
       {full && (
         <div className="fixed inset-0 z-[60] bg-black">
           {/* Mirrored like a selfie camera while recording; the saved video isn't mirrored. */}
-          <video ref={live} muted playsInline className="absolute inset-0 size-full -scale-x-100 object-cover" />
+          <video ref={live} muted autoPlay playsInline className="absolute inset-0 size-full object-cover" style={{ transform: "scaleX(-1)" }} />
           {flat.length > 0 && (
             <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/70 to-transparent pb-10 pt-[max(env(safe-area-inset-top),12px)]">
               <div className="mx-auto max-h-[38dvh] max-w-3xl overflow-y-auto px-4 [scrollbar-width:none]" onClick={() => setAt((a) => Math.min(flat.length - 1, a + 1))}>

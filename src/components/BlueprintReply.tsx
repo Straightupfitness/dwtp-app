@@ -42,6 +42,7 @@ export default function BlueprintReply({ clientId, first, initial = null, sentAt
           {busy === "ai" ? "Thinking… (about 20 sec)" : pts ? "Redo with AI" : "Talking points with AI"}
         </button>
       </div>
+      <a href={`/coach/clients/${clientId}#blueprint`} className="block text-[13px] text-accent underline">See her exact answers and her videos</a>
       {sent && <p className="text-[13px] text-[#7ddc8f]">✓ Sent to her chat {new Date(sent).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}. Record another below if you want.</p>}
       {pts ? (
         <div className="space-y-2 text-[14px] leading-snug">

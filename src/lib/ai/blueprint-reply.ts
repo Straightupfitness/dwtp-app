@@ -13,28 +13,34 @@ export type PointGroup = { h: string; items: string[] };
 const SYSTEM = `You prepare talking points for Michael Duivis's short video reply (2–4 minutes) to a client's Driven Woman Blueprint,
 the 19-question intake for his Driven Woman Transformation Program (busy women over 40; 26 weeks: Rested → Fueled → Driven; sleep first,
 then food with calories always tracked, then strength). The program starts Monday, November 16. Her Week 1 Habits & Homework is already
-open in the app. He talks to the camera in his own voice; your bullets show on screen while he records, like a teleprompter.
+open in the app. He talks to the camera in his own voice; your points show on screen while he records, like a teleprompter.
 
-Bullets are glanceable fragments, under ~12 words, not sentences, no script. Use her actual words and numbers.
+November 13, Michael: "too vague; tell me what she actually said, and pick only the most important one in each category."
+So: read everything she wrote and said (her video answers are in the summary). For each section, pick the ONE thing that matters most
+(the most revealing, emotional or highest-leverage) and skip the rest. One bullet per section; a second only if it's truly essential.
 
-FIVE SECTIONS, in this order, with these exact headings, 1–3 bullets each (fewer is better):
+EACH BULLET has two parts, separated by " → ":
+  her words (a short direct quote in quotation marks, or her exact number/answer) → what Michael should say back (a few words: the angle,
+  the why, or the one fix). Under ~35 words in total. No script, no full paragraph.
+  Example: "I wake up at 3 AM and my mind races" (5–7 nights) → that's cortisol; the Circadian Reset fixes this first, by week 4
+
+FIVE SECTIONS, in this order, with these exact headings:
 ## Open
-- (thank her + one personal detail from her answers: her work, family, a fun fact, her dream)
-## What stood out
-- (2–3 specific insights from her answers: sleep score and 3 AM wakeups, bedtime, caffeine amount and last cup vs the 10-hour cutoff,
-  alcohol, energy crash, stress and its cause, meals/breakfast/protein, tracking history, pain, menopause symptoms. Name the number and
-  why it matters, in a few words.)
-## Your roadmap
-- (her 3 focus circles the app picked and why, in her terms; any fix-its; medals already credited for what she's doing)
+- (the most personal thing she shared: work, family, fun fact, her six-month dream → a warm, specific opener)
+## The big one
+- (the single most important thing in her answers: the biggest pain point or lever, e.g. sleep, 3 AM wakeups, caffeine late in the day,
+  alcohol, stress and its cause, skipping breakfast, low protein, pain, menopause symptoms → why it matters and what the program does)
 ## What got in the way
-- (what she said got in the way every other time → how this time is different, in a few words)
+- ("what got in the way every other time", her words → why this time is different, specifically)
+## Your roadmap
+- (the 3 focus circles the app picked, tied to one thing she said; fix-its or already-credited medals only if relevant)
 ## This week
-- (one concrete first step before Monday, from her Week 1 Habits & Homework or her biggest lever; then invite one question in the app chat)
+- (one concrete first step before Monday, tied to the big one or her Week 1 Habits & Homework → then: "ask me anything in the chat")
 
 ${PROGRAM_RULES}
 
-HARD RULES: never invent anything she didn't say. If an answer is missing, skip it. Medical topics: "check with your doctor".
-Output only the five sections in that format.`;
+HARD RULES: quote only what she actually wrote or said; never invent. If she skipped a question, use the next most important thing.
+Medical topics: "check with your doctor". Output only the five sections in that format.`;
 
 export async function blueprintReplyPoints(db: SupabaseClient, clientId: string): Promise<{ groups: PointGroup[]; at: string }> {
   const [{ data: p }, { data: a }] = await Promise.all([

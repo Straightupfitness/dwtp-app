@@ -208,7 +208,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
                 initial={(bpReply?.brief as { groups: { h: string; items: string[] }[]; at: string } | null) ?? null} sentAt={(bpReply?.done_at as string | null) ?? null} />
             )}
             {assessment?.submitted_at || assessment?.ai_summary || Object.keys((assessment?.answers as object) ?? {}).length ? (
-              <details className="rounded-xl border border-border bg-card p-3 text-sm" open>
+              <details id="blueprint" className="scroll-mt-20 rounded-xl border border-border bg-card p-3 text-sm" open>
                 <summary className="cursor-pointer font-semibold">Driven Woman Blueprint{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
                 {assessment?.ai_summary && <p className="mt-2 whitespace-pre-line text-[#d4d4d4]">{assessment.ai_summary}</p>}
                 <dl className="mt-2 space-y-1.5">
