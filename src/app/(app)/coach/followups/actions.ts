@@ -12,3 +12,11 @@ export async function markFollowup(clientId: string, topic: string, done: boolea
   revalidatePath("/coach/followups");
   return { ok: true };
 }
+
+/** November 13: send his message in her app chat (the same words he can also text her from his own phone). */
+export async function sendInApp(clientId: string, text: string) {
+  if (!text.trim()) return { error: "Write your message first." };
+  const { sendMessage } = await import("@/components/chat/actions");
+  const r = await sendMessage(clientId, text.trim(), null);
+  return r?.error ? { error: r.error } : { ok: true };
+}

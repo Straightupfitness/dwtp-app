@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Brief } from "@/lib/ai/client-brief";
-import { markFollowup } from "@/app/(app)/coach/followups/actions";
+import { markFollowup, sendInApp } from "@/app/(app)/coach/followups/actions";
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
 
@@ -18,6 +18,10 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
   const [err, setErr] = useState("");
   const [done, setDone] = useState(!!doneAt);
   const [hours, setHours] = useState(initial?.hours ?? 48);
+  // November 13: write it once; send it in the app, and text it from his own phone (Messages opens with it typed in).
+  const [msg, setMsg] = useState(`Hey ${first}, `);
+  const [sentApp, setSentApp] = useState(false);
+  const [sending, setSending] = useState(false);
 
   async function run(h = hours) {
     setBusy(true); setErr("");
@@ -34,7 +38,16 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
     const r = await markFollowup(clientId, topic, next);
     if (r?.error) { setDone(!next); setErr(r.error); }
   }
-  const sms = phone ? `sms:${phone.replace(/[^\d+]/g, "")}` : null;
+  const digits = phone ? phone.replace(/[^\d+]/g, "") : "";
+  const num = /^\d{10}$/.test(digits) ? `+1${digits}` : digits;
+  const typed = msg.trim() && msg.trim() !== `Hey ${first},`;
+  const sms = num ? `sms:${num}?&body=${encodeURIComponent(typed ? msg.trim() : "")}` : null;
+  async function inApp() {
+    setSending(true); setErr("");
+    const r = await sendInApp(clientId, msg);
+    setSending(false);
+    if (r?.error) setErr(r.error); else setSentApp(true);
+  }
 
   return (
     <div className={`space-y-2.5 ${compact ? "" : "rounded-2xl border border-border bg-card p-3.5"}`}>
@@ -66,14 +79,23 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
         </div>
       )}
       {err && <p className="text-sm text-[var(--red)]">{err}</p>}
-      <div className="flex flex-wrap gap-2">
-        <Link href={`/coach/inbox/${clientId}`} className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border text-[13px] font-semibold">💬 Message in app</Link>
-        {sms
-          ? <a href={sms} className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border text-[13px] font-semibold">📱 Text {first}</a>
-          : <span className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-dashed border-[#2a2a2a] text-[12px] text-dim">No phone number</span>}
-        {topic && (
-          <button type="button" onClick={toggleDone} className={`min-h-10 flex-1 rounded-xl text-[13px] font-semibold ${done ? "border border-[#2f5d3a] text-[#7ddc8f]" : "bg-accent text-black"}`}>{done ? "✓ Sent · undo" : "Mark sent ✓"}</button>
-        )}
+      <div className="space-y-2">
+        <textarea value={msg} onChange={(e) => { setMsg(e.target.value); setSentApp(false); }} rows={4} aria-label={`Your message to ${first}`}
+          placeholder={`Write it your way, then send it in the app and text it to ${first}.`}
+          className="w-full rounded-xl border border-[#2a2a2a] bg-bg p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={inApp} disabled={!typed || sending || sentApp}
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-xl border text-[13px] font-semibold disabled:opacity-60 ${sentApp ? "border-[#2f5d3a] text-[#7ddc8f]" : "border-border"}`}>
+            {sentApp ? "✓ Sent in app" : sending ? "Sending…" : "💬 Send in app"}
+          </button>
+          {sms
+            ? <a href={sms} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border text-[13px] font-semibold">📱 Text {first}</a>
+            : <span className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-dashed border-[#2a2a2a] text-[12px] text-dim">No phone number on file</span>}
+          {topic && (
+            <button type="button" onClick={toggleDone} className={`min-h-11 flex-1 rounded-xl text-[13px] font-semibold ${done ? "border border-[#2f5d3a] text-[#7ddc8f]" : "bg-accent text-black"}`}>{done ? "✓ Sent · undo" : "Mark sent ✓"}</button>
+          )}
+        </div>
+        <p className="text-[11px] text-dim">📱 opens Messages on your phone with this typed in, from your own number. <Link href={`/coach/inbox/${clientId}`} className="underline">Open her chat</Link></p>
       </div>
     </div>
   );
