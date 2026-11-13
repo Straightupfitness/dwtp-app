@@ -27,6 +27,12 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
   const [error, setError] = useState("");
   const [at, setAt] = useState(0);
   const [size, setSize] = useState(20);
+  // November 13: pick the camera and microphone (Elgato or the built-in FaceTime camera); remembered on this computer.
+  const [cams, setCams] = useState<MediaDeviceInfo[]>([]);
+  const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
+  const [camId, setCamId] = useState("");
+  const [micId, setMicId] = useState("");
+  const [streamKey, setStreamKey] = useState(0);
   const flat = points.flatMap((g) => g.items.map((t) => ({ h: g.h, t })));
   const full = mode === "preview" || mode === "recording";
 
@@ -53,17 +59,40 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
     if (!full || !v || !stream.current) return;
     if (v.srcObject !== stream.current) v.srcObject = stream.current;
     v.play().catch(() => {});
-  }, [full, mode]);
+  }, [full, mode, streamKey]);
   useEffect(() => { document.getElementById(`pp-${at}`)?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [at]);
 
-  async function openCamera() {
+  const saved = (k: string) => { try { return localStorage.getItem(k) ?? ""; } catch { return ""; } };
+  async function getStream(cam: string, mic: string) {
+    const video: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, ...(cam ? { deviceId: { exact: cam } } : { facingMode: "user" }) };
+    const audio: MediaTrackConstraints | boolean = mic ? { deviceId: { exact: mic } } : true;
+    try { return await navigator.mediaDevices.getUserMedia({ video, audio }); }
+    catch (e) {
+      // The saved camera or mic isn't plugged in (e.g. the Elgato): fall back to the default ones.
+      if (cam || mic) return await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
+      throw e;
+    }
+  }
+  async function openCamera(cam = camId || saved("dwtp-cam"), mic = micId || saved("dwtp-mic")) {
     setError("");
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
-      setAt(0); setMode("preview"); // the effect below connects the camera once the full-screen view is on the page
+      stream.current?.getTracks().forEach((t) => t.stop());
+      stream.current = await getStream(cam, mic);
+      const devices = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+      setCams(devices.filter((d) => d.kind === "videoinput"));
+      setMics(devices.filter((d) => d.kind === "audioinput"));
+      setCamId(stream.current.getVideoTracks()[0]?.getSettings().deviceId ?? "");
+      setMicId(stream.current.getAudioTracks()[0]?.getSettings().deviceId ?? "");
+      setStreamKey((k) => k + 1);
+      if (mode !== "preview") { setAt(0); setMode("preview"); } // the effect connects the camera once the full-screen view is on the page
     } catch {
       setError("I couldn't open your camera. Allow camera and microphone access in your browser, then try again.");
+      setMode("idle");
     }
+  }
+  function choose(kind: "cam" | "mic", id: string) {
+    try { localStorage.setItem(kind === "cam" ? "dwtp-cam" : "dwtp-mic", id); } catch {}
+    if (kind === "cam") { setCamId(id); openCamera(id, micId); } else { setMicId(id); openCamera(camId, id); }
   }
   function close() { stream.current?.getTracks().forEach((t) => t.stop()); setMode("idle"); }
   function start() {
@@ -107,7 +136,7 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
     <div className="space-y-3 rounded-xl border border-border bg-bg p-3">
       {mode === "idle" && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={openCamera} className={`${btn} bg-accent text-black`}>{label}</button>
+          <button type="button" onClick={() => openCamera()} className={`${btn} bg-accent text-black`}>{label}</button>
           <label className={`${btn} inline-flex cursor-pointer items-center border border-border`}>
             Upload a video
             <input type="file" accept="video/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0])} />
@@ -139,6 +168,22 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
                   <button type="button" onClick={() => setSize((s) => Math.min(34, s + 2))} className="grid size-9 place-items-center rounded-full bg-white/15" aria-label="Bigger text">A+</button>
                 </span>
               </div>
+            </div>
+          )}
+          {mode === "preview" && (cams.length > 1 || mics.length > 1) && (
+            <div className="absolute inset-x-0 bottom-[120px] mx-auto flex max-w-md flex-wrap justify-center gap-2 px-4">
+              {cams.length > 1 && (
+                <select value={camId} onChange={(e) => choose("cam", e.target.value)} aria-label="Camera"
+                  className="min-h-10 max-w-[48%] flex-1 rounded-full border border-white/20 bg-black/70 px-3 text-[13px] text-white">
+                  {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId}>📷 {d.label || `Camera ${i + 1}`}</option>)}
+                </select>
+              )}
+              {mics.length > 1 && (
+                <select value={micId} onChange={(e) => choose("mic", e.target.value)} aria-label="Microphone"
+                  className="min-h-10 max-w-[48%] flex-1 rounded-full border border-white/20 bg-black/70 px-3 text-[13px] text-white">
+                  {mics.map((d, i) => <option key={d.deviceId} value={d.deviceId}>🎙 {d.label || `Microphone ${i + 1}`}</option>)}
+                </select>
+              )}
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-4 bg-gradient-to-t from-black/80 to-transparent pb-[max(env(safe-area-inset-bottom),20px)] pt-10">

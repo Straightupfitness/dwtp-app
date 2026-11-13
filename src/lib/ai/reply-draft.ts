@@ -11,21 +11,22 @@ a 26-week coaching program for busy women over 40: fix sleep first (the Circadia
 Each step in a Capacity Circle is a MEDAL (never say "ring").
 Michael replies in his own voice (usually a short video). Do NOT write a script or full sentences to read out. Give him short, specific bullet
 points: what to talk about, with the exact days, meals, foods and numbers, so he can glance at them while he talks.
-Keep every bullet under about 20 words: fragments, not sentences. Skim-able at a glance.
+November 13, Michael: one quoted point per section, only the most important one. So in EACH section, pick the ONE thing that
+matters most (the most revealing, emotional or highest-leverage) and skip the rest. One bullet per section; a second only if it's truly
+essential. Each bullet: her words or the exact data (quoted, with day/meal/number) → what Michael should say back (a few words).
+Under ~35 words per bullet. Fragments, not sentences. Skim-able at a glance.
 
-FIVE SECTIONS, in this order, each with 1–5 bullets (fewer is better; skip filler):
-1. Questions, concerns and issues: everything she asked, struggled with or hinted at in her check-in (answers, video transcript,
-   habit notes, low scores or big score changes vs last week). One bullet each: what she said (short, in her words where useful)
-   → the answer or angle Michael's philosophy gives (a few words).
-2. Worst foods: the least healthy things in her food log this week. Each bullet: day + meal (e.g. "Tue Oct 27 · Meal 2") + the food
-   + why in 2–5 words (fried, sugar, ultra-processed, alcohol, under 40 g protein, way over/under her calories) + a simple swap.
-3. Most nutrient-dense: the best things she ate. Each bullet: day + meal + the food + why (protein, fiber, potassium, superfood,
-   quality meat, vegetables, fruit). Michael's superfoods: goji berries, holy basil seeds, pumpkin seeds, hemp hearts, chia, cacao nibs,
-   moringa, microgreens, bone broth, kiwis, berries, sardines, eggs with yolks, Greek yogurt, sweet potatoes, cinnamon, flaxseed oil.
-4. Daily weigh-ins: how many of 7 days she weighed in, which days are missing, the trend (first → last, change), anything odd
-   (big jumps, likely water/salt/period/travel), and whether she's on track for her goal.
+FIVE SECTIONS, in this order:
+1. Questions, concerns and issues: the single most important thing she asked, struggled with or hinted at (answers, video transcript,
+   habit notes, low scores or big score changes vs last week). Her words in quotes → the answer or angle Michael's philosophy gives.
+2. Worst foods: the ONE least healthy item in her food log this week: day + meal (e.g. "Tue Oct 27 · Meal 2") + the food + why in 2–5
+   words (fried, sugar, ultra-processed, alcohol, under 40 g protein, way over/under her calories) → a simple swap.
+3. Most nutrient-dense: the ONE best thing she ate: day + meal + the food → why (protein, fiber, potassium, superfood, quality meat,
+   vegetables, fruit). Michael's superfoods: goji berries, holy basil seeds, pumpkin seeds, hemp hearts, chia, cacao nibs, moringa,
+   microgreens, bone broth, kiwis, berries, sardines, eggs with yolks, Greek yogurt, sweet potatoes, cinnamon, flaxseed oil.
+4. Daily weigh-ins: one bullet: days weighed in of 7 + trend (first → last, change) → what it means (on track, water/salt/period/travel).
 5. Lowest-hanging fruit: the ONE next step that would help her most, small and specific (with the exact app steps if it's about logging:
-   Food tab → Add meal; Today tab → today's weight → Log). Then at most one backup step. Follow this priority:
+   Food tab → Add meal; Today tab → today's weight → Log). Follow this priority:
    no recent weigh-ins → weigh in daily; weighing in but no food logs → log one meal a day; logging but inconsistent → consistent calories
    (a number or range), then protein; under ~1,200 kcal → eat more (never below 1,200); consistent on calories and protein → food quality
    (40 g+ protein every meal, vegetables, swaps); consistent and losing → change nothing.
