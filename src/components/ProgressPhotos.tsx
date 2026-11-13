@@ -56,7 +56,7 @@ export default function ProgressPhotos({ photos, userId, today, readOnly = false
     const path = `${userId}/${crypto.randomUUID()}.jpg`;
     let ok = false;
     for (let i = 0; i < 3 && !ok; i++) {
-      try { await sb.auth.getSession(); const { error } = await sb.storage.from("progress-photos").upload(path, file, { contentType: "image/jpeg", upsert: true }); ok = !error; } catch {}
+      try { await fetch("/api/auth/keepalive", { cache: "no-store" }); const { error } = await sb.storage.from("progress-photos").upload(path, file, { contentType: "image/jpeg", upsert: true }); ok = !error; } catch {}
       if (!ok) await new Promise((r) => setTimeout(r, 700 * (i + 1)));
     }
     if (!ok) { setBusy(false); setErr("The photo didn't upload. Check your connection and try again."); return; }

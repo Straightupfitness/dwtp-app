@@ -122,7 +122,7 @@ export default function PrompterRecorder({ points, bucket, folder, onUploaded, l
     const sb = createClient();
     let err: string | null = null;
     for (let i = 0; i < 2; i++) {
-      await sb.auth.getSession();
+      await fetch("/api/auth/keepalive", { cache: "no-store" }).catch(() => {});
       const { error: e } = await sb.storage.from(bucket).upload(path, blob, { contentType: blob.type || "video/webm", upsert: true });
       err = e ? e.message : null;
       if (!e) break;

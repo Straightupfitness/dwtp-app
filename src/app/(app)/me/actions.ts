@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" }); // November 13: only this phone/browser, not all her devices
   redirect("/login");
 }
 

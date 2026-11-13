@@ -26,6 +26,19 @@ function whoFromCookie(request: NextRequest): string | null {
   }
 }
 
+/** November 13: write to the auth_events log (best effort; never slows or breaks a page). */
+async function logAuth(row: Record<string, unknown>) {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/\s+/g, "");
+  if (!key) return;
+  try {
+    await fetch(`${supabaseUrl()}/rest/v1/auth_events`, {
+      method: "POST", signal: AbortSignal.timeout(1500),
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(row),
+    });
+  } catch {}
+}
+
 export async function proxy(request: NextRequest) {
   let response = withPath(request);
   const url = supabaseUrl();
@@ -34,6 +47,7 @@ export async function proxy(request: NextRequest) {
     // Keys missing in Vercel: show a clear message instead of crashing every page.
     return new NextResponse("DWTP setup: the Supabase URL or publishable key is missing in Vercel's environment variables.", { status: 503 });
   }
+  let refreshed = false;
   const supabase = createServerClient(
     url,
     key,
@@ -41,6 +55,7 @@ export async function proxy(request: NextRequest) {
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (list) => {
+          refreshed = true;
           list.forEach(({ name, value }) => request.cookies.set(name, value));
           response = withPath(request);
           list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
@@ -54,7 +69,13 @@ export async function proxy(request: NextRequest) {
     const { data, error } = await supabase.auth.getUser();
     user = data.user;
     // November 13 (Connie keeps getting signed out): say why in the logs when someone who had a session loses it.
-    if (!user && hadSession) console.error("session lost", JSON.stringify({ path: request.nextUrl.pathname, who: whoFromCookie(request), code: (error as { code?: string } | null)?.code ?? null, msg: error?.message ?? null }));
+    if (!user && hadSession) {
+      const ev = { kind: "lost", path: request.nextUrl.pathname, who: whoFromCookie(request), code: (error as { code?: string } | null)?.code ?? null, message: error?.message ?? null, agent: request.headers.get("user-agent")?.slice(0, 200) ?? null };
+      console.error("session lost", JSON.stringify(ev));
+      await logAuth(ev);
+    } else if (user && refreshed) {
+      await logAuth({ kind: "refreshed", user_id: user.id, who: user.email ?? null, path: request.nextUrl.pathname, agent: request.headers.get("user-agent")?.slice(0, 200) ?? null });
+    }
   } catch (err) {
     console.error("auth check failed", err);
   }

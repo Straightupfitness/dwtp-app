@@ -126,7 +126,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
     const path = `${userId}/${crypto.randomUUID()}.jpg`;
     for (let i = 0; i < 3; i++) {
       try {
-        await sb.auth.getSession(); // refreshes an expired token before the upload
+        await fetch("/api/auth/keepalive", { cache: "no-store" }).catch(() => {}); // the server renews her sign-in if needed
         const { error: e } = await sb.storage.from("food-photos").upload(path, p, { contentType: "image/jpeg", upsert: true });
         if (!e) return path;
       } catch {}
