@@ -1,4 +1,5 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import SignInCodeButton from "@/components/SignInCodeButton";
 import BlueprintReply from "@/components/BlueprintReply";
 import { blueprintDone } from "@/lib/blueprint";
 import BriefPanel from "@/components/BriefPanel";
@@ -116,6 +117,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         </div>
       </header>
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
+      <SignInCodeButton clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
       <BriefPanel clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
 
       <GuaranteeCard g={guarantee} />

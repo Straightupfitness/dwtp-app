@@ -70,6 +70,16 @@ export default function LoginPage() {
     setState(r.ok ? "sent" : "error");
   }
 
+  const [resend, setResend] = useState<"" | "sending" | "sent">("");
+  const [resendMsg, setResendMsg] = useState("");
+  async function sendAgain() {
+    setResend("sending"); setResendMsg("");
+    const r = await sendSignInLink(email).catch(() => ({ ok: false as const, reason: "failed" as const }));
+    if (r.ok) { setResend("sent"); try { localStorage.setItem(SAVED, JSON.stringify({ email: email.trim().toLowerCase(), at: Date.now() })); } catch {} return; }
+    setResend("");
+    setResendMsg(r.reason === "toomany" ? "Several emails were just sent. Check your inbox and spam, or wait 15 minutes. Or text Michael for a code."
+      : r.reason === "notfound" ? "I couldn't find that email. Tap “Wrong email? Change it”." : "The email didn't go out. Try again in a minute, or text Michael for a code.");
+  }
   const display = "font-[family-name:var(--font-display)] uppercase";
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col px-6 pb-8 pt-[max(4.5rem,env(safe-area-inset-top))]">
@@ -91,8 +101,17 @@ export default function LoginPage() {
             <button disabled={code.length !== 6 || checking} className="min-h-[50px] rounded-[14px] border border-accent text-[16px] font-semibold text-accent disabled:opacity-50">{checking ? "Checking…" : "Sign in with code"}</button>
             {codeErr && <p className="text-sm text-[var(--red)]">{codeErr}</p>}
           </form>
-          <p className="text-[13px] text-dim">Any code from the last 2 hours works. No need to ask for another email.</p>
-          <button type="button" onClick={() => { forget(); setCode(""); setCodeErr(""); setState("idle"); }} className="min-h-11 text-sm text-accent">Use a different email</button>
+          <p className="text-[13px] text-dim">Any code from the last 2 hours works.</p>
+          {/* November 13 (Connie: "doesn't send the email and doesn't ask for my email anymore"): a clear way to get a new one. */}
+          <div className="flex flex-col gap-1.5 rounded-[14px] border border-border p-3">
+            <p className="text-[13px] text-[#a8a8a8]">No email? Check spam, then:</p>
+            <button type="button" disabled={resend === "sending"} onClick={sendAgain} className="min-h-11 rounded-xl bg-[#1d1d1d] text-[15px] font-semibold disabled:opacity-60">
+              {resend === "sending" ? "Sending…" : resend === "sent" ? "Sent ✓ Check your email" : "Send me a new email"}
+            </button>
+            {resendMsg && <p className="text-sm text-[var(--red)]">{resendMsg}</p>}
+            <button type="button" onClick={() => { forget(); setCode(""); setCodeErr(""); setState("idle"); }} className="min-h-11 text-sm text-accent">Wrong email? Change it</button>
+            <p className="text-[12px] text-dim">Still stuck? Text Michael and he&apos;ll send you a code.</p>
+          </div>
         </div>
       ) : (
         <>
