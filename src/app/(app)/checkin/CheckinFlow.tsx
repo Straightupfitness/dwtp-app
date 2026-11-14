@@ -127,7 +127,7 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
 
       {cur === "welcome" && (
         <div className="space-y-3">
-          {!hasVideo && <p className="rounded-[18px] border border-border bg-card p-4 text-[15px]">Hey, it&apos;s check-in time. This takes about three minutes, and Michael reads every word and replies to you personally.</p>}
+          {!hasVideo && <p className="rounded-[18px] border border-border bg-card p-4 text-[15px]">Hi, it&apos;s check-in time. This takes about three minutes, and Michael reads every word and replies to you personally.</p>}
           {badWeek.already
             ? <p className="rounded-[14px] border border-[#7c5cff]/60 bg-[#151024] p-3 text-[14px]">This week is a <b>bad week</b> (Bad Week Plan). It still counts. Just tell me how it went.</p>
             : <label className="flex items-start gap-3 rounded-[14px] border border-[#7c5cff]/60 bg-[#151024] p-3">

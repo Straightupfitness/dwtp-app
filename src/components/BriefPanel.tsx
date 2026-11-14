@@ -2,7 +2,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Brief } from "@/lib/ai/client-brief";
-import { markFollowup, sendInApp } from "@/app/(app)/coach/followups/actions";
+import { markFollowup, sendInApp, sendVideoReply } from "@/app/(app)/coach/followups/actions";
+import PrompterRecorder from "./PrompterRecorder";
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
 
@@ -19,9 +20,23 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
   const [done, setDone] = useState(!!doneAt);
   const [hours, setHours] = useState(initial?.hours ?? 48);
   // November 13: write it once; send it in the app, and text it from his own phone (Messages opens with it typed in).
-  const [msg, setMsg] = useState(`Hey ${first}, `);
+  const [msg, setMsg] = useState(`Hi ${first}, `);
   const [sentApp, setSentApp] = useState(false);
   const [sending, setSending] = useState(false);
+  // November 13: or reply with a video, with these bullets on screen while he records.
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [video, setVideo] = useState<string | null>(null);
+  const [vNote, setVNote] = useState(`Hi ${first}, here's a reply to `);
+  const [vBusy, setVBusy] = useState(false);
+  const [vSent, setVSent] = useState(false);
+  async function sendVideo() {
+    if (!video) return;
+    setVBusy(true); setErr("");
+    const r = await sendVideoReply(clientId, video, vNote, topic ? [topic] : []);
+    setVBusy(false);
+    if (r?.error) { setErr(r.error); return; }
+    setVSent(true); setVideo(null); if (topic) setDone(true);
+  }
 
   async function run(h = hours) {
     setBusy(true); setErr("");
@@ -40,7 +55,7 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
   }
   const digits = phone ? phone.replace(/[^\d+]/g, "") : "";
   const num = /^\d{10}$/.test(digits) ? `+1${digits}` : digits;
-  const typed = msg.trim() && msg.trim() !== `Hey ${first},`;
+  const typed = msg.trim() && msg.trim() !== `Hi ${first},`;
   const sms = num ? `sms:${num}?&body=${encodeURIComponent(typed ? msg.trim() : "")}` : null;
   async function inApp() {
     setSending(true); setErr("");
@@ -79,6 +94,28 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
         </div>
       )}
       {err && <p className="text-sm text-[var(--red)]">{err}</p>}
+      {brief && (
+        <div className="space-y-2 rounded-xl border border-border p-2.5">
+          {!videoOpen ? (
+            <button type="button" onClick={() => setVideoOpen(true)} className="min-h-10 w-full text-[13px] font-semibold text-accent">🎥 Reply with a video (these points on screen)</button>
+          ) : (
+            <>
+              <PrompterRecorder points={[{ h: "What she's been doing", items: brief.doing }, { h: "Your message", items: brief.points }]}
+                bucket="media" folder={`chat/${clientId}`} onUploaded={(p) => { setVideo(p); setVSent(false); }} />
+              {video && (
+                <>
+                  <textarea value={vNote} onChange={(e) => setVNote(e.target.value)} rows={2} aria-label="A line of text with your video"
+                    className="w-full rounded-xl border border-[#2a2a2a] bg-bg p-3 text-[15px] outline-none focus:border-accent" />
+                  <button type="button" onClick={sendVideo} disabled={vBusy} className="min-h-11 w-full rounded-xl bg-accent text-[14px] font-semibold text-black disabled:opacity-50">
+                    {vBusy ? "Sending…" : `Send the video to ${first}'s chat`}
+                  </button>
+                </>
+              )}
+              {vSent && <p className="text-[13px] text-[#7ddc8f]">✓ Video sent to her chat</p>}
+            </>
+          )}
+        </div>
+      )}
       <div className="space-y-2">
         <textarea value={msg} onChange={(e) => { setMsg(e.target.value); setSentApp(false); }} rows={4} aria-label={`Your message to ${first}`}
           placeholder={`Write it your way, then send it in the app and text it to ${first}.`}

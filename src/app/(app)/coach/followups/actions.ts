@@ -21,8 +21,11 @@ export async function sendInApp(clientId: string, text: string) {
   return r?.error ? { error: r.error } : { ok: true };
 }
 
-/** November 13: his Blueprint reply video (and a line of text) goes to her chat; she's marked done in the queue. */
-export async function sendBlueprintReply(clientId: string, videoPath: string, note: string) {
+/**
+ * November 13: a video from Michael (recorded with his talking points on screen) goes to her chat with a line of
+ * text. `topics`: follow-up topics to mark done (e.g. "blueprint").
+ */
+export async function sendVideoReply(clientId: string, videoPath: string, note: string, topics: string[] = []) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in" };
@@ -30,8 +33,12 @@ export async function sendBlueprintReply(clientId: string, videoPath: string, no
   const { sendMessage } = await import("@/components/chat/actions");
   const r = await sendMessage(clientId, note.trim(), videoPath, { kind: "video" });
   if (r?.error) return { error: /check constraint|attachment_kind/i.test(r.error) ? "Run the chat video SQL file first." : r.error };
-  await supabase.from("coach_followups").upsert({ client_id: clientId, topic: "blueprint", done_at: new Date().toISOString() }, { onConflict: "client_id,topic" });
-  await supabase.from("coach_followups").upsert({ client_id: clientId, topic: "blueprint-reply", done_at: new Date().toISOString() }, { onConflict: "client_id,topic" });
+  for (const topic of topics) await supabase.from("coach_followups").upsert({ client_id: clientId, topic, done_at: new Date().toISOString() }, { onConflict: "client_id,topic" });
   revalidatePath("/coach/followups");
   return { ok: true };
+}
+
+/** His Blueprint reply video: to her chat, and she's marked done in the queue. */
+export async function sendBlueprintReply(clientId: string, videoPath: string, note: string) {
+  return sendVideoReply(clientId, videoPath, note, ["blueprint", "blueprint-reply"]);
 }

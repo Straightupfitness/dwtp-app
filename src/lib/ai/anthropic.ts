@@ -32,7 +32,10 @@ export async function askClaude(opts: {
   // check-in drafts). Then ask again with plenty of room.
   const first = opts.maxTokens ?? 1500;
   let r = await call(first);
-  if (!r.text.trim() && r.stop !== "refusal") r = await call(Math.max(first * 4, 12000));
+  // November 13 (Patricia's Blueprint points stopped mid-sentence): an answer cut off at the length limit is
+  // incomplete, so ask again with plenty of room instead of showing half of it.
+  if ((!r.text.trim() || r.stop === "max_tokens") && r.stop !== "refusal") r = await call(Math.max(first * 4, 12000));
+  if (r.stop === "max_tokens") throw new Error("The AI's answer was cut off. Try again.");
   if (!r.text.trim()) throw new Error(r.stop === "refusal" ? "The AI declined to write this one. Write it by hand." : `The AI returned no text (${r.stop || "no reason given"}).`);
   return r.text;
 }

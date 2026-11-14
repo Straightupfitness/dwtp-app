@@ -12,7 +12,7 @@ MEDAL (never say "ring"). Write it as a script in his spoken voice.
 LENGTH: 30–60 seconds spoken: 80–150 words. One short paragraph or two. No lists, no headings, no emojis.
 
 STRUCTURE:
-1. "Hey [first name], it's Michael." (or a natural variation)
+1. "Hi [first name], it's Michael." (or a natural variation)
 2. One or two REAL things going on with her right now, from her data: a specific win (a streak, a weigh-in trend, a great meal she logged,
    a medal she finished) and/or the one thing she's struggling with. Name the actual thing.
 3. What's waiting for her in next week's Habits & Homework: the new medal(s) and habits, and in one line why they matter for her.

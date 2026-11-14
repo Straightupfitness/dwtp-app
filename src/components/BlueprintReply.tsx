@@ -14,7 +14,7 @@ export default function BlueprintReply({ clientId, first, initial = null, sentAt
   const [busy, setBusy] = useState<"" | "ai" | "send">("");
   const [err, setErr] = useState("");
   const [video, setVideo] = useState<string | null>(null);
-  const [note, setNote] = useState(`Here's my feedback on your Blueprint, ${first}! Watch when you have a few minutes 🎥`);
+  const [note, setNote] = useState(`Hi ${first}, here's a reply to `);
   const [sent, setSent] = useState(sentAt);
 
   async function draft() {
