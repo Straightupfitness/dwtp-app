@@ -61,7 +61,7 @@ export function blueprintState(submittedAt: string | null | undefined, answers: 
   return !submittedAt && Object.keys(a).some((k) => k !== "previous") ? "started" : "not-started";
 }
 
-export async function clientBrief(db: SupabaseClient, clientId: string, opts: { hours?: number; topic?: string } = {}): Promise<Brief> {
+async function clientBriefOnce(db: SupabaseClient, clientId: string, opts: { hours?: number; topic?: string } = {}): Promise<Brief> {
   const hours = opts.hours ?? 48;
   const sinceIso = new Date(Date.now() - hours * 3_600_000).toISOString();
   const { data: p } = await db.from("profiles")
@@ -145,4 +145,14 @@ ${coachMsgs.join("\n") || "no messages"}`;
   const doing = block("DOING"), points = block("POINTS");
   if (!doing.length && !points.length) throw new Error("The AI didn't return bullets. Try again.");
   return { status, doing, points, at: new Date().toISOString(), hours, topic };
+}
+
+/** November 13: one automatic retry when the AI hiccups or answers oddly. */
+export async function clientBrief(db: SupabaseClient, clientId: string, opts: { hours?: number; topic?: string } = {}): Promise<Brief> {
+  try { return await clientBriefOnce(db, clientId, opts); }
+  catch (e) {
+    console.error("client brief: retrying", e);
+    await new Promise((r) => setTimeout(r, 1500));
+    return await clientBriefOnce(db, clientId, opts);
+  }
 }

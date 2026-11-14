@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { blueprintReplyPoints } from "@/lib/ai/blueprint-reply";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /** November 13: AI talking points for Michael's video reply to her Blueprint (coach only). Saved so they come back. */
 export async function POST(req: Request) {

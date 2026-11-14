@@ -42,7 +42,7 @@ ${PROGRAM_RULES}
 HARD RULES: quote only what she actually wrote or said; never invent. If she skipped a question, use the next most important thing.
 Medical topics: "check with your doctor". Output only the five sections in that format.`;
 
-export async function blueprintReplyPoints(db: SupabaseClient, clientId: string): Promise<{ groups: PointGroup[]; at: string }> {
+async function blueprintReplyPointsOnce(db: SupabaseClient, clientId: string): Promise<{ groups: PointGroup[]; at: string }> {
   const [{ data: p }, { data: a }] = await Promise.all([
     db.from("profiles").select("full_name, program_start, start_weight_lbs, goal_weight_lbs, coach_notes").eq("id", clientId).single(),
     db.from("assessments").select("answers, ai_summary, submitted_at").eq("client_id", clientId).maybeSingle(),
@@ -79,4 +79,15 @@ ${String(a.ai_summary ?? "none").slice(0, 4000)}`;
   const out = groups.filter((g) => g.items.length);
   if (!out.length) throw new Error("The AI didn't return talking points. Try again.");
   return { groups: out, at: new Date().toISOString() };
+}
+
+/** November 13 (Daisy's "AI couldn't do it, try again"): one automatic retry when the AI hiccups or answers oddly. */
+export async function blueprintReplyPoints(db: SupabaseClient, clientId: string): Promise<{ groups: PointGroup[]; at: string }> {
+  try { return await blueprintReplyPointsOnce(db, clientId); }
+  catch (e) {
+    if (/hasn't sent her Blueprint/.test(String((e as Error).message))) throw e;
+    console.error("blueprint reply: retrying", e);
+    await new Promise((r) => setTimeout(r, 1500));
+    return await blueprintReplyPointsOnce(db, clientId);
+  }
 }

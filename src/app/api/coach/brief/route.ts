@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { clientBrief } from "@/lib/ai/client-brief";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /** November 13: the "last 48 hours" bullets for one client (coach only). Saved for the follow-up queue when a topic is given. */
 export async function POST(req: Request) {
