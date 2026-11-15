@@ -129,3 +129,60 @@ export async function assignProgram(clientId: string, programId: string, days?: 
   revalidatePath(`/coach/clients/${clientId}`, "layout");
   return { ok: true };
 }
+
+/** November 15: the workout programs in the app (Trainerize imports and the main one), for picking a ready workout. */
+export async function listPrograms() {
+  const db = await coach();
+  if (!db) return [];
+  const { data } = await db.from("programs").select("id, name").not("id", "like", "custom-%").order("sort").order("name");
+  return (data ?? []).map((p) => ({ id: p.id as string, name: p.name as string }));
+}
+
+/** Strength workouts in one program (by phase), or across all programs matching a search. */
+export async function findWorkouts(programId: string | null, q: string) {
+  const db = await coach();
+  if (!db) return [];
+  let phases: { id: number; name: string; program: string }[] = [];
+  if (programId) {
+    const { data } = await db.from("program_phases").select("id, name, program").eq("program", programId).order("position");
+    phases = (data ?? []) as typeof phases;
+  }
+  let links: { phase_id: number; day: number | null; workout_id: number }[] = [];
+  if (phases.length) {
+    const { data } = await db.from("phase_workouts").select("phase_id, day, workout_id").in("phase_id", phases.map((p) => p.id));
+    links = (data ?? []) as typeof links;
+  }
+  let wq = db.from("workouts").select("id, name, kind, workout_items(position, exercises(name))").eq("kind", "strength").limit(programId ? 400 : 40);
+  if (programId) wq = wq.in("id", links.length ? links.map((l) => l.workout_id) : [-1]);
+  const words = q.trim().split(/\s+/).filter(Boolean).slice(0, 4);
+  for (const w of words) wq = wq.ilike("name", `%${w.replace(/[%_]/g, "")}%`);
+  if (!programId && !words.length) return [];
+  const { data: ws } = await wq;
+  const phaseName = new Map(phases.map((p) => [p.id, p.name]));
+  type W = { id: number; name: string; workout_items: { position: number; exercises: { name: string } | null }[] };
+  return ((ws ?? []) as unknown as W[]).map((w) => {
+    const l = links.find((x) => x.workout_id === w.id);
+    const ex = [...w.workout_items].sort((a, b) => a.position - b.position).map((i) => i.exercises?.name).filter(Boolean) as string[];
+    return { id: w.id, name: w.name, phase: l ? phaseName.get(l.phase_id) ?? "" : "", day: l?.day ?? null, count: ex.length, preview: ex.slice(0, 4).join(", ") };
+  }).sort((a, b) => a.phase.localeCompare(b.phase) || (a.day ?? 0) - (b.day ?? 0) || a.name.localeCompare(b.name));
+}
+
+/** Copy a ready workout (name and every exercise, sets, reps, rest) into one of her days. The original isn't touched. */
+export async function copyWorkoutInto(clientId: string, targetWorkoutId: number, sourceWorkoutId: number) {
+  const db = await coach();
+  if (!db) return { error: "Coach only" };
+  const [{ data: src }, { data: items }] = await Promise.all([
+    db.from("workouts").select("name, minutes, circuit, rounds, notes").eq("id", sourceWorkoutId).single(),
+    db.from("workout_items").select("position, exercise_id, sets, target, seconds, rest_seconds, log_type").eq("workout_id", sourceWorkoutId),
+  ]);
+  if (!src) return { error: "Workout not found." };
+  const { error: e1 } = await db.from("workouts").update({ name: src.name, minutes: src.minutes, circuit: src.circuit, rounds: src.rounds, notes: src.notes }).eq("id", targetWorkoutId);
+  if (e1) return { error: e1.message };
+  await db.from("workout_items").delete().eq("workout_id", targetWorkoutId);
+  if (items?.length) {
+    const { error } = await db.from("workout_items").insert(items.map((i) => ({ ...i, workout_id: targetWorkoutId })));
+    if (error) return { error: error.message };
+  }
+  revalidatePath(`/coach/clients/${clientId}/program`);
+  return { ok: true };
+}

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addDay, addExercise, createCustomProgram, removeLastDay, saveDay, searchExercises, assignProgram, type ItemInput } from "./actions";
+import { addDay, addExercise, copyWorkoutInto, createCustomProgram, findWorkouts, listPrograms, removeLastDay, saveDay, searchExercises, assignProgram, type ItemInput } from "./actions";
 
 type Item = ItemInput & { name: string; video: boolean };
 export type Day = { day: number; workoutId: number; name: string; items: Item[] };
@@ -63,6 +63,7 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   const [adding, setAdding] = useState(false);
+  const [picking, setPicking] = useState(false);
   const set = (i: number, patch: Partial<Item>) => { setItems((xs) => xs.map((x, k) => (k === i ? { ...x, ...patch } : x))); setDirty(true); };
   const move = (i: number, by: number) => { setItems((xs) => { const ys = [...xs]; const j = i + by; if (j < 0 || j >= ys.length) return xs; [ys[i], ys[j]] = [ys[j], ys[i]]; return ys; }); setDirty(true); };
 
@@ -72,6 +73,12 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
         <span className="shrink-0 rounded-md bg-accent px-2 py-0.5 text-[12px] font-bold text-black">Day {d.day}</span>
         <input value={name} onChange={(e) => { setName(e.target.value); setDirty(true); }} aria-label={`Day ${d.day} name`} className={`${input} min-w-0 flex-1 font-semibold`} />
       </div>
+      {picking
+        ? <WorkoutPicker day={d.day} onPick={(w) => start(async () => {
+            const r = await copyWorkoutInto(clientId, d.workoutId, w.id);
+            if (r?.error) setMsg(r.error); else { setPicking(false); setMsg(`Day ${d.day} is now “${w.name}” ✓`); router.refresh(); }
+          })} onClose={() => setPicking(false)} busy={pending} />
+        : <button type="button" onClick={() => setPicking(true)} className="min-h-10 w-full rounded-xl border border-border text-[13px] font-semibold">📋 Use a ready workout (Trainerize)</button>}
       <ol className="space-y-2">
         {items.map((it, i) => (
           <li key={i} className="space-y-1.5 rounded-xl border border-[#242424] bg-bg/60 p-2.5">
@@ -147,6 +154,58 @@ function ExercisePicker({ onPick, onClose }: { onPick: (e: Found) => void; onClo
             if ("error" in r && r.error) { setErr(r.error); return; }
             if ("exercise" in r && r.exercise) { onPick(r.exercise); setMaking(false); setNn({ name: "", notes: "", youtube: "" }); }
           })} className="min-h-10 w-full rounded-lg bg-accent text-[13px] font-semibold text-black disabled:opacity-50">{pending ? "Adding…" : "Add it"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type FoundW = Awaited<ReturnType<typeof findWorkouts>>[number];
+/** November 15: pick one of the workouts already in the app (Trainerize imports): browse a program, or search by name. */
+function WorkoutPicker({ day, onPick, onClose, busy }: { day: number; onPick: (w: FoundW) => void; onClose: () => void; busy: boolean }) {
+  const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
+  const [prog, setProg] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [list, setList] = useState<FoundW[] | null>(null);
+  const [sure, setSure] = useState<FoundW | null>(null);
+  useEffect(() => { listPrograms().then(setPrograms); }, []);
+  useEffect(() => {
+    if (!prog && q.trim().length < 2) return;
+    const t = setTimeout(() => { findWorkouts(prog || null, q).then(setList); }, 250);
+    return () => clearTimeout(t);
+  }, [prog, q]);
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/50 bg-bg p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-semibold">Pick a workout for Day {day}</p>
+        <button type="button" onClick={onClose} className="min-h-9 px-2 text-[13px] text-dim">Cancel</button>
+      </div>
+      <select value={prog} onChange={(e) => { setProg(e.target.value); setList(null); }} aria-label="Program" className={`${input} w-full`}>
+        <option value="">All programs (search below)</option>
+        {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={prog ? "Filter by name (optional)" : "Search workouts by name: lower body, push, glutes…"} aria-label="Search workouts" className={`${input} w-full`} />
+      {list && (
+        <ul className="max-h-80 overflow-y-auto rounded-lg border border-[#222]">
+          {list.map((w, i) => {
+            const head = w.phase && w.phase !== list[i - 1]?.phase ? w.phase : null;
+            return (
+              <li key={w.id}>
+                {head && <p className="sticky top-0 bg-[#141414] px-2.5 py-1 text-[11px] uppercase tracking-[0.1em] text-accent">{head}</p>}
+                <button type="button" onClick={() => setSure(w)} className={`block w-full border-t border-[#1d1d1d] px-2.5 py-2 text-left hover:bg-[#1a1a1a] ${sure?.id === w.id ? "bg-[#1f1a10]" : ""}`}>
+                  <span className="block text-[14px] font-semibold">{w.name}{w.day ? <span className="ml-1 text-[11px] font-normal text-dim">· Day {w.day}</span> : null}</span>
+                  <span className="block truncate text-[12px] text-dim">{w.count} exercises · {w.preview}</span>
+                </button>
+              </li>
+            );
+          })}
+          {!list.length && <li className="px-2.5 py-2 text-[13px] text-dim">No workouts found.</li>}
+        </ul>
+      )}
+      {sure && (
+        <div className="space-y-1.5 rounded-lg border border-accent/60 p-2">
+          <p className="text-[13px]">Replace Day {day} with <b>{sure.name}</b> ({sure.count} exercises)? You can still change it after.</p>
+          <button type="button" disabled={busy} onClick={() => onPick(sure)} className="min-h-10 w-full rounded-lg bg-accent text-[13px] font-semibold text-black disabled:opacity-50">{busy ? "Copying…" : `Use it for Day ${day}`}</button>
         </div>
       )}
     </div>
