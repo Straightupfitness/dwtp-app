@@ -241,7 +241,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
               <div className="aspect-video overflow-hidden rounded-[16px] bg-black">
                 <iframe src={yt(overview.youtube)} title="Workout overview" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen className="size-full" />
               </div>
-              <p className="text-[13px] leading-snug text-dim">Michael walks through every exercise. Then each one has a short clip to remind you.</p>
+              <p className="text-[13px] leading-snug text-dim">Michael walks through every exercise. Then each one has a short clip to remind you.
+                {" "}No sound? Flip your silent switch off, or <a href={`https://www.youtube.com/watch?v=${overview.youtube}`} target="_blank" rel="noopener noreferrer" className="text-accent underline">watch it on YouTube</a>.</p>
             </div>
           )}
           <ol className="divide-y divide-border rounded-[18px] border border-border bg-card">
@@ -369,6 +370,15 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
             <iframe key={s.youtube} src={yt(s.youtube)} title={s.name} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="size-full" />
           ) : <div className="grid size-full place-items-center text-dim">No video</div>}
         </div>
+        {/* November 15 (Claudia: "no sound in the app, sound in YouTube"): iPhones in silent mode often mute YouTube
+            inside web apps, but not in the YouTube app. A one-tap way out, under every YouTube video. */}
+        {!s.clip && s.youtube && (
+          <div className="-mt-1.5 flex items-center justify-between gap-2 text-[12px] text-dim">
+            <span>No sound? Flip your iPhone&apos;s silent switch off, or</span>
+            <a href={`https://www.youtube.com/watch?v=${s.youtube}`} target="_blank" rel="noopener noreferrer"
+              className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-border px-3 font-semibold text-text">▶ Watch on YouTube</a>
+          </div>
+        )}
 
         <div>
           <h2 className={`${display} text-[26px] leading-tight`}>{s.name}</h2>
