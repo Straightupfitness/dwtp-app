@@ -171,3 +171,13 @@ export async function deleteClientForever(clientId: string, typedName: string) {
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** November 15: Michael sets which weekdays she trains (0 = Sunday … 6 = Saturday), same as she can in her Calendar. */
+export async function setClientWorkoutDays(clientId: string, days: number[]) {
+  const { supabase } = await coach();
+  const clean = Array.from(new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))).sort();
+  const { error } = await supabase.from("profiles").update({ workout_days: clean }).eq("id", clientId);
+  if (error) return { error: error.message };
+  revalidatePath(`/coach/clients/${clientId}`);
+  return { ok: true };
+}

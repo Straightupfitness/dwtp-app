@@ -1,4 +1,7 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import CoachWorkoutDays from "@/components/CoachWorkoutDays";
+import { loadWorkoutWeek } from "@/lib/workouts";
+import { defaultWorkoutDays } from "@/lib/calendar";
 import RemoveClient from "@/components/RemoveClient";
 import SignInCodeButton from "@/components/SignInCodeButton";
 import BlueprintReply from "@/components/BlueprintReply";
@@ -45,6 +48,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   })));
   const tweekNow = trainingWeek((p?.program_start as string | null) ?? null, todayIn((p?.timezone as string | null) ?? "America/Los_Angeles"));
   if (!p) notFound();
+  // November 15: which workout lands on which day (her current week, or Week 1 before she starts).
+  const wkPlan = p.program_start ? await loadWorkoutWeek(supabase, id, Math.max(1, tweekNow)).catch(() => null) : null;
   const [state, { data: t }, { data: checkins }, { data: focusRows }, prog, { data: purchases }, { data: assessment }] = await Promise.all([
     loadProgram(supabase, id),
     supabase.from("nutrition_targets").select("maintenance_calories, calorie_target, protein_g, fiber_g, potassium_mg").eq("client_id", id).maybeSingle(),
@@ -119,6 +124,10 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <a href="#progress" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Progress</a>
         </div>
       </header>
+      {wkPlan?.phase && (
+        <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} initial={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
+          workouts={wkPlan.strength.map((w) => ({ day: w.day, title: w.title }))} weekLabel={tweekNow >= 1 ? `This week (Week ${tweekNow})` : "Week 1 (starts Monday)"} programName={wkPlan.program.name} />
+      )}
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
       <SignInCodeButton clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
       <BriefPanel clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
