@@ -35,7 +35,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const { id } = await params;
   const supabase = await createClient();
   const { data: p } = await supabase.from("profiles").select("*").eq("id", id).single();
-  const { data: progRows } = await supabase.from("programs").select("id, name, weeks").eq("active", true).order("sort").order("name");
+  // November 15: plus her own custom programs (hidden from everyone else's list), so saving her details keeps hers.
+  const { data: progRows } = await supabase.from("programs").select("id, name, weeks").or(`active.eq.true,id.like.custom-${id.slice(0, 8)}-%`).order("sort").order("name");
   const programs = (progRows ?? []) as { id: string; name: string; weeks: number }[];
   // November 5: her program's weeks, for "Her workouts this week".
   const { data: phRows } = await supabase.from("program_phases").select("name, first_week, weeks").eq("program", (p?.workout_program as string | null) ?? "sltp").order("first_week");
@@ -113,6 +114,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <a href="#details" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Edit details</a>
           <a href="#food" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Food log</a>
           <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Workouts</Link>
+          <Link href={`/coach/clients/${id}/program`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">{String(p.workout_program ?? "").startsWith("custom-") ? "✎ Her custom program" : "+ Custom program"}</Link>
           <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Chat</Link>
           <a href="#progress" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Progress</a>
         </div>
