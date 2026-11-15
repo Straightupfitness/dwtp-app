@@ -254,6 +254,8 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                 {one
                   ? <Link href={`/coach/inbox/${one.id}`} className={`${act} border-accent bg-accent text-black`}>Message in chat</Link>
                   : <button type="button" onClick={() => { setComposing(true); setMsg(""); }} className={`${act} border-accent bg-accent text-black`}>Message {picked.size} in chat</button>}
+                {/* November 15: text them from his own phone, Hit 'Em Up style. */}
+                <Link href={`/coach/text?ids=${[...picked].join(",")}`} className={act}>📱 Text {one ? one.first : picked.size} from my phone</Link>
                 {one && <Link href={`/coach/clients/${one.id}`} className={act}>Open her page</Link>}
                 {one && <SeeHerApp clientId={one.id} />}
                 {one?.checkin?.id && <Link href={`/coach/checkins/${one.checkin.id}`} className={act}>Week {one.checkin.week} check-in</Link>}
