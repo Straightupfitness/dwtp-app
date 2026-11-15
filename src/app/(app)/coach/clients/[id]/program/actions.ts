@@ -52,7 +52,7 @@ export async function createCustomProgram(clientId: string, days: number, copyCu
   // Her usual cardio menu comes along (the same cardio workouts, not copies).
   for (const c of now?.cardio ?? []) await db.from("phase_workouts").insert({ phase_id: phaseId, workout_id: c.id, day: null });
 
-  await db.from("profiles").update({ workout_program: progId, workout_start_week: 1, strength_days_per_week: n }).eq("id", clientId);
+  await db.from("profiles").update({ workout_program: progId, workout_start_week: 1, strength_days_per_week: Math.min(3, n) }).eq("id", clientId);
   revalidatePath(`/coach/clients/${clientId}`, "layout");
   return { ok: true };
 }
@@ -82,7 +82,7 @@ export async function addDay(clientId: string, phaseId: number) {
   const wid = newId();
   await db.from("workouts").insert({ id: wid, name: `Day ${d}`, kind: "strength", circuit: false });
   await db.from("phase_workouts").insert({ phase_id: phaseId, workout_id: wid, day: d });
-  await db.from("profiles").update({ strength_days_per_week: d }).eq("id", clientId);
+  await db.from("profiles").update({ strength_days_per_week: Math.min(3, d) }).eq("id", clientId);
   revalidatePath(`/coach/clients/${clientId}/program`);
   return { ok: true };
 }
@@ -94,7 +94,7 @@ export async function removeLastDay(clientId: string, phaseId: number) {
   const { data: links } = await db.from("phase_workouts").select("day, workout_id").eq("phase_id", phaseId).not("day", "is", null).order("day", { ascending: false });
   if (!links?.length || links.length === 1) return { error: "Keep at least one day." };
   await db.from("phase_workouts").delete().eq("phase_id", phaseId).eq("workout_id", links[0].workout_id);
-  await db.from("profiles").update({ strength_days_per_week: links.length - 1 }).eq("id", clientId);
+  await db.from("profiles").update({ strength_days_per_week: Math.min(3, links.length - 1) }).eq("id", clientId);
   revalidatePath(`/coach/clients/${clientId}/program`);
   return { ok: true };
 }
@@ -124,7 +124,7 @@ export async function addExercise(name: string, notes: string, youtube: string) 
 export async function assignProgram(clientId: string, programId: string, days?: number) {
   const db = await coach();
   if (!db) return { error: "Coach only" };
-  const { error } = await db.from("profiles").update({ workout_program: programId, ...(days ? { strength_days_per_week: days } : {}) }).eq("id", clientId);
+  const { error } = await db.from("profiles").update({ workout_program: programId, ...(days ? { strength_days_per_week: Math.min(3, days) } : {}) }).eq("id", clientId);
   if (error) return { error: error.message };
   revalidatePath(`/coach/clients/${clientId}`, "layout");
   return { ok: true };

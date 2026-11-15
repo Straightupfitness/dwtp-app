@@ -192,9 +192,9 @@ export async function setClientSchedule(clientId: string, map: Record<number, nu
   for (const [k, v] of Object.entries(map ?? {})) { const wd = Number(k), d = Number(v); if (wd >= 0 && wd <= 6 && d >= 1) clean[String(wd)] = d; }
   const n = Object.keys(clean).length;
   const { error } = await supabase.from("profiles").update(n
-    ? { workout_schedule: clean, workout_days: Object.keys(clean).map(Number).sort(), strength_days_per_week: n }
+    ? { workout_schedule: clean, workout_days: Object.keys(clean).map(Number).sort(), strength_days_per_week: Math.min(3, n) } // the column allows 1–3 (3 = every day of the program)
     : { workout_schedule: null }).eq("id", clientId);
-  if (error) return { error: /workout_schedule/.test(error.message) ? "Run the workout schedule SQL file first." : error.message };
+  if (error) return { error: /workout_schedule/.test(error.message) ? "Run the workout schedule SQL file first." : "Couldn't save her week. Try again." };
   revalidatePath(`/coach/clients/${clientId}`);
   return { ok: true };
 }
