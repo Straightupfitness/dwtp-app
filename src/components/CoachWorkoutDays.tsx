@@ -8,10 +8,12 @@ export type PlanDay = { day: number; title: string; exercises: string[] };
 
 /** A rough "what it works" label from the exercise names (Michael checks the list). */
 export function focusOf(ex: string[]) {
-  const n = ex.join(" | ").toLowerCase();
-  const count = (words: string[]) => words.reduce((k, w) => k + (n.match(new RegExp(w, "g"))?.length ?? 0), 0);
-  const lower = count(["squat", "deadlift", "rdl", "lunge", "leg ", "legs", "hamstring", "glute", "hip thrust", "calf", "step up", "step-up", "split squat", "bridge", "abduct", "adduct", "kettlebell swing"]);
-  const upper = count(["press", "row", "pull", "chin", "push", "curl", "tricep", "bicep", "fly", "raise", "lat ", "dip", "chest", "shoulder", "face pull"]);
+  // Each exercise counts once: lower-body words win ("Leg Press" is legs, "Calf Raise" is legs).
+  const LOWER = /squat|deadlift|\brdl\b|lunge|\bleg|hamstring|glute|hip thrust|calf|step[ -]?up|bridge|abduct|adduct|swing|good morning|sled|quad/i;
+  const UPPER = /press|row|pull|chin|push|curl|tricep|bicep|\bfly|flye|raise|\blat\b|lats|\bdip|chest|shoulder|delt/i;
+  const SKIP = /warm|mobility|stretch|overview|foam|cardio|treadmill|bike|walk|plank|crunch|\babs?\b|core|dead bug|bird dog/i;
+  let lower = 0, upper = 0;
+  for (const e of ex) { if (SKIP.test(e)) continue; if (LOWER.test(e)) lower++; else if (UPPER.test(e)) upper++; }
   if (!lower && !upper) return "";
   if (lower >= upper * 2) return "Lower body";
   if (upper >= lower * 2) return "Upper body";
