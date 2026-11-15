@@ -1,6 +1,6 @@
 import { blueprintLabels } from "@/lib/blueprint";
 import CoachWorkoutDays from "@/components/CoachWorkoutDays";
-import { loadWorkoutWeek } from "@/lib/workouts";
+import { loadSchedule, loadWorkoutWeek } from "@/lib/workouts";
 import { defaultWorkoutDays } from "@/lib/calendar";
 import RemoveClient from "@/components/RemoveClient";
 import SignInCodeButton from "@/components/SignInCodeButton";
@@ -50,6 +50,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   if (!p) notFound();
   // November 15: which workout lands on which day (her current week, or Week 1 before she starts).
   const wkPlan = p.program_start ? await loadWorkoutWeek(supabase, id, Math.max(1, tweekNow)).catch(() => null) : null;
+  const wkSchedule = await loadSchedule(supabase, id);
+  const { data: wkItems } = wkPlan?.allStrength.length
+    ? await supabase.from("workout_items").select("workout_id, position, exercises(name)").in("workout_id", wkPlan.allStrength.map((w) => w.id))
+    : { data: [] };
+  const planDays = (wkPlan?.allStrength ?? []).map((w) => ({ day: w.day!, title: w.title,
+    exercises: ((wkItems ?? []) as unknown as { workout_id: number; position: number; exercises: { name: string } | null }[]).filter((i) => i.workout_id === w.id).sort((a, b) => a.position - b.position).map((i) => i.exercises?.name ?? "").filter(Boolean) }));
   const [state, { data: t }, { data: checkins }, { data: focusRows }, prog, { data: purchases }, { data: assessment }] = await Promise.all([
     loadProgram(supabase, id),
     supabase.from("nutrition_targets").select("maintenance_calories, calorie_target, protein_g, fiber_g, potassium_mg").eq("client_id", id).maybeSingle(),
@@ -125,8 +131,9 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         </div>
       </header>
       {wkPlan?.phase && (
-        <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} initial={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
-          workouts={wkPlan.strength.map((w) => ({ day: w.day, title: w.title }))} weekLabel={tweekNow >= 1 ? `This week (Week ${tweekNow})` : "Week 1 (starts Monday)"} programName={wkPlan.program.name} />
+        <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
+          workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
+          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
       )}
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
       <SignInCodeButton clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />

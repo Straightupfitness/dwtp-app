@@ -10,6 +10,8 @@ export async function setWorkoutDays(days: number[]) {
   const clean = Array.from(new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))).sort();
   const { error } = await supabase.from("profiles").update({ workout_days: clean }).eq("id", user.id);
   if (error) { console.error("workout days", error.message); return { error: "Couldn't save. Try again in a minute." }; }
+  // November 15: picking her own days replaces Michael's day-by-day schedule (if he set one).
+  await supabase.from("profiles").update({ workout_schedule: null }).eq("id", user.id).then(() => {}, () => {});
   revalidatePath("/calendar");
   revalidatePath("/today");
   return { ok: true };

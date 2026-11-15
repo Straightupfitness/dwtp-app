@@ -181,3 +181,20 @@ export async function setClientWorkoutDays(clientId: string, days: number[]) {
   revalidatePath(`/coach/clients/${clientId}`);
   return { ok: true };
 }
+
+/**
+ * November 15 (Claudia): Michael's day-by-day schedule. `map` = weekday → program day (Monday: Day 2 …). Also sets
+ * her workout days to match. null clears it (back to Day 1, 2, 3… onto her own days).
+ */
+export async function setClientSchedule(clientId: string, map: Record<number, number> | null) {
+  const { supabase } = await coach();
+  const clean: Record<string, number> = {};
+  for (const [k, v] of Object.entries(map ?? {})) { const wd = Number(k), d = Number(v); if (wd >= 0 && wd <= 6 && d >= 1) clean[String(wd)] = d; }
+  const n = Object.keys(clean).length;
+  const { error } = await supabase.from("profiles").update(n
+    ? { workout_schedule: clean, workout_days: Object.keys(clean).map(Number).sort(), strength_days_per_week: n }
+    : { workout_schedule: null }).eq("id", clientId);
+  if (error) return { error: /workout_schedule/.test(error.message) ? "Run the workout schedule SQL file first." : error.message };
+  revalidatePath(`/coach/clients/${clientId}`);
+  return { ok: true };
+}

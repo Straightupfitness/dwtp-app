@@ -1,52 +1,97 @@
 "use client";
 import { useState, useTransition } from "react";
-import { setClientWorkoutDays } from "@/app/(app)/coach/clients/[id]/actions";
+import { setClientSchedule, setClientWorkoutDays } from "@/app/(app)/coach/clients/[id]/actions";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first, like the program week
 const NAME = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export type PlanDay = { day: number; title: string; exercises: string[] };
+
+/** A rough "what it works" label from the exercise names (Michael checks the list). */
+export function focusOf(ex: string[]) {
+  const n = ex.join(" | ").toLowerCase();
+  const count = (words: string[]) => words.reduce((k, w) => k + (n.match(new RegExp(w, "g"))?.length ?? 0), 0);
+  const lower = count(["squat", "deadlift", "rdl", "lunge", "leg ", "legs", "hamstring", "glute", "hip thrust", "calf", "step up", "step-up", "split squat", "bridge", "abduct", "adduct", "kettlebell swing"]);
+  const upper = count(["press", "row", "pull", "chin", "push", "curl", "tricep", "bicep", "fly", "raise", "lat ", "dip", "chest", "shoulder", "face pull"]);
+  if (!lower && !upper) return "";
+  if (lower >= upper * 2) return "Lower body";
+  if (upper >= lower * 2) return "Upper body";
+  return "Full body";
+}
 
 /**
- * November 15: Michael picks her workout days and sees exactly which workout lands on which day (Day 1 on her first
- * workout day of the week, Day 2 on the next…). Works before her start date too.
+ * November 15 (Claudia: Mon/Tue/Thu, upper/lower/upper from a 4-day program): Michael sees every workout of her
+ * program this week (what's in it, what it works) and picks which one goes on which weekday. It follows the program
+ * into every phase (Monday stays "Day 2" when the phase changes).
  */
-export default function CoachWorkoutDays({ clientId, first, initial, workouts, weekLabel, programName }: {
-  clientId: string; first: string; initial: number[]; workouts: { day: number | null; title: string }[]; weekLabel: string; programName: string;
+export default function CoachWorkoutDays({ clientId, first, schedule, workoutDays, days, weekLabel, programName }: {
+  clientId: string; first: string; schedule: Record<number, number> | null; workoutDays: number[]; days: PlanDay[]; weekLabel: string; programName: string;
 }) {
-  const [days, setDays] = useState<number[]>(initial);
+  // Start from his schedule, or from today's rule (Day 1, 2, 3… onto her workout days).
+  const initial: Record<number, number> = schedule ?? Object.fromEntries(ORDER.filter((d) => workoutDays.includes(d)).slice(0, days.length).map((wd, i) => [wd, days[i]?.day]).filter((x) => x[1]));
+  const [map, setMap] = useState<Record<number, number>>(initial);
+  const [open, setOpen] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
-  const dirty = [...days].sort().join() !== [...initial].sort().join();
-  const picked = ORDER.filter((d) => days.includes(d));
-  const need = workouts.length;
+  const dirty = JSON.stringify(map) !== JSON.stringify(initial) || !schedule;
+  const used = Object.values(map);
+  const dupes = used.filter((d, i) => used.indexOf(d) !== i);
+  const title = (d: number) => days.find((x) => x.day === d);
+
   return (
-    <div className="space-y-2.5 rounded-xl border border-border bg-card p-3 text-sm">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3 text-sm">
       <div>
-        <p className="font-semibold">{first}&apos;s workout days</p>
-        <p className="text-[12px] text-dim">{programName} · {need} workout{need === 1 ? "" : "s"} a week. They go in order onto the days you pick.</p>
+        <p className="font-semibold">{first}&apos;s workout week</p>
+        <p className="text-[12px] text-dim">{programName} · {weekLabel} · {days.length} workouts in this phase. Pick which one she does on which day. It carries into every phase.</p>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {ORDER.map((d) => {
-          const on = days.includes(d);
-          return <button key={d} type="button" aria-pressed={on} onClick={() => { setDays((x) => on ? x.filter((y) => y !== d) : [...x, d]); setMsg(""); }}
-            className={`min-h-10 min-w-[3.1rem] rounded-lg border text-[13px] font-semibold ${on ? "border-accent bg-accent text-black" : "border-[#2a2a2a] text-dim"}`}>{NAME[d].slice(0, 3)}</button>;
+
+      <div className="space-y-1.5">
+        {days.map((d) => {
+          const f = focusOf(d.exercises);
+          return (
+            <div key={d.day} className="rounded-lg border border-[#242424] bg-bg/60">
+              <button type="button" onClick={() => setOpen(open === d.day ? null : d.day)} className="flex min-h-11 w-full items-center gap-2 px-2.5 text-left">
+                <span className="shrink-0 rounded bg-[#2a2a2a] px-1.5 py-0.5 text-[11px] font-bold">Day {d.day}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{d.title}</span>
+                {f && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${f === "Lower body" ? "bg-[#1d2a3a] text-[#9cc7ff]" : f === "Upper body" ? "bg-[#33240f] text-accent" : "bg-[#222] text-[#cfcfcf]"}`}>{f}</span>}
+                <span className="text-dim">{open === d.day ? "▾" : "▸"}</span>
+              </button>
+              {open === d.day && (
+                <ol className="list-decimal space-y-0.5 px-2.5 pb-2.5 pl-8 text-[13px] text-[#d6d6d6]">{d.exercises.map((e, i) => <li key={i}>{e}</li>)}{!d.exercises.length && <li className="list-none text-dim">No exercises listed.</li>}</ol>
+              )}
+            </div>
+          );
         })}
       </div>
-      <div className="rounded-lg border border-[#242424] bg-bg/60 p-2.5">
-        <p className="mb-1 text-[11px] uppercase tracking-[0.1em] text-dim">{weekLabel}: what lands where</p>
-        {picked.length >= need ? (
-          <ul className="space-y-0.5 text-[13px]">
-            {picked.map((d, i) => <li key={d}><b className="inline-block w-24">{NAME[d]}</b>{workouts[i] ? workouts[i].title : <span className="text-dim">Cardio or catch-up</span>}</li>)}
-          </ul>
-        ) : <p className="text-[13px] text-[#e7d3a8]">Pick at least {need} days. With fewer, her calendar uses the default days for {need} workouts.</p>}
+
+      <div className="space-y-1.5 rounded-lg border border-[#242424] p-2.5">
+        <p className="text-[11px] uppercase tracking-[0.1em] text-dim">Her week</p>
+        {ORDER.map((wd) => (
+          <label key={wd} className="flex items-center gap-2">
+            <span className="w-24 shrink-0 text-[13px] font-semibold">{NAME[wd]}</span>
+            <select value={map[wd] ?? ""} onChange={(e) => { const v = Number(e.target.value); setMap((m) => { const n = { ...m }; if (v) n[wd] = v; else delete n[wd]; return n; }); setMsg(""); }}
+              className="min-h-10 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-2 text-[13px] outline-none focus:border-accent">
+              <option value="">Rest / cardio</option>
+              {days.map((d) => { const f = focusOf(d.exercises); return <option key={d.day} value={d.day}>Day {d.day} · {d.title}{f ? ` (${f})` : ""}</option>; })}
+            </select>
+          </label>
+        ))}
+        {dupes.length > 0 && <p className="text-[12px] text-[#e7d3a8]">Day {dupes[0]} is on two days. A workout can only count once a week, so pick a different day for one of them.</p>}
+        {Object.keys(map).length > 0 && <p className="text-[12px] text-dim">{ORDER.filter((wd) => map[wd]).map((wd) => `${NAME[wd].slice(0, 3)}: ${title(map[wd])?.title ?? `Day ${map[wd]}`}`).join(" · ")}</p>}
       </div>
-      <div className="flex items-center gap-2">
-        <button type="button" disabled={!dirty || pending || picked.length < need} onClick={() => start(async () => {
-          const r = await setClientWorkoutDays(clientId, days);
-          setMsg(r?.error ?? "Saved ✓ Her calendar shows these days now.");
-        })} className="min-h-10 rounded-lg bg-accent px-4 text-[13px] font-semibold text-black disabled:opacity-40">{pending ? "Saving…" : "Save her days"}</button>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!dirty || pending || dupes.length > 0 || !Object.keys(map).length} onClick={() => start(async () => {
+          const r = await setClientSchedule(clientId, map);
+          setMsg(r?.error ?? "Saved ✓ Her calendar and Workouts tab follow this week by week.");
+        })} className="min-h-10 rounded-lg bg-accent px-4 text-[13px] font-semibold text-black disabled:opacity-40">{pending ? "Saving…" : "Save her week"}</button>
+        {schedule && <button type="button" disabled={pending} onClick={() => start(async () => {
+          const r = await setClientSchedule(clientId, null);
+          if (!r?.error) await setClientWorkoutDays(clientId, workoutDays);
+          setMsg(r?.error ?? "Cleared. Workouts go back to Day 1, 2, 3… on her days.");
+        })} className="min-h-10 rounded-lg border border-border px-3 text-[13px] text-dim">Clear schedule</button>}
         {msg && <span className="text-[12px] text-dim">{msg}</span>}
       </div>
-      <p className="text-[11px] text-dim">She can still change her days in her Calendar. A workout she does on another day moves to the day she did it, and one she misses rolls forward.</p>
+      <p className="text-[11px] text-dim">If she changes her workout days in her own Calendar, this schedule is cleared and her workouts go back to Day 1, 2, 3… on her days.</p>
     </div>
   );
 }

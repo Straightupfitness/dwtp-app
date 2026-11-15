@@ -64,7 +64,10 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   // November 7 (Sandra): a 4-day program never crams two workouts on one day. If she has fewer days picked than
   // workouts, she gets the default days for that many (Mon/Tue/Thu/Fri for 4) until she picks enough.
   const perWeek = plan?.strength.length ?? 0;
-  if (perWeek && workoutDays.length < perWeek) workoutDays = defaultWorkoutDays(perWeek);
+  // November 15: Michael's schedule (Monday Day 2, Tuesday Day 1…) sets her workout days.
+  const scheduled = (plan?.strength ?? []).map((w) => w.weekday).filter((d): d is number => d !== undefined);
+  if (scheduled.length) workoutDays = scheduled;
+  else if (perWeek && workoutDays.length < perWeek) workoutDays = defaultWorkoutDays(perWeek);
   if (plan?.phase) {
     const ev = (w: (typeof plan.strength)[number]): CalEvent => ({ kind: "workout", title: `Workout · ${w.title}`, detail: `${w.done ? "Done · " : ""}${w.minutes ? `About ${w.minutes} min` : `${w.exercises} exercises`}`, href: `/workouts/${w.id}${tweek !== plan.current ? `?w=${tweek}` : ""}` });
     const hasWorkout = (d: string) => !!out.find((x) => x.date === d)?.events.some((e) => e.kind === "workout");
