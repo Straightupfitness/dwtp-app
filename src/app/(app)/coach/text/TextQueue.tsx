@@ -2,19 +2,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; week: number; weight: number | null; goal: number | null };
+export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; week?: number; weight?: number | null; goal?: number | null; city?: string | null };
 
-const FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{week}", "Program week"], ["{weight}", "Latest weight"], ["{goal}", "Goal weight"], ["{togo}", "Lbs to goal"]];
-const TPL_KEY = "dwtp-text-template";
+const CLIENT_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{week}", "Program week"], ["{weight}", "Latest weight"], ["{goal}", "Goal weight"], ["{togo}", "Lbs to goal"]];
+const LEAD_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{city}", "City"]];
 const SENT_KEY = "dwtp-text-sent";
-const fmt = (n: number | null) => (n === null ? "" : String(Math.round(n * 10) / 10));
+const fmt = (n: number | null | undefined) => (n === undefined ? "" :  n === null ? "" : String(Math.round(n * 10) / 10));
 
 export function fill(t: string, r: TextRow) {
-  const togo = r.weight !== null && r.goal !== null ? Math.max(0, Math.round((r.weight - r.goal) * 10) / 10) : null;
+  const togo = r.weight != null && r.goal != null ? Math.max(0, Math.round((r.weight - r.goal) * 10) / 10) : null;
   return t
     .replace(/\{\s*first\s*(name)?\s*\}|\[\s*first\s*name\s*\]|\bfirst_?name\b/gi, r.first)
     .replace(/\{\s*last\s*(name)?\s*\}/gi, r.last)
-    .replace(/\{\s*week\s*\}/gi, r.week >= 1 ? String(r.week) : "1")
+    .replace(/\{\s*week\s*\}/gi, (r.week ?? 0) >= 1 ? String(r.week) : "1")
+    .replace(/\{\s*city\s*\}/gi, r.city ?? "")
     .replace(/\{\s*weight\s*\}/gi, fmt(r.weight))
     .replace(/\{\s*goal\s*\}/gi, fmt(r.goal))
     .replace(/\{\s*togo\s*\}/gi, fmt(togo));
@@ -29,7 +30,9 @@ const smsHref = (phone: string, body: string) => {
  * he taps send, swipes back, and the next one is highlighted. Progress is kept on this phone (the app may reload
  * while he's in Messages).
  */
-export default function TextQueue({ rows }: { rows: TextRow[] }) {
+export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[]; kind?: "clients" | "leads" }) {
+  const FIELDS = kind === "leads" ? LEAD_FIELDS : CLIENT_FIELDS;
+  const TPL_KEY = `dwtp-text-template${kind === "leads" ? "-leads" : ""}`;
   const [tpl, setTpl] = useState("Hi {first}, ");
   const [sent, setSent] = useState<Record<string, number>>({});
   const [step, setStep] = useState<"write" | "send">("write");
@@ -43,7 +46,7 @@ export default function TextQueue({ rows }: { rows: TextRow[] }) {
       if (t) setTpl(t);
       if (s.key === key && s.sent && Object.keys(s.sent).length) { setSent(s.sent); setStep("send"); if (s.tpl) setTpl(s.tpl); }
     } catch {}
-  }, [key]);
+  }, [key, TPL_KEY]);
   const save = (next: Record<string, number>) => { setSent(next); try { localStorage.setItem(SENT_KEY, JSON.stringify({ key, tpl, sent: next })); } catch {} };
 
   const withPhone = rows.filter((r) => r.phone), noPhone = rows.filter((r) => !r.phone);
@@ -64,7 +67,7 @@ export default function TextQueue({ rows }: { rows: TextRow[] }) {
           <p className="whitespace-pre-line">{fill(tpl, rows[0])}</p>
         </div>
       )}
-      {noPhone.length > 0 && <p className="text-[13px] text-[#e7d3a8]">No phone number for {noPhone.map((r) => r.first).join(", ")}, so they&apos;re skipped. Add one on her client page.</p>}
+      {noPhone.length > 0 && <p className="text-[13px] text-[#e7d3a8]">No phone number for {noPhone.map((r) => r.first).join(", ")}, so they&apos;re skipped. Add one on her {kind === "leads" ? "lead" : "client page"}.</p>}
       <button type="button" disabled={!tpl.trim() || !withPhone.length} onClick={() => { try { localStorage.setItem(TPL_KEY, tpl); } catch {} save({}); setStep("send"); }}
         className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">Next: send to {withPhone.length} →</button>
     </div>
@@ -97,7 +100,7 @@ export default function TextQueue({ rows }: { rows: TextRow[] }) {
       </ul>
       {done === withPhone.length && <p className="rounded-xl border border-[#2f5d3a] p-3 text-center text-[14px] text-[#7ddc8f]">All {done} texted 🎉</p>}
       {noPhone.length > 0 && (
-        <p className="text-[13px] text-dim">No phone number: {noPhone.map((r, i) => <span key={r.id}>{i ? ", " : ""}<Link href={`/coach/clients/${r.id}`} className="underline">{r.first}</Link></span>)}</p>
+        <p className="text-[13px] text-dim">No phone number: {noPhone.map((r, i) => <span key={r.id}>{i ? ", " : ""}{kind === "leads" ? r.first : <Link href={`/coach/clients/${r.id}`} className="underline">{r.first}</Link>}</span>)}</p>
       )}
     </div>
   );

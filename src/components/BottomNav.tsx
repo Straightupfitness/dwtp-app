@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { IconClients, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
+import { IconClients, IconLeads, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
 
 // Order set by Michael (October 28); Circles moved into Progress (October 29). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
@@ -14,6 +14,7 @@ const CLIENT = [
   { href: "/lessons", label: "Lessons", Icon: IconLessons },
 ];
 const COACH = [
+  { href: "/coach/leads", label: "Leads", Icon: IconLeads }, // November 15: left of Clients
   { href: "/coach", label: "Clients", Icon: IconClients },
   // November 7: no Today tab for Michael. Today is her screen; he lands on Clients (use "See her app" to see hers).
   { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
