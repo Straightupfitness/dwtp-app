@@ -12,7 +12,7 @@ import { createClient, viewAsInfo } from "@/lib/supabase/server";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: me } = user ? await supabase.from("profiles").select("role, full_name, avatar_path, program_start, timezone").eq("id", user.id).single() : { data: null };
+  const { data: me } = user ? await supabase.from("profiles").select("role, full_name, avatar_path, program_start, timezone, status").eq("id", user.id).single() : { data: null };
   const coach = me?.role === "coach";
   const viewing = user && !coach ? await viewAsInfo() : null;
   // Last seen (for Michael's "not in the app for 48 hours"): at most one write every 15 minutes.
@@ -40,7 +40,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       )}
       <TopBar coach={coach} unread={count ?? 0} alerts={alerts ?? 0} name={me?.full_name ?? null} avatarPath={me?.avatar_path ?? null} />
       {/* November 1: Michael's screens use the full width on a computer. */}
-      <main className={`mx-auto px-4 pb-28 pt-4 ${coach ? "max-w-md md:max-w-[1400px] md:px-8" : "max-w-md"}`}>{children}</main>
+      <main className={`mx-auto px-4 pb-28 pt-4 ${coach ? "max-w-md md:max-w-[1400px] md:px-8" : "max-w-md"}`}>
+        {/* November 15: a removed client can't use the app; she sees this instead. */}
+        {!coach && !viewing && me?.status === "cancelled" ? (
+          <div className="mt-16 space-y-3 text-center">
+            <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold uppercase">Your program has ended</h1>
+            <p className="text-[15px] leading-relaxed text-[#a8a8a8]">Thank you for being part of the Driven Woman Transformation Program. Want to keep going? Text or email Michael and he&apos;ll get you set up.</p>
+            <a href="mailto:michael@straightupfitness.com" className="inline-grid min-h-12 place-items-center rounded-xl bg-accent px-6 font-semibold text-black">Email Michael</a>
+          </div>
+        ) : children}
+      </main>
       <BottomNav coach={coach} />
       {user && !viewing && <TimezoneSync saved={me?.timezone ?? null} />}
       <InstallCatcher />

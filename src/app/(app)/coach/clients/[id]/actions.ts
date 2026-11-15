@@ -125,3 +125,49 @@ export async function foodWeekFor(clientId: string) {
   const { loadFoodWeek } = await import("@/lib/food-week");
   return loadFoodWeek(supabase, clientId);
 }
+
+/**
+ * November 15: remove a client. She drops off his Clients list, gets no reminders, and can't open the app (she sees
+ * "your program has ended"). Everything is kept; Restore brings her back as she was.
+ */
+export async function removeClient(clientId: string) {
+  const { supabase } = await coach();
+  const { error } = await supabase.from("profiles").update({ status: "cancelled" }).eq("id", clientId).eq("role", "client");
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+export async function restoreClient(clientId: string) {
+  const { supabase } = await coach();
+  const { error } = await supabase.from("profiles").update({ status: "active" }).eq("id", clientId).eq("role", "client");
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Delete her for good: her account, logs, check-ins, chat, photos and videos. Can't be undone. He types her first
+ * name to confirm. Only for someone already removed.
+ */
+export async function deleteClientForever(clientId: string, typedName: string) {
+  await coach();
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const db = adminClient();
+  const { data: p } = await db.from("profiles").select("full_name, role, status").eq("id", clientId).single();
+  if (!p || p.role !== "client") return { error: "Client not found." };
+  if (p.status !== "cancelled") return { error: "Remove her first, then delete." };
+  const first = ((p.full_name as string | null) ?? "").trim().split(/\s+/)[0] ?? "";
+  if (!first || typedName.trim().toLowerCase() !== first.toLowerCase()) return { error: `Type “${first}” to confirm.` };
+  // Her files first (best effort), then the account; everything in the database that's hers goes with it.
+  for (const [bucket, folder] of [["food-photos", clientId], ["checkin-videos", clientId], ["progress-photos", clientId], ["media", `chat/${clientId}`], ["media", clientId]] as const) {
+    try {
+      const { data: files } = await db.storage.from(bucket).list(folder, { limit: 1000 });
+      const paths = (files ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`);
+      if (paths.length) await db.storage.from(bucket).remove(paths);
+    } catch {}
+  }
+  const { error } = await db.auth.admin.deleteUser(clientId);
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

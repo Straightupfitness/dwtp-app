@@ -1,4 +1,5 @@
 import { blueprintLabels } from "@/lib/blueprint";
+import RemoveClient from "@/components/RemoveClient";
 import SignInCodeButton from "@/components/SignInCodeButton";
 import BlueprintReply from "@/components/BlueprintReply";
 import { blueprintDone } from "@/lib/blueprint";
@@ -284,6 +285,9 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       <div id="details" className="scroll-mt-20 space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-dim">Her details and targets</h2>
         <ProfileForm clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
+      </div>
+      <div id="remove" className="scroll-mt-20">
+        <RemoveClient clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} removed={p.status === "cancelled"} />
       </div>
     </section>
   );

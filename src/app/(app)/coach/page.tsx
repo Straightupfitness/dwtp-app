@@ -29,6 +29,7 @@ export default async function CoachHome() {
         <Link href="/coach/clients/new" className="flex min-h-11 items-center justify-center rounded-xl border border-accent text-sm font-semibold text-accent">+ Add client</Link>
       </div>
       <RosterView rows={rows} />
+      <p className="text-center"><Link href="/coach/removed" className="text-[13px] text-dim underline">Removed clients</Link></p>
     </section>
   );
 }
