@@ -77,7 +77,7 @@ export const BLUEPRINT: Screen[] = [
     note("menopause_note", "Tell me more (optional)"),
   ] },
   { key: "travel", code: "7X-18", title: "How often do you travel?", fields: [
-    { id: "travel", label: "Travel", kind: "choice", options: ["Never", "About once a month", "Every week"] },
+    { id: "travel", label: "Travel", kind: "choice", options: ["Never", "Every few months", "About once a month", "Every week"] },
     note("travel_note"),
   ] },
   { key: "last", code: "7X-19", title: "Last one", fields: [{ id: "anything_else", label: "Anything else you want me to know? Or tell me a fun fact about you.", kind: "open", optional: true, video: true }] },

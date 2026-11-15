@@ -3,6 +3,8 @@ import type { Daily } from "@/lib/daily";
 import type { BadgeStatus } from "@/lib/badges";
 import { DayBars, WeightLine } from "./Charts";
 import BadgeIcon from "./BadgeIcon";
+import WeightDots from "./WeightDots";
+import DailyCombo from "./DailyCombo";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const card = "rounded-[18px] border border-border bg-card p-4";
@@ -62,8 +64,8 @@ export default function ProgressView({ data, badges, range, base, coach = false,
       <section className={`${card} space-y-3`}>
         <H right={lost !== null && lost !== 0 ? <span className={`text-[13px] font-semibold ${lost > 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lost > 0 ? `−${lost}` : `+${-lost}`} lbs since the start</span> : null}>Weight</H>
         {last && <p className="text-[13px] text-[#a8a8a8]">Latest <b className="text-text">{last.lbs} lbs</b> on {short(last.date)}{g.goalWeight ? ` · ${Math.abs(Math.round((last.lbs - g.goalWeight) * 10) / 10)} lbs to goal` : ""}</p>}
-        <WeightLine points={data.weights} goal={g.goalWeight} />
-        {data.weights.length > 0 && (
+        {coach ? <WeightDots points={data.weights} goal={g.goalWeight} /> : <WeightLine points={data.weights} goal={g.goalWeight} />}
+        {!coach && data.weights.length > 0 && (
           <details className="group">
             <summary className="cursor-pointer list-none text-[13px] font-semibold text-accent">Every weigh-in ({data.weights.length}) <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
             <ul className="mt-2 max-h-64 divide-y divide-border overflow-y-auto rounded-xl border border-border text-[14px]">
@@ -82,7 +84,14 @@ export default function ProgressView({ data, badges, range, base, coach = false,
         )}
       </section>
 
-      <section className={`${card} space-y-4`}>
+      {coach && (
+        <section className={`${card} space-y-3`}>
+          <H>Food, water, steps day by day</H>
+          <DailyCombo days={days} goals={g} />
+          <p className="text-[11px] text-dim">Solid = hit the target · faded = under it · red = over her calories. Dashed line = target (each bar against its own target).</p>
+        </section>
+      )}
+      {!coach && <section className={`${card} space-y-4`}>
         <H>Food, day by day</H>
         <div><p className="mb-1 text-[13px] font-semibold">Calories</p>
           <DayBars days={series((d) => (d.meals ? d.calories : null))} color="#f5a623" unit="kcal" goal={g.calories} band={g.calories ? [g.calories - 100, g.calories + 100] : null} /></div>
@@ -93,16 +102,16 @@ export default function ProgressView({ data, badges, range, base, coach = false,
         <div><p className="mb-1 text-[13px] font-semibold">Potassium</p>
           <DayBars days={series((d) => (d.meals ? d.potassium : null))} color="#c084fc" unit="mg" goal={g.potassium} band={[g.potassium - 500, g.potassium + 500]} fmt={k} /></div>
         <p className="text-[11px] text-dim">Shaded band = on target. Dashed line = {coach ? "her" : "your"} goal.</p>
-      </section>
+      </section>}
 
-      <section className={`${card} space-y-4`}>
+      {!coach && <section className={`${card} space-y-4`}>
         <div><H>Water</H>
           <div className="mt-2"><DayBars days={series((d) => d.water)} color="#38bdf8" unit="oz" goal={g.water} /></div></div>
         <div><H>Steps</H>
           <div className="mt-2">{hasSteps
             ? <DayBars days={series((d) => d.steps)} color="#a3e635" unit="steps" goal={g.steps} />
             : <p className="text-[13px] text-dim">{coach ? "Her steps show here once her iPhone syncs them (Shortcut under Account)." : "Your steps show here once your iPhone syncs them. Set it up under Account → Apple Health. You also report your weekly average in your check-in."}</p>}</div></div>
-      </section>
+      </section>}
 
       {!hideBadges && <BadgesCard badges={badges} coach={coach} />}
 
@@ -130,9 +139,12 @@ export default function ProgressView({ data, badges, range, base, coach = false,
 /** Her badges: earned ones in color, the rest with how far along she is. */
 export function BadgesCard({ badges, coach = false }: { badges: BadgeStatus[]; coach?: boolean }) {
   const she = coach ? "She" : "You";
+  const Wrap = coach ? "details" : "section"; // November 15: collapsible on Michael's view, like "Every day, in numbers"
   return (
-      <section className={`${card} space-y-3`}>
-        <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>
+      <Wrap className={`${card} group space-y-3`}>
+        {coach
+          ? <summary className={`${display} flex cursor-pointer list-none items-baseline justify-between gap-2 text-lg`}><span>Badges <span className="inline-block text-dim transition group-open:rotate-180">⌄</span></span><span className="font-sans text-[12px] normal-case text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span></summary>
+          : <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>}
         <ul className="grid grid-cols-1 gap-2">
           {badges.map((b) => (
             <li key={b.def.key} className="flex items-center gap-3 rounded-[14px] border border-border bg-[#141414] p-2.5">
@@ -148,6 +160,6 @@ export function BadgesCard({ badges, coach = false }: { badges: BadgeStatus[]; c
           ))}
         </ul>
         <p className="text-[11px] text-dim">{she} keep{coach ? "s" : ""} a badge for good once it&apos;s earned. Earned badges show next to {coach ? "her" : "your"} name in Community.</p>
-      </section>
+      </Wrap>
   );
 }

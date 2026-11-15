@@ -3,6 +3,8 @@ import { createClient, viewAsInfo } from "@/lib/supabase/server";
 import BackButton from "@/components/BackButton";
 import MarkRead from "./MarkRead";
 
+export const dynamic = "force-dynamic"; // November 15: always the latest, never a saved copy
+
 const display = "font-[family-name:var(--font-display)] uppercase";
 
 /**

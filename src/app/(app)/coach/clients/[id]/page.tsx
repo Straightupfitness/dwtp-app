@@ -1,4 +1,6 @@
-import { blueprintLabels } from "@/lib/blueprint";
+import { BLUEPRINT, blueprintLabels } from "@/lib/blueprint";
+import PageRecorder from "@/components/PageRecorder";
+import OpenOnHash from "@/components/OpenOnHash";
 import CoachWorkoutDays from "@/components/CoachWorkoutDays";
 import { loadSchedule, loadWorkoutWeek } from "@/lib/workouts";
 import { defaultWorkoutDays } from "@/lib/calendar";
@@ -118,9 +120,13 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
           <span className="text-dim">Last in the app: <b className="text-text">{lastInLabel(seen)}</b></span>
           <SeenStrip seen={seen} size={18} labels />
+          {/* November 15: her current and goal weight, right up top. */}
+          {(() => { const lw = prog.data.weights[prog.data.weights.length - 1]; return lw ? <span className="text-dim">Current: <b className="text-text">{lw.lbs} lbs</b></span> : null; })()}
+          {p.goal_weight_lbs ? <span className="text-dim">Goal: <b className="text-[#7ee2a8]">{p.goal_weight_lbs} lbs</b></span> : null}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <SeeHerApp clientId={id} />
+          <PageRecorder clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} />
           <WelcomeButton clientId={id} failed={welcome === "failed"} />
           <a href="#details" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Edit details</a>
           <a href="#food" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Food log</a>
@@ -233,9 +239,31 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
                 <summary className="cursor-pointer font-semibold">Driven Woman Blueprint{assessment?.submitted_at ? ` · ${new Date(assessment.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</summary>
                 {assessment?.ai_summary && <p className="mt-2 whitespace-pre-line text-[#d4d4d4]">{assessment.ai_summary}</p>}
                 <dl className="mt-2 space-y-1.5">
-                  {Object.entries((assessment?.answers as Record<string, unknown>) ?? {}).filter(([k]) => !["videos", "previous", "assigned"].includes(k)).map(([k, v]) => (
-                    <div key={k}><dt className="text-xs text-dim">{bpLabels[k] ?? labels[k] ?? k.replace(/_/g, " ")}</dt><dd className="whitespace-pre-line">{typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : JSON.stringify(v)}</dd></div>
-                  ))}
+                  {/* November 15: in Blueprint order, each answer under its question (notes say what they're about). */}
+                  {(() => {
+                    const ans = (assessment?.answers as Record<string, unknown>) ?? {};
+                    const val = (v: unknown) => (typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : typeof v === "number" ? String(v) : JSON.stringify(v));
+                    const has = (v: unknown) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.length);
+                    const known = new Set(BLUEPRINT.flatMap((sc) => sc.fields.map((f) => f.id)));
+                    const groups = BLUEPRINT.map((sc) => ({ sc, rows: sc.fields.filter((f) => has(ans[f.id])) })).filter((g) => g.rows.length);
+                    const extra = Object.entries(ans).filter(([k, v]) => !known.has(k) && !["videos", "previous", "assigned"].includes(k) && has(v));
+                    return <>
+                      {groups.map(({ sc, rows }) => (
+                        <div key={sc.key} className="rounded-lg border border-[#242424] bg-bg/50 p-2.5">
+                          <dt className="text-[13px] font-semibold text-accent">{sc.title}</dt>
+                          <dd className="mt-1 space-y-1">
+                            {rows.map((f) => (
+                              <div key={f.id}>
+                                {(f.kind !== "open" || rows.length > 1) && <span className="block text-xs text-dim">{f.kind === "note" ? `${f.label.replace(/\s*\(optional\)/i, "")} (her note on this)` : f.label}</span>}
+                                <span className="whitespace-pre-line">{val(ans[f.id])}</span>
+                              </div>
+                            ))}
+                          </dd>
+                        </div>
+                      ))}
+                      {extra.map(([k, v]) => <div key={k}><dt className="text-xs text-dim">{labels[k] ?? k.replace(/_/g, " ")}</dt><dd className="whitespace-pre-line">{val(v)}</dd></div>)}
+                    </>;
+                  })()}
                   {/* November 11: what the app picked for her from the Blueprint. */}
                   {assigned && (
                     <div className="rounded-xl border border-accent/50 bg-[#161310] p-3 sm:col-span-2">
@@ -300,10 +328,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <ProgressView data={prog.data} badges={prog.status} range={range} base={`/coach/clients/${id}`} coach />
       </div>
 
-      <div id="details" className="scroll-mt-20 space-y-2">
-        <h2 className="text-sm uppercase tracking-widest text-dim">Her details and targets</h2>
-        <ProfileForm clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
-      </div>
+      <OpenOnHash ids={["details"]} />
+      {/* November 15: same look as "Every day, in numbers", and collapsible. */}
+      <details id="details" className="group scroll-mt-20 space-y-2 rounded-[18px] border border-border bg-card p-4">
+        <summary className="cursor-pointer list-none font-[family-name:var(--font-display)] text-lg uppercase">Her details and targets <span className="inline-block text-dim transition group-open:rotate-180">⌄</span></summary>
+        <div className="mt-3"><ProfileForm clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} /></div>
+      </details>
       <div id="remove" className="scroll-mt-20">
         <RemoveClient clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} removed={p.status === "cancelled"} />
       </div>
