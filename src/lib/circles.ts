@@ -207,9 +207,12 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
       const planWeek = planWeekOf.get(rid) ?? null;
       const planDate = P && planWeek ? addDays(P, (planWeek - 1) * 7) : null;
       const row = cr.get(rid);
-      const saved = (row?.opened_on as string) ?? null;
+      // November 15 (Michael): a fix-it opened for her (by him or from her Blueprint) is open right away, even before
+      // her program starts, never waiting for a later date.
+      const savedOn = (row?.opened_on as string) ?? null;
+      const saved = savedOn && c.kind !== "growth" && row?.status === "open" ? minDate(savedOn, today) : savedOn;
       let opensOn: string | null = null, halfwayOf: number | null = null;
-      if (P) {
+      if (P || (c.kind !== "growth" && saved)) {
         if (!workAhead) opensOn = minDate(planDate, saved);
         else if (n === 1) opensOn = minDate(planDate ?? (focus ? P : null), saved);
         else {

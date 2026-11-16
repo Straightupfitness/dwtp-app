@@ -89,7 +89,11 @@ export async function assignFromBlueprint(db: SupabaseClient, clientId: string, 
     const r = ringOf(slug, n);
     if (r) await db.from("client_rings").upsert({ client_id: clientId, ring_id: r.id, status: "open", opened_on: opened, opened_early: true }, { onConflict: "client_id,ring_id", ignoreDuplicates: true });
   };
-  for (const s of fixSlugs) await open(s, 1);
+  // November 15 (Michael): fix-its open today, the moment her Blueprint is in, not on her program start date.
+  for (const s of fixSlugs) {
+    const r = ringOf(s, 1);
+    if (r) await db.from("client_rings").upsert({ client_id: clientId, ring_id: r.id, status: "open", opened_on: today, opened_early: true }, { onConflict: "client_id,ring_id", ignoreDuplicates: true });
+  }
 
   // 3. Momentum: skip what she's already doing.
   const skipped: string[] = [];
