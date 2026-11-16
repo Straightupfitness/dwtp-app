@@ -25,7 +25,7 @@ export function focusOf(ex: string[]) {
  * program this week (what's in it, what it works) and picks which one goes on which weekday. It follows the program
  * into every phase (Monday stays "Day 2" when the phase changes).
  */
-export default function CoachWorkoutDays({ clientId, first, schedule, workoutDays, days, weekLabel, programName }: {
+export default function CoachWorkoutDays({ clientId, schedule, workoutDays, days, weekLabel, programName }: {
   clientId: string; first: string; schedule: Record<number, number> | null; workoutDays: number[]; days: PlanDay[]; weekLabel: string; programName: string;
 }) {
   // Start from his schedule, or from today's rule (Day 1, 2, 3… onto her workout days).

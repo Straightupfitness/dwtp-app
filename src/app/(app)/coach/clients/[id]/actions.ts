@@ -19,7 +19,9 @@ export async function updateClient(clientId: string, form: FormData) {
   const start = str(form.get("program_start"));
   if (start && new Date(start + "T00:00:00Z").getUTCDay() !== 1) return { error: "The program always starts on a Monday." };
   // Email: her sign-in address too, so change it in her login first.
-  const email = str(form.get("email"))?.toLowerCase() ?? null;
+  // November 15: her details, her targets and her program are separate forms now, so only fields that came in change.
+  const has = (k: string) => form.has(k);
+  const email = has("email") ? str(form.get("email"))?.toLowerCase() ?? null : null;
   const { data: before } = await supabase.from("profiles").select("email").eq("id", clientId).single();
   if (email && email !== before?.email) {
     if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "That email doesn't look right." };
@@ -27,24 +29,30 @@ export async function updateClient(clientId: string, form: FormData) {
     const { error: authErr } = await adminClient().auth.admin.updateUserById(clientId, { email, email_confirm: true });
     if (authErr) return { error: /already|registered|exists/i.test(authErr.message) ? "Another account already uses that email." : `Couldn't change her email: ${safeError(authErr)}` };
   }
-  const { error } = await supabase.from("profiles").update({
-    ...(email ? { email } : {}), phone: str(form.get("phone")), timezone: str(form.get("timezone")) ?? "America/Los_Angeles",
-    full_name: str(form.get("full_name")), program_start: start, plan: str(form.get("plan")), status: str(form.get("status")) ?? "active",
-    start_weight_lbs: num(form.get("start_weight_lbs")), goal_weight_lbs: num(form.get("goal_weight_lbs")),
-    strength_days_per_week: num(form.get("strength_days_per_week")),
-    ...(str(form.get("workout_program")) ? { workout_program: str(form.get("workout_program")), workout_start_week: Math.max(1, Math.round(num(form.get("workout_start_week")) ?? 1)) } : {}),
-    wake_time: str(form.get("wake_time")), bedtime: str(form.get("bedtime")), coach_notes: str(form.get("coach_notes")),
-    water_goal_oz: Math.round(num(form.get("water_goal_oz")) ?? 128), step_goal: Math.round(num(form.get("step_goal")) ?? 10000),
-  }).eq("id", clientId);
-  if (error) return { error: error.message };
+  const patch: Record<string, unknown> = {};
+  if (email) patch.email = email;
+  for (const k of ["phone", "full_name", "plan", "wake_time", "bedtime", "coach_notes"]) if (has(k)) patch[k] = str(form.get(k));
+  if (has("timezone")) patch.timezone = str(form.get("timezone")) ?? "America/Los_Angeles";
+  if (has("status")) patch.status = str(form.get("status")) ?? "active";
+  if (has("program_start")) patch.program_start = start;
+  for (const k of ["start_weight_lbs", "goal_weight_lbs"]) if (has(k)) patch[k] = num(form.get(k));
+  if (has("strength_days_per_week")) { const n = num(form.get("strength_days_per_week")); patch.strength_days_per_week = n === null ? null : Math.min(3, Math.max(1, Math.round(n))); }
+  if (str(form.get("workout_program"))) { patch.workout_program = str(form.get("workout_program")); patch.workout_start_week = Math.max(1, Math.round(num(form.get("workout_start_week")) ?? 1)); }
+  if (has("water_goal_oz")) patch.water_goal_oz = Math.round(num(form.get("water_goal_oz")) ?? 128);
+  if (has("step_goal")) patch.step_goal = Math.round(num(form.get("step_goal")) ?? 10000);
+  if (Object.keys(patch).length) {
+    const { error } = await supabase.from("profiles").update(patch).eq("id", clientId);
+    if (error) return { error: error.message };
+  }
   // Birthday (November 2) on its own, so the rest saves even before the birthday column exists (0032).
-  if (form.has("birthday")) await supabase.from("profiles").update({ birthday: str(form.get("birthday")) }).eq("id", clientId);
-  const { error: e2 } = await supabase.from("nutrition_targets").upsert({
-    client_id: clientId, maintenance_calories: num(form.get("maintenance_calories")), calorie_target: num(form.get("calorie_target")),
-    protein_g: num(form.get("protein_g")), fiber_g: num(form.get("fiber_g")), potassium_mg: num(form.get("potassium_mg")),
-    set_by: coachId, updated_at: new Date().toISOString(),
-  });
-  if (e2) return { error: e2.message };
+  if (has("birthday")) await supabase.from("profiles").update({ birthday: str(form.get("birthday")) }).eq("id", clientId);
+  const tKeys = ["maintenance_calories", "calorie_target", "protein_g", "fiber_g", "potassium_mg"].filter(has);
+  if (tKeys.length) {
+    const { error: e2 } = await supabase.from("nutrition_targets").upsert({
+      client_id: clientId, ...Object.fromEntries(tKeys.map((k) => [k, num(form.get(k))])), set_by: coachId, updated_at: new Date().toISOString(),
+    });
+    if (e2) return { error: e2.message };
+  }
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach");
   return { ok: true, emailChanged: !!email && email !== before?.email };

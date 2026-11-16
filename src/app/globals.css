@@ -41,3 +41,15 @@ body {
 @media (prefers-reduced-motion: reduce) { .animate-\[cp-pop_600ms_ease-out\], .animate-\[cp-rise_2s_ease-out_forwards\] { animation: none !important; } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 @media (prefers-reduced-motion: reduce) { .animate-\[shake_300ms\] { animation: none !important; } }
+
+/* November 15: her goal weight on her page, a little shiny. */
+.shine-text {
+  background: linear-gradient(110deg, #5fd394 0%, #b9f5cf 30%, #ffffff 45%, #b9f5cf 60%, #5fd394 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine-text 3.5s ease-in-out infinite;
+}
+@keyframes shine-text { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .shine-text { animation: none; } }

@@ -11,8 +11,9 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "
  * November 13: "What's she been up to?" The AI reads her last 48 hours (or 7 days) and gives Michael two short lists:
  * what she's been doing, and the flow for his message. Bullets only; he writes it in his own words, in the app and by text.
  */
-export default function BriefPanel({ clientId, first, phone, topic, initial = null, doneAt = null, compact = false }: {
+export default function BriefPanel({ clientId, first, phone, topic, initial = null, doneAt = null, compact = false, bare = false }: {
   clientId: string; first: string; phone: string | null; topic?: string; initial?: Brief | null; doneAt?: string | null; compact?: boolean;
+  bare?: boolean; // November 15: inside a "What she's been up to" section on her page (no card, no title of its own)
 }) {
   const [brief, setBrief] = useState<Brief | null>(initial);
   const [busy, setBusy] = useState(false);
@@ -65,10 +66,10 @@ export default function BriefPanel({ clientId, first, phone, topic, initial = nu
   }
 
   return (
-    <div className={`space-y-2.5 ${compact ? "" : "rounded-2xl border border-border bg-card p-3.5"}`}>
+    <div className={`space-y-2.5 ${compact || bare ? "" : "rounded-2xl border border-border bg-card p-3.5"}`}>
       {!compact && (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-accent">What&apos;s she been up to?</p>
+          {bare ? <span /> : <p className="text-[11px] uppercase tracking-[0.15em] text-accent">What&apos;s she been up to?</p>}
           <div className="flex rounded-lg border border-[#2a2a2a] text-[12px]">
             {[48, 168].map((h) => <button key={h} type="button" onClick={() => { setHours(h); if (brief) run(h); }} className={`min-h-8 px-2.5 ${hours === h ? "bg-[#2a2a2a] text-text" : "text-dim"}`}>{h === 48 ? "48 hours" : "7 days"}</button>)}
           </div>

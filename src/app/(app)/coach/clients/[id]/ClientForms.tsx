@@ -4,13 +4,18 @@ import { updateClient, setFocus, openNextRing, signOff, addPurchase, deletePurch
 
 const input = "mt-1 block w-full rounded-lg border border-border bg-bg px-3 py-2 text-base text-text outline-none focus:border-accent";
 
-export function ProfileForm({ clientId, p, t, programs = [], phaseWeeks = [], tweek = 1 }: {
+/**
+ * Her details, her targets and her program (November 15: three separate forms on her page; each saves only its own
+ * fields).
+ */
+export function ProfileForm({ clientId, p, t, programs = [], phaseWeeks = [], tweek = 1, part = "details" }: {
   clientId: string;
   p: Record<string, string | number | null>;
   t: { maintenance_calories: number | null; calorie_target: number | null; protein_g: number | null; fiber_g?: number | null; potassium_mg?: number | null } | null;
   programs?: { id: string; name: string; weeks: number }[];
   /** November 5: every week of her program ("SLTP Phase 1 · week 2"), and her training week now. */
   phaseWeeks?: { pw: number; label: string }[]; tweek?: number;
+  part?: "details" | "targets" | "program";
 }) {
   const [msg, setMsg] = useState("");
   const [wsw, setWsw] = useState<number>(Number(p.workout_start_week ?? 1) || 1);
@@ -24,60 +29,70 @@ export function ProfileForm({ clientId, p, t, programs = [], phaseWeeks = [], tw
   );
   return (
     <form action={(f) => start(async () => { const r = await updateClient(clientId, f); setMsg(r?.error ?? (r?.emailChanged ? "Saved. She now signs in with the new email." : "Saved.")); })} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        {field("full_name", "Name")}
-        {field("email", "Email (she signs in with this)", "email")}
-        {field("phone", "Phone", "tel")}
-        {field("birthday", "Birthday", "date")}
-        <label className="text-sm text-dim">Time zone
-          <select name="timezone" defaultValue={String(p.timezone ?? "America/Los_Angeles")} className={input}>
-            {[["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Phoenix", "Arizona"], ["America/Chicago", "Central"],
-              ["America/New_York", "Eastern"], ["America/Anchorage", "Alaska"], ["Pacific/Honolulu", "Hawaii"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            {![...["America/Los_Angeles", "America/Denver", "America/Phoenix", "America/Chicago", "America/New_York", "America/Anchorage", "Pacific/Honolulu"]].includes(String(p.timezone ?? "America/Los_Angeles")) &&
-              <option value={String(p.timezone)}>{String(p.timezone)}</option>}
-          </select>
-        </label>
-        {field("program_start", "Program start (a Monday)", "date")}
-        <label className="text-sm text-dim">Plan
-          <select name="plan" defaultValue={String(p.plan ?? "")} className={input}>
-            <option value="">–</option><option value="26_weeks">26 weeks</option><option value="52_weeks">Full year</option><option value="monthly">Monthly</option>
-          </select>
-        </label>
-        <label className="text-sm text-dim">Status
-          <select name="status" defaultValue={String(p.status ?? "active")} className={input}>
-            {["onboarding", "active", "paused", "completed", "cancelled"].map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </label>
-        {field("start_weight_lbs", "Start weight (lbs)", "number")}
-        {field("goal_weight_lbs", "Goal weight (lbs)", "number")}
-        {field("strength_days_per_week", "Strength days / week", "number")}
-        <label className="col-span-2 text-sm text-dim">Workout program
-          <select name="workout_program" defaultValue={String(p.workout_program ?? "sltp")} className={input}>
-            {programs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.weeks} weeks)</option>)}
-          </select>
-        </label>
-        {/* November 5: pick where she is this week; the app works out "start her at program week" from it. */}
-        <label className="col-span-2 text-sm text-dim">Her workouts this week
-          <select value={phaseWeeks.some((x) => x.pw === nowPw) ? nowPw : ""} onChange={(e) => { const pw = Number(e.target.value); if (pw) setWsw(pw - tweek + 1); }} className={input}>
-            {!phaseWeeks.some((x) => x.pw === nowPw) && <option value="">{nowPw < 1 ? "Not started yet" : `Program week ${nowPw}`}</option>}
-            {phaseWeeks.map((x) => <option key={x.pw} value={x.pw}>{x.label}</option>)}
-          </select>
-          <input type="hidden" name="workout_start_week" value={wsw} />
-          <span className="mt-1 block text-[11px]">Next week she moves on automatically. (Start her at program week: {wsw}. Change the program above, save, then pick the week.)</span>
-        </label>
-        {field("wake_time", "Wake time", "time")}
-        {field("bedtime", "Bedtime", "time")}
-        {field("maintenance_calories", "Maintenance kcal", "number", t?.maintenance_calories)}
-        {field("calorie_target", "Calorie target", "number", t?.calorie_target)}
-        {field("protein_g", "Protein target (g)", "number", t?.protein_g)}
-        {field("fiber_g", "Fiber target (g, blank = 30)", "number", t?.fiber_g)}
-        {field("potassium_mg", "Potassium target (mg, blank = 4,700)", "number", t?.potassium_mg)}
-        {field("water_goal_oz", "Water goal (oz a day)", "number", p.water_goal_oz ?? 128)}
-        {field("step_goal", "Step goal (a day)", "number", p.step_goal ?? 10000)}
-      </div>
-      <label className="block text-sm text-dim">Your notes on her (onboarding call, what works). The AI reads these.
-        <textarea name="coach_notes" rows={4} defaultValue={String(p.coach_notes ?? "")} className={input} />
-      </label>
+      {part === "details" && (
+        <div className="grid grid-cols-2 gap-3">
+          {field("full_name", "Name")}
+          {field("email", "Email (she signs in with this)", "email")}
+          {field("phone", "Phone", "tel")}
+          {field("birthday", "Date of birth", "date")}
+          <label className="text-sm text-dim">Time zone
+            <select name="timezone" defaultValue={String(p.timezone ?? "America/Los_Angeles")} className={input}>
+              {[["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Phoenix", "Arizona"], ["America/Chicago", "Central"],
+                ["America/New_York", "Eastern"], ["America/Anchorage", "Alaska"], ["Pacific/Honolulu", "Hawaii"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {![...["America/Los_Angeles", "America/Denver", "America/Phoenix", "America/Chicago", "America/New_York", "America/Anchorage", "Pacific/Honolulu"]].includes(String(p.timezone ?? "America/Los_Angeles")) &&
+                <option value={String(p.timezone)}>{String(p.timezone)}</option>}
+            </select>
+          </label>
+          {field("program_start", "Program start (a Monday)", "date")}
+          <label className="text-sm text-dim">Plan
+            <select name="plan" defaultValue={String(p.plan ?? "")} className={input}>
+              <option value="">–</option><option value="26_weeks">26 weeks</option><option value="52_weeks">Full year</option><option value="monthly">Monthly</option>
+            </select>
+          </label>
+          <label className="text-sm text-dim">Status
+            <select name="status" defaultValue={String(p.status ?? "active")} className={input}>
+              {["onboarding", "active", "paused", "completed", "cancelled"].map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </label>
+          {field("start_weight_lbs", "Start weight (lbs)", "number")}
+          {field("goal_weight_lbs", "Goal weight (lbs)", "number")}
+          <label className="col-span-2 block text-sm text-dim">Your notes on her (onboarding call, what works). The AI reads these.
+            <textarea name="coach_notes" rows={4} defaultValue={String(p.coach_notes ?? "")} className={input} />
+          </label>
+        </div>
+      )}
+      {part === "targets" && (
+        <div className="grid grid-cols-2 gap-3">
+          {field("wake_time", "Wake time", "time")}
+          {field("bedtime", "Bedtime", "time")}
+          {field("maintenance_calories", "Maintenance kcal", "number", t?.maintenance_calories)}
+          {field("calorie_target", "Calorie target", "number", t?.calorie_target)}
+          {field("protein_g", "Protein target (g, blank = 120)", "number", t?.protein_g)}
+          {field("fiber_g", "Fiber target (g, blank = 30)", "number", t?.fiber_g)}
+          {field("potassium_mg", "Potassium target (mg, blank = 4,700)", "number", t?.potassium_mg)}
+          {field("water_goal_oz", "Water target (oz a day, blank = 128)", "number", p.water_goal_oz ?? 128)}
+          {field("step_goal", "Steps a day (blank = 10,000)", "number", p.step_goal ?? 10000)}
+        </div>
+      )}
+      {part === "program" && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="col-span-2 text-sm text-dim">Workout program
+            <select name="workout_program" defaultValue={String(p.workout_program ?? "sltp")} className={input}>
+              {programs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.weeks} weeks)</option>)}
+            </select>
+          </label>
+          {/* November 5: pick where she is this week; the app works out "start her at program week" from it. */}
+          <label className="col-span-2 text-sm text-dim">Her workouts this week
+            <select value={phaseWeeks.some((x) => x.pw === nowPw) ? nowPw : ""} onChange={(e) => { const pw = Number(e.target.value); if (pw) setWsw(pw - tweek + 1); }} className={input}>
+              {!phaseWeeks.some((x) => x.pw === nowPw) && <option value="">{nowPw < 1 ? "Not started yet" : `Program week ${nowPw}`}</option>}
+              {phaseWeeks.map((x) => <option key={x.pw} value={x.pw}>{x.label}</option>)}
+            </select>
+            <input type="hidden" name="workout_start_week" value={wsw} />
+            <span className="mt-1 block text-[11px]">Next week she moves on automatically. (Start her at program week: {wsw}. Change the program above, save, then pick the week.)</span>
+          </label>
+          {field("strength_days_per_week", "Strength days / week (1–3; 3 = every day of the program)", "number")}
+        </div>
+      )}
       <button disabled={pending} className="min-h-11 rounded-lg bg-accent px-5 font-semibold text-black disabled:opacity-50">{pending ? "Saving…" : "Save"}</button>
       {msg && <span className="ml-3 text-sm">{msg}</span>}
     </form>
