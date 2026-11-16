@@ -10,6 +10,7 @@ export type PlayerItem = {
   position: number; sets: number; target: string | null; seconds: number | null; rest: number | null; logType: string;
   exerciseId: number; name: string; notes: string | null; youtube: string | null; clip: string | null; poster: string | null;
   last: ({ set_no: number } & SetVals)[]; lastWhen: string | null; logged: ({ set_no: number } & SetVals)[];
+  group?: string | null; // November 15: a superset letter; exercises next to each other with the same letter go back to back
 };
 type Props = {
   workout: { id: number; name: string; title: string; kind: "strength" | "cardio"; circuit: boolean; rounds: number | null; minutes: number | null; notes: string | null };
@@ -68,6 +69,14 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     const x = subs[s.position];
     return x ? { ...s, exerciseId: x.id, name: x.name, notes: x.notes, clip: x.clip, poster: x.poster, youtube: x.youtube, last: x.last, lastWhen: x.lastWhen, original: { name: s.name } } : s;
   }), [baseSteps, subs]);
+  // November 15 (Michael): supersets. For each exercise, the run of exercises next to it with the same letter.
+  const runs = useMemo(() => steps.map((s, i) => {
+    if (!s.group) return null;
+    let a = i, b = i;
+    while (a > 0 && steps[a - 1].group === s.group) a--;
+    while (b < steps.length - 1 && steps[b + 1].group === s.group) b++;
+    return b > a ? { start: a, end: b, letter: s.group, n: i - a + 1, size: b - a + 1, rounds: Math.max(...steps.slice(a, b + 1).map((x) => x.sets)) } : null;
+  }), [steps]);
   const [step, setStep] = useState<number>(-1); // -1 = start screen, steps.length = finished
   const [sound, setSound] = useState(false); // clips start muted; one tap turns the sound on (November 1)
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
@@ -162,8 +171,19 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     setVals((v) => ({ ...v, [k]: { ...filled, done } }));
     if (done) {
       play("set-done");
-      // November 2: rest after every set, the last one too (she rests before the next exercise).
-      if (s.rest) setRest({ ends: nowMs() + s.rest * 1000, total: s.rest });
+      const i = steps.findIndex((x) => x.position === s.position), run = runs[i];
+      if (run && i < run.end) {
+        // A superset: straight to the next exercise, no rest.
+        setTimeout(() => setStep(i + 1), 450);
+      } else if (run) {
+        // End of a superset round: rest, then back to the first exercise for the next round.
+        const r = s.rest ?? Math.max(0, ...steps.slice(run.start, run.end + 1).map((x) => x.rest ?? 0));
+        if (r) setRest({ ends: nowMs() + r * 1000, total: r });
+        if (setNo < run.rounds) setTimeout(() => setStep(run.start), 450);
+      } else if (s.rest) {
+        // November 2: rest after every set, the last one too (she rests before the next exercise).
+        setRest({ ends: nowMs() + s.rest * 1000, total: s.rest });
+      }
     }
     if (!sessionId || preview) return;
     const r = await logSet(sessionId, s.position, setNo, s.exerciseId, { ...filled, done });
@@ -247,12 +267,17 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           )}
           <ol className="divide-y divide-border rounded-[18px] border border-border bg-card">
             {steps.map((s, i) => (
-              <li key={s.position}>
+              <li key={s.position} className={runs[i] ? "border-l-[3px] border-l-accent" : ""}>
+                {runs[i]?.n === 1 && (
+                  <p className="px-2.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
+                    Superset {runs[i]!.letter} · {runs[i]!.rounds} rounds · back to back, then rest
+                  </p>
+                )}
                 <button type="button" onClick={() => (sessionId || preview ? setStep(i) : undefined)} className="flex w-full items-center gap-3 p-2.5 text-left">
                   <span className="relative size-14 shrink-0 overflow-hidden rounded-[12px] bg-[#1b1b1b]">
                     {/* eslint-disable-next-line @next/next/no-img-element -- poster */}
                     {s.poster && <img src={s.poster} alt="" className="size-full object-cover" />}
-                    <span className="absolute bottom-0.5 left-1 text-[11px] font-bold text-white drop-shadow">{i + 1}</span>
+                    <span className="absolute bottom-0.5 left-1 text-[11px] font-bold text-white drop-shadow">{runs[i] ? `${runs[i]!.letter}${runs[i]!.n}` : i + 1}</span>
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[15px] font-medium leading-snug">{s.name}</span>
@@ -316,6 +341,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
 
   // ── One exercise ─────────────────────────────────────────
   const s = steps[step];
+  const run = runs[step];
   const fields = fieldsFor(s.logType);
   const rows = fields.length ? s.sets + (extra[s.position] ?? 0) : 1;
   const last = step === steps.length - 1;
@@ -384,9 +410,17 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           <h2 className={`${display} text-[26px] leading-tight`}>{s.name}</h2>
           <Substitute key={s.position} current={s.name} original={(s as { original?: Original }).original ?? null}
             onPick={(x) => setSub(s.position, x)} onUndo={() => setSub(s.position, null)} />
+          {run && (
+            <div className="mt-2 rounded-[14px] border border-accent/60 bg-[#161310] p-2.5 text-[13px] text-[#e9dcc0]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Superset {run.letter} · exercise {run.n} of {run.size}</p>
+              <p className="mt-0.5">{step < run.end
+                ? <>Do one set, then go straight to <b className="text-text">{steps[step + 1].name}</b>. No rest.</>
+                : <>Do one set, then rest and go back to <b className="text-text">{steps[run.start].name}</b> for the next round ({run.rounds} rounds).</>}</p>
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Chip strong>{summary(s)}</Chip>
-            {s.rest ? <Chip>Rest {s.rest >= 60 ? mmss(s.rest) : `${s.rest} s`}</Chip> : null}
+            {s.rest && (!run || step === run.end) ? <Chip>Rest {s.rest >= 60 ? mmss(s.rest) : `${s.rest} s`}</Chip> : null}
             {s.logType === "timedFasterBetter" && <Chip>Faster is better</Chip>}
             {s.logType === "timedLongerBetter" && <Chip>Longer is better</Chip>}
           </div>

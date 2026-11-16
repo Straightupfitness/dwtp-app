@@ -8,7 +8,7 @@ import { loadWorkoutWeek } from "@/lib/workouts";
  * ordinary program in the app (one long phase, Day 1–N workouts, the usual cardio menu), so the Workouts tab, the
  * Player, her calendar and history all work as before.
  */
-export type ItemInput = { exercise_id: number; sets: number; target: string; rest_seconds: number | null; log_type: string };
+export type ItemInput = { exercise_id: number; sets: number; target: string; rest_seconds: number | null; log_type: string; superset?: string | null };
 
 async function coach() {
   const supabase = await createClient();
@@ -44,7 +44,7 @@ export async function createCustomProgram(clientId: string, days: number, copyCu
     const { error } = await db.from("workouts").insert({ id: wid, name: src?.name ?? `Day ${d}`, kind: "strength", circuit: false, minutes: src?.minutes ?? null });
     if (error) return { error: error.message };
     if (src) {
-      const { data: items } = await db.from("workout_items").select("position, exercise_id, sets, target, seconds, rest_seconds, log_type").eq("workout_id", src.id);
+      const { data: items } = await db.from("workout_items").select("*").eq("workout_id", src.id);
       if (items?.length) await db.from("workout_items").insert(items.map((i) => ({ ...i, workout_id: wid })));
     }
     await db.from("phase_workouts").insert({ phase_id: phaseId, workout_id: wid, day: d });
@@ -67,6 +67,7 @@ export async function saveDay(clientId: string, workoutId: number, name: string,
   const rows = items.filter((i) => i.exercise_id).map((i, k) => ({
     workout_id: workoutId, position: k + 1, exercise_id: i.exercise_id, sets: Math.min(20, Math.max(1, Math.round(i.sets || 1))),
     target: i.target.trim() || null, rest_seconds: i.rest_seconds ?? null, seconds: null, log_type: LOG_TYPES.includes(i.log_type) ? i.log_type : "strength",
+    superset: i.superset || null,
   }));
   if (rows.length) { const { error } = await db.from("workout_items").insert(rows); if (error) return { error: error.message }; }
   revalidatePath(`/coach/clients/${clientId}/program`);
@@ -173,7 +174,7 @@ export async function copyWorkoutInto(clientId: string, targetWorkoutId: number,
   if (!db) return { error: "Coach only" };
   const [{ data: src }, { data: items }] = await Promise.all([
     db.from("workouts").select("name, minutes, circuit, rounds, notes").eq("id", sourceWorkoutId).single(),
-    db.from("workout_items").select("position, exercise_id, sets, target, seconds, rest_seconds, log_type").eq("workout_id", sourceWorkoutId),
+    db.from("workout_items").select("*").eq("workout_id", sourceWorkoutId),
   ]);
   if (!src) return { error: "Workout not found." };
   const { error: e1 } = await db.from("workouts").update({ name: src.name, minutes: src.minutes, circuit: src.circuit, rounds: src.rounds, notes: src.notes }).eq("id", targetWorkoutId);

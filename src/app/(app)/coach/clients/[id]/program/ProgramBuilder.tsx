@@ -65,6 +65,20 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
   const set = (i: number, patch: Partial<Item>) => { setItems((xs) => xs.map((x, k) => (k === i ? { ...x, ...patch } : x))); setDirty(true); };
+  // November 15: supersets. Linked exercises next to each other get the same letter (A, B, …) when saved.
+  const linked = (i: number) => !!items[i]?.superset && items[i].superset === items[i + 1]?.superset;
+  const toggleLink = (i: number) => {
+    const on = linked(i);
+    const links = items.map((_, k) => (k === i ? !on : linked(k)));
+    let letter = 64;
+    setItems(items.map((x, k) => {
+      const inRun = links[k] || (k > 0 && links[k - 1]);
+      if (!inRun) return { ...x, superset: null };
+      if (!(k > 0 && links[k - 1])) letter++;
+      return { ...x, superset: String.fromCharCode(letter) };
+    }));
+    setDirty(true);
+  };
   const move = (i: number, by: number) => { setItems((xs) => { const ys = [...xs]; const j = i + by; if (j < 0 || j >= ys.length) return xs; [ys[i], ys[j]] = [ys[j], ys[i]]; return ys; }); setDirty(true); };
 
   return (
@@ -81,9 +95,10 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
         : <button type="button" onClick={() => setPicking(true)} className="min-h-10 w-full rounded-xl border border-border text-[13px] font-semibold">📋 Use a ready workout (Trainerize)</button>}
       <ol className="space-y-2">
         {items.map((it, i) => (
-          <li key={i} className="space-y-1.5 rounded-xl border border-[#242424] bg-bg/60 p-2.5">
+          <li key={i} className={`space-y-1.5 rounded-xl border bg-bg/60 p-2.5 ${it.superset ? "border-accent/60" : "border-[#242424]"}`}>
             <div className="flex items-start gap-2">
               <span className="mt-0.5 w-5 shrink-0 text-[13px] text-dim">{i + 1}.</span>
+              {it.superset && <span className="mt-0.5 shrink-0 rounded bg-accent px-1.5 text-[11px] font-bold text-black">{it.superset}</span>}
               <span className="min-w-0 flex-1 text-[14px] font-semibold">{it.name}{!it.video && <span className="ml-1 text-[11px] font-normal text-dim">(no video)</span>}</span>
               <button type="button" onClick={() => move(i, -1)} aria-label="Move up" className="grid size-8 place-items-center rounded-md border border-border text-[12px]">▲</button>
               <button type="button" onClick={() => move(i, 1)} aria-label="Move down" className="grid size-8 place-items-center rounded-md border border-border text-[12px]">▼</button>
@@ -98,6 +113,12 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
                 {!LOGS.some(([v]) => v === it.log_type) && <option value={it.log_type}>{it.log_type}</option>}
               </select>
             </div>
+            {i < items.length - 1 && (
+              <button type="button" onClick={() => toggleLink(i)} aria-pressed={linked(i)}
+                className={`ml-7 min-h-8 rounded-full border px-3 text-[12px] font-semibold ${linked(i) ? "border-accent bg-accent text-black" : "border-border text-dim"}`}>
+                🔗 {linked(i) ? "Superset with the next one ✓" : "Superset with the next one"}
+              </button>
+            )}
           </li>
         ))}
         {!items.length && <li className="text-[13px] text-dim">No exercises yet.</li>}
@@ -107,7 +128,7 @@ function DayEditor({ clientId, d }: { clientId: string; d: Day }) {
         : <button type="button" onClick={() => setAdding(true)} className="min-h-10 w-full rounded-xl border border-dashed border-[#3a3a3a] text-[13px] text-accent">+ Add an exercise</button>}
       <div className="flex items-center gap-2">
         <button type="button" disabled={!dirty || pending} onClick={() => start(async () => {
-          const r = await saveDay(clientId, d.workoutId, name, items.map(({ exercise_id, sets, target, rest_seconds, log_type }) => ({ exercise_id, sets, target, rest_seconds, log_type })));
+          const r = await saveDay(clientId, d.workoutId, name, items.map(({ exercise_id, sets, target, rest_seconds, log_type, superset }) => ({ exercise_id, sets, target, rest_seconds, log_type, superset })));
           if (r?.error) setMsg(r.error); else { setMsg("Saved ✓"); setDirty(false); router.refresh(); }
         })} className="min-h-11 flex-1 rounded-xl bg-accent text-[14px] font-semibold text-black disabled:opacity-40">{pending ? "Saving…" : dirty ? `Save Day ${d.day}` : "Saved"}</button>
         {msg && <span className="text-[13px] text-dim">{msg}</span>}

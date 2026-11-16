@@ -24,14 +24,14 @@ export default async function CustomProgramPage({ params }: { params: Promise<{ 
     phaseId = (ph?.id as number | undefined) ?? null;
     if (phaseId) {
       const { data: links } = await supabase.from("phase_workouts")
-        .select("day, workouts(id, name, kind, workout_items(position, sets, target, rest_seconds, log_type, exercises(id, name, clip_path, youtube_id)))").eq("phase_id", phaseId);
-      type W = { id: number; name: string; kind: string; workout_items: { position: number; sets: number; target: string | null; rest_seconds: number | null; log_type: string; exercises: { id: number; name: string; clip_path: string | null; youtube_id: string | null } | null }[] };
+        .select("day, workouts(id, name, kind, workout_items(position, sets, target, rest_seconds, log_type, superset, exercises(id, name, clip_path, youtube_id)))").eq("phase_id", phaseId);
+      type W = { id: number; name: string; kind: string; workout_items: { position: number; sets: number; target: string | null; rest_seconds: number | null; log_type: string; superset: string | null; exercises: { id: number; name: string; clip_path: string | null; youtube_id: string | null } | null }[] };
       const rows = (links ?? []) as unknown as { day: number | null; workouts: W | null }[];
       days = rows.filter((r) => r.workouts?.kind === "strength" && r.day).sort((a, b) => a.day! - b.day!).map((r) => ({
         day: r.day!, workoutId: r.workouts!.id, name: r.workouts!.name,
         items: [...r.workouts!.workout_items].sort((a, b) => a.position - b.position).filter((i) => i.exercises).map((i) => ({
           exercise_id: i.exercises!.id, name: i.exercises!.name, video: !!(i.exercises!.clip_path || i.exercises!.youtube_id),
-          sets: i.sets, target: i.target ?? "", rest_seconds: i.rest_seconds, log_type: i.log_type,
+          sets: i.sets, target: i.target ?? "", rest_seconds: i.rest_seconds, log_type: i.log_type, superset: i.superset,
         })),
       }));
       cardio = rows.filter((r) => r.workouts?.kind === "cardio").map((r) => r.workouts!.name);

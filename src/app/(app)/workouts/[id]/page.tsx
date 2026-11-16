@@ -13,6 +13,9 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
     .eq("id", Number(id)).maybeSingle();
   if (!w) notFound();
   const items = ((w.workout_items ?? []) as unknown as Item[]).filter((i) => i.exercise).sort((a, b) => a.position - b.position);
+  // November 15: superset letters, read on their own so the page still works if that column isn't there yet.
+  const { data: ss } = await supabase.from("workout_items").select("position, superset").eq("workout_id", w.id);
+  const groupAt = new Map(((ss ?? []) as { position: number; superset: string | null }[]).map((r) => [r.position, r.superset]));
 
   // Week 0 is a real week before launch (November 7), so parse it rather than treating 0 as "none".
   const askedWeek = sp.w !== undefined && sp.w !== "" && Number.isFinite(Number(sp.w)) ? Math.trunc(Number(sp.w)) : undefined;
@@ -31,7 +34,7 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
   // The first video named like the workout is Michael's overview: it goes on the start screen.
   const overview = items.find((i) => i.position <= 2 && i.exercise.youtube_id && i.exercise.name.trim().toLowerCase() === w.name.trim().toLowerCase()) ?? null;
   const steps: PlayerItem[] = items.filter((i) => i !== overview).map((i) => ({
-    position: i.position, sets: i.sets, target: i.target, seconds: i.seconds, rest: i.rest_seconds, logType: i.log_type,
+    position: i.position, sets: i.sets, target: i.target, seconds: i.seconds, rest: i.rest_seconds, logType: i.log_type, group: groupAt.get(i.position) ?? null,
     exerciseId: i.exercise.id, name: i.exercise.name.replace(/\s*\((SLTP|PSR|SLF|DWTP)\)\s*$/i, ""), notes: i.exercise.notes,
     youtube: i.exercise.youtube_id, clip: clipUrl(i.exercise), poster: posterUrl(i.exercise),
     last: last.get(i.exercise.id)?.sets ?? [], lastWhen: last.get(i.exercise.id)?.when ?? null,
