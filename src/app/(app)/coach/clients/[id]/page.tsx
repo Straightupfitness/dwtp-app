@@ -239,7 +239,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
               <div className="mt-2 space-y-2">
                 {state.circles.filter((c) => c.kind !== "growth" && c.status !== "open").map((c) => (
                   <div key={c.id} className="flex items-center justify-between rounded-xl border border-border p-2.5">
-                    <span>{c.name}</span><OpenRingButton clientId={id} circleId={c.id} label="Open fix-it" />
+                    <span>{c.name}{c.status === "upcoming" && c.rings[0]?.opensOn ? <span className="text-accent"> · opens {new Date(c.rings[0].opensOn + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}</span> : null}</span><OpenRingButton clientId={id} circleId={c.id} label="Open fix-it" />
                   </div>
                 ))}
               </div>

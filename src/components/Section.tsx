@@ -4,7 +4,7 @@
  */
 import SectionIcon from "./SectionIcon";
 
-export default function Section({ title, right, open = true, id, icon, children }: { title: React.ReactNode; right?: React.ReactNode; open?: boolean; id?: string; icon?: string; children: React.ReactNode }) {
+export default function Section({ title, right, open = false, id, icon, children }: { title: React.ReactNode; right?: React.ReactNode; open?: boolean; id?: string; icon?: string; children: React.ReactNode }) {
   return (
     <details id={id} open={open} data-drawer className="group scroll-mt-20 rounded-[18px] border border-border bg-card p-4">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-[family-name:var(--font-display)] text-lg uppercase">

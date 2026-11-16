@@ -138,7 +138,7 @@ export default async function TodayPage() {
 
   // Every daily and weekly habit from her open medals; a habit that lives in two circles shows once.
   const seen = new Set<string>();
-  const circleGroups: { name: string; color: string; items: (ItemState & { medal: string })[]; videos: { name: string; url: string; seconds: number | null }[] }[] = [];
+  const circleGroups: { name: string; color: string; kind: "focus" | "fixit" | "other"; items: (ItemState & { medal: string })[]; videos: { name: string; url: string; seconds: number | null }[] }[] = [];
   const weekAgo = new Date(Date.parse(today + "T00:00:00Z") - 6 * 86_400_000).toISOString().slice(0, 10);
   for (const c of state.circles) {
     for (const r of c.rings) {
@@ -148,7 +148,7 @@ export default async function TodayPage() {
         .sort((a, b) => (a.cadence === "daily" ? 0 : 1) - (b.cadence === "daily" ? 0 : 1));
       if (!its.length) continue;
       let cg = circleGroups.find((x) => x.name === c.name);
-      if (!cg) { cg = { name: c.name, color: c.color, items: [], videos: [] }; circleGroups.push(cg); }
+      if (!cg) { cg = { name: c.name, color: c.color, kind: c.kind !== "growth" ? "fixit" : c.focus ? "focus" : "other", items: [], videos: [] }; circleGroups.push(cg); }
       cg.items.push(...its.map((i) => ({ ...i, medal: r.name })));
       // November 10: a medal that opened this week shows Michael's video above its habits.
       if (r.video && r.opensOn && r.opensOn >= weekAgo) cg.videos.push({ name: r.name, ...r.video });
@@ -201,34 +201,42 @@ export default async function TodayPage() {
         </>
       )}
 
-      {circleGroups.length > 0 && (
-        <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-          {circleGroups.map((cg) => {
-            const done = cg.items.filter((i) => i.doneNow).length, all = done === cg.items.length;
-            return (
-              <details key={cg.name} className="group px-3.5">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums"
-                    style={all ? { background: cg.color } : { border: `2px solid ${cg.color}`, color: cg.color }}
-                    aria-label={`${done} of ${cg.items.length} done`}>
-                    {!all && `${done}/${cg.items.length}`}
-                    {all && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
-                  </span>
-                  <span className={`${display} flex-1 text-[17px]`} style={{ color: cg.color }}>{cg.name}</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
-                </summary>
-                <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
-                  {cg.videos.map((v) => <div key={v.name} className="py-2"><MedalVideo compact url={v.url} seconds={v.seconds} color={cg.color} name={v.name} /></div>)}
-                  {cg.items.map((it) => (
-                    <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
-                      progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} howTo={it.howTo} />
-                  ))}
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      )}
+      {/* November 15 (Michael): her habits grouped under Focus circles, then Fix-its, then anything else open. */}
+      {([["focus", "Focus circles"], ["fixit", "Fix-its"], ["other", "Also working on"]] as const).map(([kind, label]) => {
+        const list = circleGroups.filter((g) => g.kind === kind);
+        if (!list.length) return null;
+        return (
+          <div key={kind} className="space-y-1.5">
+            <h3 className="pt-1 text-[11px] uppercase tracking-[0.15em] text-accent">{label}</h3>
+            <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+              {list.map((cg) => {
+                const done = cg.items.filter((i) => i.doneNow).length, all = done === cg.items.length;
+                return (
+                  <details key={cg.name} className="group px-3.5">
+                    <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums"
+                        style={all ? { background: cg.color } : { border: `2px solid ${cg.color}`, color: cg.color }}
+                        aria-label={`${done} of ${cg.items.length} done`}>
+                        {!all && `${done}/${cg.items.length}`}
+                        {all && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
+                      </span>
+                      <span className={`${display} flex-1 text-[17px]`} style={{ color: cg.color }}>{cg.name}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+                    </summary>
+                    <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
+                      {cg.videos.map((v) => <div key={v.name} className="py-2"><MedalVideo compact url={v.url} seconds={v.seconds} color={cg.color} name={v.name} /></div>)}
+                      {cg.items.map((it) => (
+                        <ItemCheck key={it.id} itemId={it.id} done={it.doneNow} complete={it.complete} title={it.title} detail={it.detail} eyebrow={it.medal}
+                          progress={it.progress} target={it.target} cadence={it.cadence} color={cg.color} auto={it.auto} alsoIn={it.alsoIn} howTo={it.howTo} />
+                      ))}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
       {!circleGroups.length && !notStarted && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
       {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
       <BookCall />

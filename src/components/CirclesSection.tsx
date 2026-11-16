@@ -78,7 +78,7 @@ export default function CirclesSection({ state }: { state: ProgramState }) {
       {/* November 15 (Connie couldn't find them): fix-its always showing, not folded away, and honest that Michael opens them. */}
       {fixits.length > 0 && <>
         <Label>Fix-it circles. Need one? Ask Michael and he&apos;ll open it for you:</Label>
-        <List>{fixits.map((c) => <Row key={c.id} c={c} sub={`${c.rings.length} medals · ask Michael to open it`} active={false} />)}</List>
+        <List>{fixits.map((c) => <Row key={c.id} c={c} sub={c.status === "upcoming" ? opens(c) : `${c.rings.length} medals · ask Michael to open it`} active={false} />)}</List>
       </>}
     </section>
   );
