@@ -1,4 +1,5 @@
 import { BLUEPRINT, blueprintLabels } from "@/lib/blueprint";
+import Section from "@/components/Section";
 import PageRecorder from "@/components/PageRecorder";
 import OpenOnHash from "@/components/OpenOnHash";
 import CoachWorkoutDays from "@/components/CoachWorkoutDays";
@@ -137,9 +138,9 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         </div>
       </header>
       {wkPlan?.phase && (
-        <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
+        <Section title={`${((p.full_name as string | null) ?? "Her").split(" ")[0]}'s workout week`}><CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
           workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
-          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
+          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} /></Section>
       )}
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
       <SignInCodeButton clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} phone={(p.phone as string | null) ?? null} />
@@ -147,8 +148,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
       <GuaranteeCard g={guarantee} />
 
-      <div className="space-y-2">
-        <h2 className="text-sm uppercase tracking-widest text-dim">Check-ins</h2>
+      <Section title="Check-ins" right={checkins?.length ? `${checkins.length}` : undefined}>
         <div className="grid gap-2 lg:grid-cols-2">
         {(checkins ?? []).map((k) => {
           const sent = Array.isArray(k.checkin_replies) ? k.checkin_replies[0]?.sent_at : (k.checkin_replies as { sent_at?: string } | null)?.sent_at;
@@ -167,10 +167,10 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         })}
         </div>
         {!checkins?.length && <p className="text-sm text-dim">No check-ins yet.</p>}
-      </div>
+      </Section>
 
       {/* Her food, the last 7 days (November 1): tap a day for every meal, swipe between days. */}
-      <div id="food" className="scroll-mt-20"><FoodWeek data={foodWeek} coachClientId={id} /></div>
+      <Section id="food" title="Food - last 7 days"><FoodWeek data={foodWeek} coachClientId={id} title="" /></Section>
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="space-y-6">
@@ -227,8 +227,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
           {photos.length > 0 && <ProgressPhotos photos={photos} today={prog.data.today} readOnly />}
 
-          <div className="space-y-2">
-            <h2 className="text-sm uppercase tracking-widest text-dim">Assessment</h2>
+          <Section title="Assessment">
             {/* November 13: his video reply to her Blueprint, with AI talking points on screen while he records. */}
             {blueprintDone(assessment?.submitted_at as string | null) && (
               <BlueprintReply clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]}
@@ -285,11 +284,10 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
               </details>
             ) : <p className="text-sm text-dim">No assessment in the app yet. Your onboarding notes are under Edit details.</p>}
             {p.coach_notes && <p className="whitespace-pre-line rounded-xl border border-border p-3 text-sm text-[#d4d4d4]"><span className="block text-xs text-dim">Your notes</span>{p.coach_notes}</p>}
-          </div>
+          </Section>
         </div>
         <div className="space-y-6">
-          <div className="space-y-2">
-            <h2 className="text-sm uppercase tracking-widest text-dim">Circles</h2>
+          <Section title="Circles">
             {visible.map((c) => {
               const next = c.rings.find((r) => r.status === "upcoming" || r.status === "locked");
               return (
@@ -313,7 +311,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
                 ))}
               </div>
             </details>
-          </div>
+          </Section>
 
           <div className="space-y-2">
             <h2 className="text-sm uppercase tracking-widest text-dim">Focus circles</h2>

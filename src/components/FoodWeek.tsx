@@ -30,7 +30,7 @@ export default function FoodWeek({ data, title = "Food · last 7 days", compact 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm uppercase tracking-widest text-dim">{title}</h2>
+        {title && <h2 className="text-sm uppercase tracking-widest text-dim">{title}</h2>}
         <p className="text-[12px] text-dim">{logged.length}/7 days logged{avg((d) => d.kcal) !== null && <> · avg <b className="text-text">{avg((d) => d.kcal)}</b> kcal · <b className="text-text">{avg((d) => d.protein)}</b> g protein · <b className="text-text">{avg((d) => d.fiber)}</b> g fiber</>}{t.kcal ? ` · target ${t.kcal}` : ""}</p>
       </div>
       <div className={`-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0 ${compact ? "" : "lg:grid lg:grid-cols-7 lg:overflow-visible"}`}>

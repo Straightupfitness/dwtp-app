@@ -6,7 +6,7 @@ import { IconCalendar, IconChat, IconFaq } from "./Icons";
 /** One top-bar button: icon over a word, so every button says what it is. */
 function Btn({ href, label, icon, badge, aria }: { href: string; label: string; icon: React.ReactNode; badge?: number; aria?: string }) {
   return (
-    <Link href={href} aria-label={aria} className="relative flex min-h-11 min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-accent">
+    <Link href={href} aria-label={aria} prefetch={href === "/notifications" ? false : undefined} className="relative flex min-h-11 min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-accent">
       <span className="grid h-[22px] place-items-center [&>svg]:size-[20px]">{icon}</span>
       <span className="text-[10px] font-semibold leading-none text-text">{label}</span>
       {badge ? (

@@ -40,9 +40,8 @@ export default function CoachWorkoutDays({ clientId, first, schedule, workoutDay
   const title = (d: number) => days.find((x) => x.day === d);
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-3 text-sm">
+    <div className="space-y-3 text-sm">
       <div>
-        <p className="font-semibold">{first}&apos;s workout week</p>
         <p className="text-[12px] text-dim">{programName} · {weekLabel} · {days.length} workouts in this phase. Pick which one she does on which day. It carries into every phase.</p>
       </div>
 
