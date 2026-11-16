@@ -1,5 +1,7 @@
 import { BLUEPRINT, blueprintLabels } from "@/lib/blueprint";
 import Section from "@/components/Section";
+import SmoothDrawers from "@/components/SmoothDrawers";
+import Avatar from "@/components/Avatar";
 import CoachProgress from "@/components/CoachProgress";
 import AdminStuff from "@/components/AdminStuff";
 import { BadgesCard } from "@/components/ProgressView";
@@ -149,10 +151,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : p.program_start ? `Starts ${new Date(p.program_start + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}` : "Not started"} · {p.status}</p>
         <div className="flex items-center gap-2">
           {prevC && <Link href={`/coach/clients/${prevC.id}`} className={arrow} aria-label={`Previous client: ${prevC.name}`} title={prevC.name}>‹</Link>}
+          <Avatar name={p.full_name as string | null} path={p.avatar_path as string | null} size={44} />
           <h1 className="min-w-0 font-[family-name:var(--font-display)] text-3xl uppercase">{p.full_name || p.email} <BadgeRow badges={earned} size={22} /></h1>
           {nextC && <Link href={`/coach/clients/${nextC.id}`} className={arrow} aria-label={`Next client: ${nextC.name}`} title={nextC.name}>›</Link>}
         </div>
         <p className="text-xs text-dim">{p.email}</p>
+        {p.phone ? <p className="text-xs text-dim">{p.phone as string}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
           <span className="text-dim">Last in the app: <b className="text-text">{lastInLabel(seen)}</b></span>
           <SeenStrip seen={seen} size={18} labels />
@@ -177,7 +181,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       </header>
 
       {/* November 15: what needs his attention for her, at a glance. */}
-      <Section title="Action items" right={actions.length ? `${actions.length}` : "all clear"}>
+      <Section icon="action" title="Action items" right={actions.length ? `${actions.length}` : "all clear"}>
         {actions.length ? (
           <ul className="space-y-1.5">
             {actions.map((x, i) => (
@@ -204,19 +208,19 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
       </Section>
 
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
-      <Section title="What she's been up to">
+      <Section icon="activity" title="What she's been up to">
         <BriefPanel bare clientId={id} first={first} phone={(p.phone as string | null) ?? null} />
       </Section>
 
       {/* Her food, the last 7 days (November 1): tap a day for every meal, swipe between days. */}
-      <Section id="food" title="Food - last 7 days"><FoodWeek data={foodWeek} coachClientId={id} title="" /></Section>
+      <Section icon="food" id="food" title="Food - last 7 days"><FoodWeek data={foodWeek} coachClientId={id} title="" /></Section>
 
-      <Section id="progress" title="Her progress">
+      <Section icon="progress" id="progress" title="Her progress">
         <CoachProgress data={progData} range={range} base={`/coach/clients/${id}`} />
         {photos.length > 0 && <ProgressPhotos photos={photos} today={prog.data.today} readOnly />}
       </Section>
 
-      <Section title="Circles">
+      <Section icon="circles" title="Circles">
             {visible.map((c) => {
               const next = c.rings.find((r) => r.status === "upcoming" || r.status === "locked");
               return (
@@ -247,11 +251,24 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           </div>
       </Section>
 
-      <Section id="targets" title="Her targets" open={false}>
-        <ProfileForm part="targets" clientId={id} p={p} t={t} />
+      <Section icon="workouts" title={`${first}'s workouts`}>
+        {wkPlan?.phase ? (<>
+          <p className={small}>Her workout week</p>
+          <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
+          workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
+          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
+        </>) : <p className="text-sm text-dim">Her workouts show here once her program starts.</p>}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link href={`/coach/clients/${id}/program`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">{String(p.workout_program ?? "").startsWith("custom-") ? "✎ Her custom program" : "+ Custom program"}</Link>
+          <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Her workout history</Link>
+        </div>
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-[13px] font-semibold text-accent">Program settings (program, week, days)</summary>
+          <div className="mt-3"><ProfileForm part="program" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} /></div>
+        </details>
       </Section>
 
-      <Section id="assessment" title="Assessment">
+      <Section icon="assessment" id="assessment" title="Assessment">
             {/* November 13: his video reply to her Blueprint, with AI talking points on screen while he records. */}
             {blueprintDone(assessment?.submitted_at as string | null) && (
               <BlueprintReply clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]}
@@ -310,7 +327,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             {p.coach_notes && <p className="whitespace-pre-line rounded-xl border border-border p-3 text-sm text-[#d4d4d4]"><span className="block text-xs text-dim">Your notes</span>{p.coach_notes}</p>}
       </Section>
 
-      <Section title="Check-ins" right={checkins?.length ? `${checkins.length}` : undefined}>
+      <Section icon="checkins" title="Check-ins" right={checkins?.length ? `${checkins.length}` : undefined}>
         <div className="grid gap-2 lg:grid-cols-2">
         {(checkins ?? []).map((k) => {
           const sent = Array.isArray(k.checkin_replies) ? k.checkin_replies[0]?.sent_at : (k.checkin_replies as { sent_at?: string } | null)?.sent_at;
@@ -333,8 +350,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
       <BadgesCard badges={prog.status} coach />
 
+      <Section icon="targets" id="targets" title="Her targets" open={false}>
+        <ProfileForm part="targets" clientId={id} p={p} t={t} />
+      </Section>
+
       <OpenOnHash ids={["details", "targets", "assessment"]} />
-      <Section id="details" title="Her details" open={false}>
+      <Section icon="details" id="details" title="Her details" open={false}>
         <ProfileForm part="details" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
         <p className={`${small} pt-3`}>15-pound guarantee</p>
         <GuaranteeCard g={guarantee} />
@@ -354,23 +375,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             <details><summary className="cursor-pointer text-sm text-accent">+ Add a purchase</summary><div className="mt-2"><PurchaseForm clientId={id} /></div></details>
       </Section>
 
-      <Section title={`${first}'s workouts`}>
-        {wkPlan?.phase ? (<>
-          <p className={small}>Her workout week</p>
-          <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
-          workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
-          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
-        </>) : <p className="text-sm text-dim">Her workouts show here once her program starts.</p>}
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Link href={`/coach/clients/${id}/program`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">{String(p.workout_program ?? "").startsWith("custom-") ? "✎ Her custom program" : "+ Custom program"}</Link>
-          <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Her workout history</Link>
-        </div>
-        <details className="rounded-xl border border-border p-3">
-          <summary className="cursor-pointer text-[13px] font-semibold text-accent">Program settings (program, week, days)</summary>
-          <div className="mt-3"><ProfileForm part="program" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} /></div>
-        </details>
-      </Section>
-
+      <SmoothDrawers />
       <div id="remove" className="scroll-mt-20">
         <RemoveClient clientId={id} first={first} removed={p.status === "cancelled"} />
       </div>
