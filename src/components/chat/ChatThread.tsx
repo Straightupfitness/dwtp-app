@@ -9,6 +9,9 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
   const { data: msgs } = await supabase.from("messages").select("id, sender_id, body, attachment_path, attachment_kind, audio_seconds, reply_to, edited_at, created_at, read_at, hearted_at")
     .eq("client_id", clientId).order("created_at", { ascending: false }).limit(200);
   const list = (msgs ?? []).reverse();
+  // November 15: which messages have a 👍 (its own query, so chat still works before migration 0046).
+  const { data: likes } = list.length ? await supabase.from("messages").select("id").in("id", list.map((m) => m.id)).not("liked_at", "is", null) : { data: [] };
+  const liked = new Set((likes ?? []).map((x) => x.id as string));
   const photos = new Map<string, string>();
   const paths = list.map((m) => m.attachment_path).filter(Boolean) as string[];
   if (paths.length) {
@@ -44,7 +47,7 @@ export default async function ChatThread({ clientId, viewerId, otherName }: { cl
             <li key={m.id}>
               {showTime && <p className="py-2 text-center text-xs text-dim">{fmt(m.created_at)}</p>}
               <Bubble m={{
-                id: m.id, mine, body: m.body, seconds: m.audio_seconds, edited: !!m.edited_at, hearted: !!m.hearted_at, senderName: mine ? "You" : otherName,
+                id: m.id, mine, body: m.body, seconds: m.audio_seconds, edited: !!m.edited_at, hearted: !!m.hearted_at, liked: liked.has(m.id), senderName: mine ? "You" : otherName,
                 photo: m.attachment_path && !m.attachment_kind?.match(/audio|video/) ? photos.get(m.attachment_path) ?? null : null,
                 video: m.attachment_path && m.attachment_kind === "video" ? photos.get(m.attachment_path) ?? null : null,
                 audio: m.attachment_path && m.attachment_kind === "audio" ? photos.get(m.attachment_path) ?? null : null,

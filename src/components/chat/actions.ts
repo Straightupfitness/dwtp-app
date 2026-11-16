@@ -89,3 +89,14 @@ export async function sendBulk(clientIds: string[], template: string) {
   revalidatePath("/", "layout");
   return { ok: true, sent: rows.length };
 }
+
+/** November 15: 👍 on the other person's message (next to ♥). */
+export async function toggleLike(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const { data: m } = await supabase.from("messages").select("sender_id, liked_at").eq("id", id).maybeSingle();
+  if (!m || m.sender_id === user.id) return;
+  await supabase.from("messages").update({ liked_at: m.liked_at ? null : new Date().toISOString() }).eq("id", id);
+  revalidatePath("/", "layout");
+}

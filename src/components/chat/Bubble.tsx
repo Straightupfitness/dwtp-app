@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { HeartButton } from "./Heart";
+import { HeartButton, LikeButton } from "./Heart";
 import Linkify from "@/components/Linkify";
 
 export const REPLY_EVENT = "dwtp:chat-reply";
@@ -10,7 +10,7 @@ export type EditMsg = { id: string; body: string };
 
 export type BubbleMsg = {
   id: string; mine: boolean; body: string | null; photo: string | null; audio: string | null; video?: string | null; seconds: number | null;
-  edited: boolean; hearted: boolean; quote: { who: string; snippet: string } | null; senderName: string;
+  edited: boolean; hearted: boolean; liked?: boolean; quote: { who: string; snippet: string } | null; senderName: string;
 };
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
@@ -46,9 +46,14 @@ export default function Bubble({ m }: { m: BubbleMsg }) {
           )}
           {m.body && <p className="whitespace-pre-line break-words"><Linkify text={m.body} className={`break-all font-medium underline underline-offset-2 ${m.mine ? "text-black" : "text-accent"}`} /></p>}
           {m.edited && <span className={`block text-right text-[10px] ${m.mine ? "text-black/60" : "text-dim"}`}>edited</span>}
-          {m.mine && m.hearted && <span className="absolute -bottom-2 -left-2 grid size-6 place-items-center rounded-full border-2 border-bg bg-[#2a1218] text-[12px] text-[#fb7185]" aria-label="Liked">♥</span>}
+          {m.mine && (m.hearted || m.liked) && (
+            <span className="absolute -bottom-2 -left-2 flex gap-0.5">
+              {m.hearted && <span className="grid size-6 place-items-center rounded-full border-2 border-bg bg-[#2a1218] text-[12px] text-[#fb7185]" aria-label="Loved">♥</span>}
+              {m.liked && <span className="grid size-6 place-items-center rounded-full border-2 border-bg bg-[#12203a] text-[11px]" aria-label="Liked">👍</span>}
+            </span>
+          )}
         </div>
-        {!m.mine && <HeartButton id={m.id} hearted={m.hearted} />}
+        {!m.mine && <span className="flex flex-col self-end"><LikeButton id={m.id} liked={!!m.liked} /><HeartButton id={m.id} hearted={m.hearted} /></span>}
       </div>
       {open && (
         <div className="mt-1.5 flex gap-1.5">
