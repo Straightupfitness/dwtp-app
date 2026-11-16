@@ -145,7 +145,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   }
   const small = "font-[family-name:var(--font-display)] text-[13px] uppercase tracking-wide";
   return (
-    <section className="space-y-6">
+    <section className="space-y-[17px]">
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : p.program_start ? `Starts ${new Date(p.program_start + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}` : "Not started"} · {p.status}</p>
@@ -350,12 +350,12 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
       <BadgesCard badges={prog.status} coach />
 
-      <Section icon="targets" id="targets" title="Her targets" open={false}>
+      <Section icon="targets" id="targets" title="Her targets">
         <ProfileForm part="targets" clientId={id} p={p} t={t} />
       </Section>
 
       <OpenOnHash ids={["details", "targets", "assessment"]} />
-      <Section icon="details" id="details" title="Her details" open={false}>
+      <Section icon="details" id="details" title="Her details">
         <ProfileForm part="details" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
         <p className={`${small} pt-3`}>15-pound guarantee</p>
         <GuaranteeCard g={guarantee} />
