@@ -53,7 +53,7 @@ export default function Bubble({ m }: { m: BubbleMsg }) {
             </span>
           )}
         </div>
-        {!m.mine && <span className="flex flex-col self-end"><LikeButton id={m.id} liked={!!m.liked} /><HeartButton id={m.id} hearted={m.hearted} /></span>}
+        {!m.mine && <span className="flex self-end"><HeartButton id={m.id} hearted={m.hearted} /><LikeButton id={m.id} liked={!!m.liked} /></span>}
       </div>
       {open && (
         <div className="mt-1.5 flex gap-1.5">

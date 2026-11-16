@@ -112,6 +112,35 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
 
   const first = ((p.full_name as string | null) ?? "her").split(" ")[0];
   const lastW = prog.data.weights[prog.data.weights.length - 1] ?? null;
+  // November 15: Action items, what needs his attention for her right now.
+  const actions: { icon: string; text: string; href: string }[] = [];
+  const daysAgo = (d: string) => Math.round((Date.parse(prog.data.today) - Date.parse(d)) / 86_400_000);
+  for (const k of checkins ?? []) {
+    const sent = Array.isArray(k.checkin_replies) ? k.checkin_replies[0]?.sent_at : (k.checkin_replies as { sent_at?: string } | null)?.sent_at;
+    if (k.submitted_at && !sent) actions.push({ icon: "📝", text: `Reply to her ${weekName(k.week_number)} check-in`, href: `/coach/checkins/${k.id}` });
+  }
+  const bpIn = blueprintDone(assessment?.submitted_at as string | null);
+  if (!bpIn && p.status !== "cancelled") actions.push({ icon: "🧭", text: "Her Driven Woman Blueprint isn't done yet", href: `/coach/followups?tab=${Object.keys((assessment?.answers as object) ?? {}).length ? "started" : "not-started"}` });
+  if (bpIn && !bpReply?.done_at) actions.push({ icon: "🎥", text: "Send her your Blueprint reply", href: "#assessment" });
+  if (lastW && daysAgo(lastW.date) >= 3) actions.push({ icon: "⚖️", text: `No weigh-in for ${daysAgo(lastW.date)} days`, href: "#progress" });
+  if (!lastW) actions.push({ icon: "⚖️", text: "No weigh-ins yet", href: "#progress" });
+  const foodDays = foodWeek.days.filter((d) => d.meals.length).length;
+  if (foodDays < 4) actions.push({ icon: "🍽️", text: `Food logged ${foodDays} of the last 7 days`, href: "#food" });
+  const logged14 = prog.data.days.slice(-14).filter((d) => d.meals).length;
+  if (!t?.calorie_target && logged14 >= 10) actions.push({ icon: "🎯", text: `Set her calorie target (${logged14} of the last 14 days logged)`, href: "#targets" });
+  const seenAt = (p.last_seen_at as string | null) ?? null;
+  // eslint-disable-next-line react-hooks/purity -- a server page, rendered fresh on each visit
+  const awayH = seenAt ? (Date.now() - Date.parse(seenAt)) / 3_600_000 : 0;
+  if (awayH > 48) actions.push({ icon: "👋", text: `Not in the app for ${Math.round(awayH / 24)} days`, href: `/coach/inbox/${id}` });
+  for (const x of purchases ?? []) {
+    const left = x.expires_on ? Math.round((Date.parse(x.expires_on as string) - Date.parse(prog.data.today)) / 86_400_000) : null;
+    if (left !== null && left <= 21 && left >= -14) actions.push({ icon: "💳", text: left < 0 ? `Her plan ended ${-left} days ago` : `Her plan ends in ${left} days`, href: "#details" });
+  }
+  if (p.birthday) {
+    const b = String(p.birthday).slice(5, 10), y = Number(prog.data.today.slice(0, 4));
+    const next = [`${y}-${b}`, `${y + 1}-${b}`].map((d) => -daysAgo(d)).find((n) => n >= 0) ?? 999;
+    if (next <= 14) actions.push({ icon: "🎂", text: next === 0 ? "Her birthday is today!" : `Her birthday is in ${next} day${next === 1 ? "" : "s"}`, href: `/coach/inbox/${id}` });
+  }
   const small = "font-[family-name:var(--font-display)] text-[13px] uppercase tracking-wide";
   return (
     <section className="space-y-6">
@@ -128,14 +157,14 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <span className="text-dim">Last in the app: <b className="text-text">{lastInLabel(seen)}</b></span>
           <SeenStrip seen={seen} size={18} labels />
         </div>
-        {/* November 15: start, current and goal weight, bigger (goal a little shiny). */}
+        {/* November 15: start, current and goal weight, bigger (goal in gold). */}
         <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1">
           {p.start_weight_lbs ? <span className="text-[13px] text-dim">Start: <b className="text-[20px] text-text">{p.start_weight_lbs}</b> <span className="text-[16px] text-text">lbs</span></span> : null}
           {lastW ? <span className="text-[13px] text-dim">Current: <b className="text-[20px] text-text">{lastW.lbs}</b> <span className="text-[16px] text-text">lbs</span></span> : null}
-          {p.goal_weight_lbs ? <span className="text-[13px] text-dim">Goal: <b className="shine-text text-[20px]">{p.goal_weight_lbs}</b> <span className="shine-text text-[16px] font-semibold">lbs</span></span> : null}
+          {p.goal_weight_lbs ? <span className="text-[13px] text-dim">Goal: <b className="text-[20px] text-[#e8b84a]">{p.goal_weight_lbs}</b> <span className="text-[16px] font-semibold text-[#e8b84a]">lbs</span></span> : null}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-[13px] font-semibold">
+          <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#7a7a7a] px-3 text-[13px] font-semibold">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z" /></svg>Chat
           </Link>
           <SeeHerApp clientId={id} />
@@ -147,21 +176,31 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         </div>
       </header>
 
-      <Section title={`${first}'s workouts`}>
-        {wkPlan?.phase ? (<>
-          <p className={small}>Her workout week</p>
-          <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
-          workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
-          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
-        </>) : <p className="text-sm text-dim">Her workouts show here once her program starts.</p>}
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Link href={`/coach/clients/${id}/program`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">{String(p.workout_program ?? "").startsWith("custom-") ? "✎ Her custom program" : "+ Custom program"}</Link>
-          <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Her workout history</Link>
-        </div>
-        <details className="rounded-xl border border-border p-3">
-          <summary className="cursor-pointer text-[13px] font-semibold text-accent">Program settings (program, week, days)</summary>
-          <div className="mt-3"><ProfileForm part="program" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} /></div>
-        </details>
+      {/* November 15: what needs his attention for her, at a glance. */}
+      <Section title="Action items" right={actions.length ? `${actions.length}` : "all clear"}>
+        {actions.length ? (
+          <ul className="space-y-1.5">
+            {actions.map((x, i) => (
+              <li key={i}>
+                <Link href={x.href} className="flex items-center gap-2.5 rounded-xl border border-border bg-bg/50 px-3 py-2 text-[14px] hover:border-accent">
+                  <span aria-hidden="true">{x.icon}</span><span className="min-w-0 flex-1">{x.text}</span><span className="text-dim" aria-hidden="true">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-dim">Nothing needs you right now.</p>}
+          {toSignOff.length > 0 && (
+            <div className="space-y-2">
+              <p className={`${small} pt-2`}>Milestones to sign off</p>
+              {toSignOff.map(({ c, r, i }) => (
+                <div key={i.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                  <div className="flex-1"><p className="text-xs text-dim">{c.name} · Medal {r.number}</p><p className="text-sm">{i.title}</p></div>
+                  <SignOffButton clientId={id} itemId={i.id} />
+                </div>
+              ))}
+            </div>
+          )}
+        <ThursdayScript clientId={id} />
       </Section>
 
       {/* November 13: what she's been doing lately, and the flow for a personal message. */}
@@ -169,7 +208,50 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         <BriefPanel bare clientId={id} first={first} phone={(p.phone as string | null) ?? null} />
       </Section>
 
-      <Section title="Assessment">
+      {/* Her food, the last 7 days (November 1): tap a day for every meal, swipe between days. */}
+      <Section id="food" title="Food - last 7 days"><FoodWeek data={foodWeek} coachClientId={id} title="" /></Section>
+
+      <Section id="progress" title="Her progress">
+        <CoachProgress data={progData} range={range} base={`/coach/clients/${id}`} />
+        {photos.length > 0 && <ProgressPhotos photos={photos} today={prog.data.today} readOnly />}
+      </Section>
+
+      <Section title="Circles">
+            {visible.map((c) => {
+              const next = c.rings.find((r) => r.status === "upcoming" || r.status === "locked");
+              return (
+                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
+                  <MedalCircle medals={c.rings.map((r) => r.fraction)} color={c.color} size={40} label={`${c.ringsComplete} of ${c.rings.length} medals`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">{c.name}{c.focus ? <span className="text-accent"> · focus</span> : ""}</p>
+                    <p className="truncate text-xs text-dim">{c.ringsComplete}/{c.rings.length} done{c.current ? ` · Medal ${c.current.number} ${c.current.name}, day ${c.current.day}` : ""}</p>
+                  </div>
+                  {next && <OpenRingButton clientId={id} circleId={c.id} label={c.status === "open" ? `Open medal ${next.number}` : c.kind === "growth" ? "Open early" : "Open fix-it"} />}
+                </div>
+              );
+            })}
+            <details className="text-sm">
+              <summary className="cursor-pointer text-dim">Open a fix-it</summary>
+              <div className="mt-2 space-y-2">
+                {state.circles.filter((c) => c.kind !== "growth" && c.status !== "open").map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-xl border border-border p-2.5">
+                    <span>{c.name}</span><OpenRingButton clientId={id} circleId={c.id} label="Open fix-it" />
+                  </div>
+                ))}
+              </div>
+            </details>
+          <div className="space-y-2">
+            <p className={`${small} pt-3`}>Focus circles</p>
+            <FocusPicker clientId={id} selected={(focusRows ?? []).length ? focusRows!.map((f) => f.circle_id) : state.circles.filter((c) => c.focus).map((c) => c.id)}
+              circles={state.circles.filter((c) => c.kind !== "fixit_event").map((c) => ({ id: c.id, name: c.name, counts: true }))} />
+          </div>
+      </Section>
+
+      <Section id="targets" title="Her targets" open={false}>
+        <ProfileForm part="targets" clientId={id} p={p} t={t} />
+      </Section>
+
+      <Section id="assessment" title="Assessment">
             {/* November 13: his video reply to her Blueprint, with AI talking points on screen while he records. */}
             {blueprintDone(assessment?.submitted_at as string | null) && (
               <BlueprintReply clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]}
@@ -249,68 +331,9 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
         {!checkins?.length && <p className="text-sm text-dim">No check-ins yet.</p>}
       </Section>
 
-      {/* Her food, the last 7 days (November 1): tap a day for every meal, swipe between days. */}
-      <Section id="food" title="Food - last 7 days"><FoodWeek data={foodWeek} coachClientId={id} title="" /></Section>
-
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <div className="space-y-6">
-          {toSignOff.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-sm uppercase tracking-widest text-dim">Milestones to sign off</h2>
-              {toSignOff.map(({ c, r, i }) => (
-                <div key={i.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-                  <div className="flex-1"><p className="text-xs text-dim">{c.name} · Medal {r.number}</p><p className="text-sm">{i.title}</p></div>
-                  <SignOffButton clientId={id} itemId={i.id} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <ThursdayScript clientId={id} />
-          {photos.length > 0 && <ProgressPhotos photos={photos} today={prog.data.today} readOnly />}
-        </div>
-        <div className="space-y-6">
-          <Section title="Circles">
-            {visible.map((c) => {
-              const next = c.rings.find((r) => r.status === "upcoming" || r.status === "locked");
-              return (
-                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
-                  <MedalCircle medals={c.rings.map((r) => r.fraction)} color={c.color} size={40} label={`${c.ringsComplete} of ${c.rings.length} medals`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm">{c.name}{c.focus ? <span className="text-accent"> · focus</span> : ""}</p>
-                    <p className="truncate text-xs text-dim">{c.ringsComplete}/{c.rings.length} done{c.current ? ` · Medal ${c.current.number} ${c.current.name}, day ${c.current.day}` : ""}</p>
-                  </div>
-                  {next && <OpenRingButton clientId={id} circleId={c.id} label={c.status === "open" ? `Open medal ${next.number}` : c.kind === "growth" ? "Open early" : "Open fix-it"} />}
-                </div>
-              );
-            })}
-            <details className="text-sm">
-              <summary className="cursor-pointer text-dim">Open a fix-it</summary>
-              <div className="mt-2 space-y-2">
-                {state.circles.filter((c) => c.kind !== "growth" && c.status !== "open").map((c) => (
-                  <div key={c.id} className="flex items-center justify-between rounded-xl border border-border p-2.5">
-                    <span>{c.name}</span><OpenRingButton clientId={id} circleId={c.id} label="Open fix-it" />
-                  </div>
-                ))}
-              </div>
-            </details>
-          </Section>
-
-          <div className="space-y-2">
-            <h2 className="text-sm uppercase tracking-widest text-dim">Focus circles</h2>
-            <FocusPicker clientId={id} selected={(focusRows ?? []).length ? focusRows!.map((f) => f.circle_id) : state.circles.filter((c) => c.focus).map((c) => c.id)}
-              circles={state.circles.filter((c) => c.kind !== "fixit_event").map((c) => ({ id: c.id, name: c.name, counts: true }))} />
-          </div>
-
-        </div>
-      </div>
-
-      <Section id="progress" title="Her progress">
-        <CoachProgress data={progData} range={range} base={`/coach/clients/${id}`} />
-      </Section>
       <BadgesCard badges={prog.status} coach />
 
-      <OpenOnHash ids={["details"]} />
+      <OpenOnHash ids={["details", "targets", "assessment"]} />
       <Section id="details" title="Her details" open={false}>
         <ProfileForm part="details" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} />
         <p className={`${small} pt-3`}>15-pound guarantee</p>
@@ -330,8 +353,22 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             })}
             <details><summary className="cursor-pointer text-sm text-accent">+ Add a purchase</summary><div className="mt-2"><PurchaseForm clientId={id} /></div></details>
       </Section>
-      <Section title="Her targets" open={false}>
-        <ProfileForm part="targets" clientId={id} p={p} t={t} />
+
+      <Section title={`${first}'s workouts`}>
+        {wkPlan?.phase ? (<>
+          <p className={small}>Her workout week</p>
+          <CoachWorkoutDays clientId={id} first={((p.full_name as string | null) ?? "her").split(" ")[0]} schedule={wkSchedule}
+          workoutDays={((p.workout_days as number[] | null) ?? []).length ? (p.workout_days as number[]) : defaultWorkoutDays(wkPlan.strength.length)}
+          days={planDays} weekLabel={tweekNow >= 1 ? `this week (Week ${tweekNow})` : "Week 1, starts Monday"} programName={wkPlan.program.name} />
+        </>) : <p className="text-sm text-dim">Her workouts show here once her program starts.</p>}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link href={`/coach/clients/${id}/program`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">{String(p.workout_program ?? "").startsWith("custom-") ? "✎ Her custom program" : "+ Custom program"}</Link>
+          <Link href={`/coach/clients/${id}/workouts`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-[13px] font-semibold">Her workout history</Link>
+        </div>
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-[13px] font-semibold text-accent">Program settings (program, week, days)</summary>
+          <div className="mt-3"><ProfileForm part="program" clientId={id} p={p} t={t} programs={programs} phaseWeeks={phaseWeeks} tweek={tweekNow} /></div>
+        </details>
       </Section>
 
       <div id="remove" className="scroll-mt-20">

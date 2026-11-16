@@ -81,8 +81,8 @@ export default function PageRecorder({ clientId, first }: { clientId: string; fi
   return (
     <>
       {mode === "idle" && (
-        <span className="inline-flex items-center gap-2">
-          <button type="button" onClick={start} className="inline-flex min-h-10 items-center rounded-lg border border-accent px-3 text-[13px] font-semibold text-accent">🎥 Record while you review</button>
+        <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-accent pr-3">
+          <button type="button" onClick={start} className="inline-flex min-h-10 items-center px-3 text-[13px] font-semibold text-accent">🎥 Record while you review</button>
           <label className="flex items-center gap-1 text-[12px] text-dim"><input type="checkbox" checked={camOn} onChange={(e) => setCamOn(e.target.checked)} className="accent-[var(--accent)]" />camera bubble</label>
         </span>
       )}
