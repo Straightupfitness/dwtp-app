@@ -47,6 +47,7 @@ export default async function MePage() {
         </form>
       </div>
       <div className="space-y-2">
+        <Link href="/cycle" className="block rounded-xl border border-border bg-card p-3">Cycle tracker <span className="text-[13px] text-dim">(optional): train with your cycle</span></Link>
         <Link href="/checkin" className="block rounded-xl border border-border bg-card p-3">Check-ins and Michael&apos;s replies</Link>
         <Link href="/chat" className="block rounded-xl border border-border bg-card p-3">Message Michael</Link>
       </div>

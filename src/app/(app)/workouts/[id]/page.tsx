@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { clipUrl, earlyWeek, lastNumbers, loadWorkoutWeek, phaseLabel, posterUrl, stageOf, workoutTitle, type Item } from "@/lib/workouts";
 import Player, { type PlayerItem } from "./Player";
+import { loadCycle, suggest } from "@/lib/cycle";
+import { todayIn } from "@/lib/program";
 
 export default async function WorkoutPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ w?: string }> }) {
   const { id } = await params;
@@ -41,6 +43,10 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
     logged: (logs ?? []).filter((l) => l.position === i.position).map((l) => ({ set_no: l.set_no, weight: l.weight, reps: l.reps, seconds: l.seconds, note: l.note })),
   }));
   const phase = wk.phase && wk.strength.some((s) => s.id === w.id) ? wk.phase : null;
+  // November 17: her cycle tracker (when on) suggests going heavy, normal or lighter on strength days.
+  const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", user!.id).single();
+  const cyc = w.kind === "strength" ? await loadCycle(supabase, user!.id, todayIn(tzRow?.timezone ?? "America/Los_Angeles")) : null;
+  const sug = cyc?.mode ? suggest(cyc.mode, cyc.cycle, cyc.log) : null;
   const stage = phase ? stageOf(phase.stage, wk.program.name) : null;
 
   return (
@@ -52,6 +58,7 @@ export default async function WorkoutPage({ params, searchParams }: { params: Pr
       session={session ? { id: session.id as string, completed: !!session.completed_at } : null}
       preview={preview}
       ahead={early ? wk.week : undefined}
+      cycle={sug ? { suggested: sug.pick, why: sug.why, chosen: cyc?.log?.intensity ?? null } : null}
     />
   );
 }

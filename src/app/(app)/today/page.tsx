@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import CpCount from "@/components/CpCount";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, viewAsInfo } from "@/lib/supabase/server";
 import { loadProgram, type ItemState } from "@/lib/circles";
 import { journey, todayIn } from "@/lib/program";
 import StageBars, { JOURNEY_WEEKS, journeyWeek } from "@/components/JourneyBar";
@@ -22,6 +22,8 @@ import CirclesGlance from "@/components/CirclesGlance";
 import BookCall from "@/components/BookCall";
 import { BadWeekActive, BadWeekOffer } from "./BadWeek";
 import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
+import { loadCycle } from "@/lib/cycle";
+import CycleToday from "@/components/cycle/CycleToday";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -57,6 +59,8 @@ export default async function TodayPage() {
   }
   const { today, week } = state;
   const tz = profile?.timezone ?? "America/Los_Angeles";
+  // November 17: her cycle tracker, when she turned it on.
+  const [cyc, viewing] = await Promise.all([loadCycle(supabase, user!.id, today), viewAsInfo()]);
   const first = profile?.full_name?.split(" ")[0];
   const { data: cps } = await supabase.from("cp_totals").select("total, this_week").eq("client_id", user!.id).maybeSingle();
   const j = journey(state.programStart, today);
@@ -186,6 +190,7 @@ export default async function TodayPage() {
         steps={stepsYesterday} stepGoal={goals?.step_goal ?? 10000} stepsWeek={stepsWeek}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
+      {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
       <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
         <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, food, water and habits</span></span><span className="text-accent">›</span>
       </Link>

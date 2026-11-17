@@ -1,5 +1,6 @@
 import { BLUEPRINT, blueprintLabels } from "@/lib/blueprint";
 import Section from "@/components/Section";
+import { INTENSITY_INFO, PHASE_INFO, SYMPTOMS, loadCycle } from "@/lib/cycle";
 import SmoothDrawers from "@/components/SmoothDrawers";
 import Avatar from "@/components/Avatar";
 import CoachProgress from "@/components/CoachProgress";
@@ -113,6 +114,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   const visible = state.circles.filter((c) => c.kind === "growth" || c.status === "open");
 
   const first = ((p.full_name as string | null) ?? "her").split(" ")[0];
+  // November 17: her cycle tracker (if she turned it on), one line under her weights.
+  const cyc = await loadCycle(supabase, id, prog.data.today);
   const lastW = prog.data.weights[prog.data.weights.length - 1] ?? null;
   // November 15: Action items, what needs his attention for her right now.
   const actions: { icon: string; text: string; href: string }[] = [];
@@ -167,6 +170,15 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           {lastW ? <span className="text-[13px] text-dim">Current: <b className="text-[20px] text-text">{lastW.lbs}</b> <span className="text-[16px] text-text">lbs</span></span> : null}
           {p.goal_weight_lbs ? <span className="text-[13px] text-dim">Goal: <b className="text-[20px] text-[#e8b84a]">{p.goal_weight_lbs}</b> <span className="text-[16px] font-semibold text-[#e8b84a]">lbs</span></span> : null}
         </div>
+        {cyc?.mode && (
+          <p className="mt-1.5 text-[13px] text-dim">
+            {cyc.cycle ? <><span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-black" style={{ background: PHASE_INFO[cyc.cycle.phase].color }}>{PHASE_INFO[cyc.cycle.phase].label}</span> day {cyc.cycle.day} of ~{cyc.cycle.length}</>
+              : cyc.mode === "symptoms" ? "Cycle: symptoms only (no period)" : "Cycle tracker on, no period logged yet"}
+            {cyc.log?.energy ? ` · energy ${cyc.log.energy}/5 today` : ""}
+            {cyc.log?.symptoms?.length ? ` · ${cyc.log.symptoms.map((x) => SYMPTOMS.find(([k]) => k === x)?.[1] ?? x).join(", ")}` : ""}
+            {cyc.log?.intensity ? ` · chose ${INTENSITY_INFO[cyc.log.intensity].label.toLowerCase()}` : ""}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#7a7a7a] px-3 text-[13px] font-semibold">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z" /></svg>Chat

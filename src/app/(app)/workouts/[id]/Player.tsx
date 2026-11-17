@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import IntensityPick from "@/components/cycle/IntensityPick";
+import type { Intensity } from "@/lib/cycle";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { celebrate, play, primeSounds } from "@/lib/celebrate";
@@ -20,6 +22,7 @@ type Props = {
   session: { id: string; completed: boolean } | null;
   preview: boolean;
   ahead?: number; // next week's training week, when she's starting it early
+  cycle?: { suggested: Intensity; why: string; chosen: Intensity | null } | null; // November 17: cycle tracker
 };
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -53,7 +56,8 @@ function describe(s: SetVals) {
 type Sub = { id: number; name: string; notes: string | null; clip: string | null; poster: string | null; youtube: string | null; last: PlayerItem["last"]; lastWhen: string | null };
 type Original = { name: string };
 
-export default function Player({ workout, phase, overview, steps: baseSteps, session, preview, ahead }: Props) {
+export default function Player({ workout, phase, overview, steps: baseSteps, session, preview, ahead, cycle }: Props) {
+  const [intensity, setIntensity] = useState<Intensity | null>(cycle ? cycle.chosen ?? cycle.suggested : null);
   // Substitutes (November 2): she can swap any exercise for another one. Remembered on this phone for this workout;
   // the sets she logs are saved under the exercise she actually did.
   const subKey = `dwtp-subs:${session?.id ?? `w${workout.id}`}`;
@@ -267,6 +271,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
                 {" "}No sound? Flip your silent switch off, or <a href={`https://www.youtube.com/watch?v=${overview.youtube}`} target="_blank" rel="noopener noreferrer" className="text-accent underline">watch it on YouTube</a>.</p>
             </div>
           )}
+          {cycle && !reviewing && <IntensityPick suggested={cycle.suggested} why={cycle.why} chosen={cycle.chosen} onChange={setIntensity} preview={preview} />}
           <ol className="divide-y divide-border rounded-[18px] border border-border bg-card">
             {steps.map((s, i) => (
               <li key={s.position} className={runs[i] ? "border-l-[3px] border-l-accent" : ""}>
@@ -426,6 +431,12 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Chip strong>{summary(s)}</Chip>
             {s.rest && (!run || step === run.end) ? <Chip>Rest {s.rest >= 60 ? mmss(s.rest) : `${s.rest} s`}</Chip> : null}
+            {intensity && intensity !== "normal" && fields.includes("weight") && (() => {
+              const lastW = Math.max(0, ...s.last.map((l) => Number(l.weight ?? 0)));
+              if (!lastW) return <Chip>{intensity === "lighter" ? "🌙 Lighter day" : "🔥 Heavy day"}</Chip>;
+              const r = (x: number) => Math.max(0, Math.round(x / 2.5) * 2.5);
+              return <Chip>{intensity === "lighter" ? `🌙 Lighter day: about ${r(lastW * 0.85)} lb` : `🔥 Heavy day: try ${r(lastW + 5)} lb`}</Chip>;
+            })()}
             {s.logType === "timedFasterBetter" && <Chip>Faster is better</Chip>}
             {s.logType === "timedLongerBetter" && <Chip>Longer is better</Chip>}
           </div>
