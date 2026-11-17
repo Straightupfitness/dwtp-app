@@ -2,7 +2,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export type LeadInput = { first_name: string; last_name: string; email: string; phone: string; city: string; goals: string; notes: string };
+export type LeadType = "online" | "in_person" | "";
+export type Temp = "hot" | "warm" | "cold" | "dead" | "";
+export type LeadInput = {
+  first_name: string; last_name: string; email: string; phone: string; city: string; goals: string; notes: string;
+  lead_type: LeadType; time_slot: string; lead_source: string; contact_method: string; temperature: Temp;
+};
 
 async function coach() {
   const supabase = await createClient();
@@ -15,8 +20,25 @@ const clean = (l: Partial<LeadInput>) => ({
   first_name: (l.first_name ?? "").trim().slice(0, 80), last_name: (l.last_name ?? "").trim().slice(0, 80),
   email: (l.email ?? "").trim().toLowerCase().slice(0, 200) || null, phone: (l.phone ?? "").trim().slice(0, 40) || null,
   city: (l.city ?? "").trim().slice(0, 120) || null, goals: (l.goals ?? "").trim().slice(0, 2000) || null, notes: (l.notes ?? "").trim().slice(0, 4000) || null,
+  lead_type: l.lead_type === "online" || l.lead_type === "in_person" ? l.lead_type : null,
+  time_slot: (l.time_slot ?? "").trim().slice(0, 60) || null, lead_source: (l.lead_source ?? "").trim().slice(0, 120) || null,
+  contact_method: (l.contact_method ?? "").trim().slice(0, 60) || null,
+  temperature: ["hot", "warm", "cold", "dead"].includes(l.temperature ?? "") ? l.temperature : null,
 });
-const missingTable = (m: string) => /relation .*leads|does not exist|schema cache/i.test(m) ? "Run the leads SQL file in Supabase first." : m;
+const missingTable = (m: string) => /relation .*leads|does not exist|schema cache/i.test(m) ? "Run the leads SQL files in Supabase first." : m;
+
+/** November 17: mark one or more leads hot, warm, cold or dead (or online / in person), in one tap. */
+export async function setLeads(ids: string[], patch: { temperature?: Temp; lead_type?: LeadType }) {
+  const db = await coach();
+  if (!db) return { error: "Coach only" };
+  const row: Record<string, string | null> = { updated_at: new Date().toISOString() };
+  if (patch.temperature !== undefined) row.temperature = patch.temperature || null;
+  if (patch.lead_type !== undefined) row.lead_type = patch.lead_type || null;
+  const { error } = await db.from("leads").update(row).in("id", ids);
+  if (error) return { error: missingTable(error.message) };
+  revalidatePath("/coach/leads");
+  return { ok: true };
+}
 
 /** November 15: add or change one lead. */
 export async function saveLead(id: string | null, l: LeadInput) {

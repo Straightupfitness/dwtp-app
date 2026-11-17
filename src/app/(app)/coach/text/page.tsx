@@ -17,9 +17,9 @@ export default async function TextPage({ searchParams }: { searchParams: Promise
   const want = new Set((ids ?? "").split(",").filter(Boolean));
   if (kind === "leads") {
     // November 15: the same flow for leads (fill-ins: first, last, city).
-    const { data } = await supabase.from("leads").select("id, first_name, last_name, phone, city").in("id", [...want]);
+    const { data } = await supabase.from("leads").select("id, first_name, last_name, phone, city, time_slot").in("id", [...want]);
     const leads: TextRow[] = (data ?? []).map((l) => ({ id: l.id as string, name: `${l.first_name} ${l.last_name}`.trim() || "(no name)", first: (l.first_name as string) || "there",
-      last: (l.last_name as string) ?? "", phone: (l.phone as string | null) ?? null, city: (l.city as string | null) ?? null }));
+      last: (l.last_name as string) ?? "", phone: (l.phone as string | null) ?? null, city: (l.city as string | null) ?? null, time: (l.time_slot as string | null) ?? null }));
     return (
       <section className="mx-auto max-w-2xl space-y-3.5">
         <BackButton fallback="/coach/leads" />

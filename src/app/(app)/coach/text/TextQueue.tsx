@@ -2,10 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; week?: number; weight?: number | null; goal?: number | null; city?: string | null };
+export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; week?: number; weight?: number | null; goal?: number | null; city?: string | null; time?: string | null };
 
 const CLIENT_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{week}", "Program week"], ["{weight}", "Latest weight"], ["{goal}", "Goal weight"], ["{togo}", "Lbs to goal"]];
-const LEAD_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{city}", "City"]];
+const LEAD_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{city}", "City"], ["{time}", "Time slot"]];
 const SENT_KEY = "dwtp-text-sent";
 const fmt = (n: number | null | undefined) => (n === undefined ? "" :  n === null ? "" : String(Math.round(n * 10) / 10));
 
@@ -16,6 +16,7 @@ export function fill(t: string, r: TextRow) {
     .replace(/\{\s*last\s*(name)?\s*\}/gi, r.last)
     .replace(/\{\s*week\s*\}/gi, (r.week ?? 0) >= 1 ? String(r.week) : "1")
     .replace(/\{\s*city\s*\}/gi, r.city ?? "")
+    .replace(/\{\s*time\s*\}/gi, r.time ?? "")
     .replace(/\{\s*weight\s*\}/gi, fmt(r.weight))
     .replace(/\{\s*goal\s*\}/gi, fmt(r.goal))
     .replace(/\{\s*togo\s*\}/gi, fmt(togo));

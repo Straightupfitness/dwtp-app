@@ -8,9 +8,9 @@ export default async function LeadsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
   if (me?.role !== "coach") redirect("/today");
-  const { data, error } = await supabase.from("leads").select("id, first_name, last_name, email, phone, city, goals, notes, source, created_at").order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("leads").select("id, first_name, last_name, email, phone, city, goals, notes, source, created_at, lead_type, time_slot, lead_source, contact_method, temperature").order("created_at", { ascending: false });
   return (
-    <section className="mx-auto max-w-5xl space-y-3.5 pb-28">
+    <section className="mx-auto max-w-7xl space-y-3.5 pb-28">
       <header>
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Not clients yet</p>
         <h1 className="mt-1 font-[family-name:var(--font-display)] text-[30px] font-semibold uppercase">Leads</h1>

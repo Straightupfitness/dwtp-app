@@ -1,16 +1,31 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { deleteLeads, importLeads, saveLead, type LeadInput } from "./actions";
+import { deleteLeads, importLeads, saveLead, setLeads, type LeadInput, type LeadType, type Temp } from "./actions";
 
-export type Lead = { id: string; first_name: string; last_name: string; email: string | null; phone: string | null; city: string | null; goals: string | null; notes: string | null; source: string; created_at: string };
+export type Lead = {
+  id: string; first_name: string; last_name: string; email: string | null; phone: string | null; city: string | null; goals: string | null; notes: string | null; source: string; created_at: string;
+  lead_type?: "online" | "in_person" | null; time_slot?: string | null; lead_source?: string | null; contact_method?: string | null; temperature?: "hot" | "warm" | "cold" | "dead" | null;
+};
 
-const EMPTY: LeadInput = { first_name: "", last_name: "", email: "", phone: "", city: "", goals: "", notes: "" };
+const EMPTY: LeadInput = { first_name: "", last_name: "", email: "", phone: "", city: "", goals: "", notes: "", lead_type: "", time_slot: "", lead_source: "", contact_method: "", temperature: "" };
 const FIELDS: [keyof LeadInput, string, string][] = [
-  ["first_name", "First name", "text"], ["last_name", "Last name", "text"], ["email", "Email", "email"], ["phone", "Phone", "tel"],
-  ["city", "City she lives in", "text"], ["goals", "Her goals", "area"], ["notes", "Extra info", "area"],
+  ["first_name", "First name", "text"], ["last_name", "Last name", "text"], ["phone", "Phone", "tel"], ["email", "Email", "email"],
+  ["time_slot", "Time slot", "text"], ["city", "City she lives in", "text"], ["lead_source", "Source (where you got her)", "text"],
+  ["contact_method", "Main way you talk (Txt, IG DM…)", "text"], ["notes", "Notes", "area"], ["goals", "Her goals", "area"],
 ];
-const nice = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// November 17: how hot she is, and online or in person.
+const TEMPS: { v: Exclude<Temp, "">; label: string; icon: string; on: string }[] = [
+  { v: "hot", label: "Hot", icon: "🔥", on: "border-[#ef4444] bg-[#ef4444]/20 text-[#ff8a8a]" },
+  { v: "warm", label: "Warm", icon: "☀️", on: "border-[#f5a623] bg-[#f5a623]/20 text-[#ffc76b]" },
+  { v: "cold", label: "Cold", icon: "❄️", on: "border-[#60a5fa] bg-[#60a5fa]/20 text-[#9cc8ff]" },
+  { v: "dead", label: "Dead", icon: "🪦", on: "border-[#6b6b6b] bg-[#6b6b6b]/25 text-[#bdbdbd]" },
+];
+const TYPES: { v: Exclude<LeadType, "">; label: string }[] = [{ v: "online", label: "Online" }, { v: "in_person", label: "In person" }];
+const toInput = (l: Lead): LeadInput => ({
+  first_name: l.first_name, last_name: l.last_name, email: l.email ?? "", phone: l.phone ?? "", city: l.city ?? "", goals: l.goals ?? "", notes: l.notes ?? "",
+  lead_type: l.lead_type ?? "", time_slot: l.time_slot ?? "", lead_source: l.lead_source ?? "", contact_method: l.contact_method ?? "", temperature: l.temperature ?? "",
+});
 const fmtPhone = (p: string | null) => { const d = (p ?? "").replace(/\D/g, "").slice(-10); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p ?? ""; };
 
 /** One CSV line → cells (handles quotes). */
@@ -39,6 +54,8 @@ export function parseLeads(text: string): Partial<LeadInput>[] {
     name: head.findIndex((h) => h === "name" || h === "fullname" || h === "contactname"),
     email: find("email", "mail"), phone: find("phone", "mobile", "cell", "number", "tel"),
     city: find("city", "town", "location"), goals: find("goal"), notes: find("note", "extra", "info", "comment", "tags"),
+    time: find("timeslot", "time", "slot"), source: find("source", "leadsource", "from"), method: find("methodofcommunication", "method", "communication", "contactvia"),
+    type: find("onlineorinperson", "leadtype", "type", "online", "inperson"), temp: find("temperature", "temp", "status", "hotwarm"),
   };
   const hasHeader = col.email >= 0 || col.phone >= 0 || col.first >= 0 || col.name >= 0;
   const body = hasHeader ? lines.slice(1) : lines;
@@ -53,7 +70,13 @@ export function parseLeads(text: string): Partial<LeadInput>[] {
     }
     let first = get(col.first), last = get(col.last);
     if (!first && col.name >= 0) { const [f, ...r] = get(col.name).split(/\s+/); first = f ?? ""; last = last || r.join(" "); }
-    return { first_name: first, last_name: last, email: get(col.email), phone: get(col.phone), city: get(col.city), goals: get(col.goals), notes: get(col.notes) };
+    const ty = get(col.type).toLowerCase(), te = get(col.temp).toLowerCase();
+    return {
+      first_name: first, last_name: last === "N/A" ? "" : last, email: get(col.email), phone: get(col.phone), city: get(col.city), goals: get(col.goals), notes: get(col.notes),
+      time_slot: get(col.time), lead_source: get(col.source), contact_method: get(col.method),
+      lead_type: /online/.test(ty) ? "online" : /person|local|gym/.test(ty) ? "in_person" : "",
+      temperature: (["hot", "warm", "cold", "dead"].find((t) => te.includes(t)) ?? "") as Temp,
+    };
   });
 }
 
@@ -63,6 +86,8 @@ export function parseLeads(text: string): Partial<LeadInput>[] {
  */
 export default function LeadsView({ leads }: { leads: Lead[] }) {
   const [search, setSearch] = useState("");
+  const [tempF, setTempF] = useState<Temp | "all" | "none">("all");
+  const [typeF, setTypeF] = useState<LeadType | "all">("all");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<{ id: string | null; f: LeadInput } | null>(null);
   const [upload, setUpload] = useState<{ text: string; rows: Partial<LeadInput>[] } | null>(null);
@@ -73,8 +98,11 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return leads.filter((l) => !q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes].some((x) => (x ?? "").toLowerCase().includes(q)));
-  }, [leads, search]);
+    return leads.filter((l) => (!q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes, l.lead_source, l.contact_method, l.time_slot].some((x) => (x ?? "").toLowerCase().includes(q)))
+      && (tempF === "all" || (tempF === "none" ? !l.temperature : l.temperature === tempF))
+      && (typeF === "all" || l.lead_type === typeF));
+  }, [leads, search, tempF, typeF]);
+  const mark = (ids: string[], patch: { temperature?: Temp; lead_type?: LeadType }) => start(async () => { const r = await setLeads(ids, patch); if (r?.error) setMsg(r.error); });
   const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const pickedRows = leads.filter((l) => picked.has(l.id));
@@ -92,28 +120,76 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => { setEdit({ id: null, f: { ...EMPTY } }); setErr(""); }} className="min-h-11 rounded-xl bg-accent px-4 text-[14px] font-semibold text-black">+ Add a lead</button>
         <button type="button" onClick={() => { setUpload({ text: "", rows: [] }); setErr(""); }} className="min-h-11 rounded-xl border border-border px-4 text-[14px] font-semibold">⬆ Upload a list</button>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, city, goals…" aria-label="Search leads"
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, city, source, notes…" aria-label="Search leads"
           className="min-h-11 min-w-[12rem] flex-1 rounded-xl border border-border bg-card px-3 text-[15px] outline-none focus:border-accent" />
       </div>
       {msg && <p className="text-[13px] text-[#7ddc8f]">{msg}</p>}
+      {/* November 17: filter by how hot she is, and online / in person. */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+        {([["all", "All"], ...TEMPS.map((t) => [t.v, `${t.icon} ${t.label}`]), ["none", "Not marked"]] as [Temp | "all" | "none", string][]).map(([v, label]) => (
+          <button key={v} type="button" onClick={() => setTempF(v)} aria-pressed={tempF === v}
+            className={`min-h-9 rounded-full border px-3 ${tempF === v ? "border-accent bg-accent text-black font-semibold" : "border-border text-dim"}`}>
+            {label} <span className="opacity-70">{v === "all" ? leads.length : leads.filter((l) => (v === "none" ? !l.temperature : l.temperature === v)).length}</span>
+          </button>
+        ))}
+        <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+        {([["all", "Online + in person"], ["online", "Online"], ["in_person", "In person"]] as [LeadType | "all", string][]).map(([v, label]) => (
+          <button key={v} type="button" onClick={() => setTypeF(v)} aria-pressed={typeF === v}
+            className={`min-h-9 rounded-full border px-3 ${typeF === v ? "border-accent text-accent font-semibold" : "border-border text-dim"}`}>{label}</button>
+        ))}
+      </div>
 
       <div className="flex items-center gap-2 px-1 text-[13px] text-dim">
         <input type="checkbox" checked={allPicked} onChange={() => setPicked((p) => { const n = new Set(p); for (const l of shown) { if (allPicked) n.delete(l.id); else n.add(l.id); } return n; })} className="size-4 accent-[var(--accent)]" aria-label="Select all shown" />
         <span>{shown.length} lead{shown.length === 1 ? "" : "s"}{search ? " found" : ""}</span>
       </div>
 
-      <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+      {/* November 17: a table on a computer (one column per detail), cards on a phone. Tap a name to edit. */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card lg:block">
+        <table className="w-full text-left text-[13px]">
+          <thead className="text-[11px] uppercase tracking-wide text-dim">
+            <tr className="border-b border-border">
+              <th className="w-8 p-2" /><th className="p-2">Type</th><th className="p-2">First</th><th className="p-2">Last</th><th className="p-2">Phone</th><th className="p-2">Email</th>
+              <th className="p-2">Time slot</th><th className="p-2">City</th><th className="p-2">Source</th><th className="p-2">Method</th><th className="p-2">Notes</th><th className="p-2">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {shown.map((l) => (
+              <tr key={l.id} className={`align-top ${picked.has(l.id) ? "bg-[#161310]" : ""} ${l.temperature === "dead" ? "opacity-60" : ""}`}>
+                <td className="p-2"><input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} aria-label={`Select ${l.first_name} ${l.last_name}`} className="mt-0.5 size-[17px] accent-[var(--accent)]" /></td>
+                <td className="p-2"><TypePick v={l.lead_type ?? ""} onPick={(v) => mark([l.id], { lead_type: v })} /></td>
+                <td className="p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="font-semibold hover:text-accent">{l.first_name || "—"}</button></td>
+                <td className="p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="font-semibold hover:text-accent">{l.last_name}</button></td>
+                <td className="whitespace-nowrap p-2">{fmtPhone(l.phone) || <span className="text-dim">—</span>}</td>
+                <td className="max-w-[12rem] truncate p-2" title={l.email ?? ""}>{l.email || <span className="text-dim">—</span>}</td>
+                <td className="whitespace-nowrap p-2">{l.time_slot || <span className="text-dim">—</span>}</td>
+                <td className="p-2">{l.city || <span className="text-dim">—</span>}</td>
+                <td className="p-2">{l.lead_source || <span className="text-dim">—</span>}</td>
+                <td className="whitespace-nowrap p-2">{l.contact_method || <span className="text-dim">—</span>}</td>
+                <td className="min-w-[14rem] max-w-[22rem] p-2 text-[#cfcfcf]">{l.notes}</td>
+                <td className="p-2"><TempPick v={l.temperature ?? ""} onPick={(v) => mark([l.id], { temperature: v })} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!shown.length && <p className="p-6 text-center text-[14px] text-dim">{leads.length ? "Nobody matches." : "No leads yet. Add one, or upload a list."}</p>}
+      </div>
+      <ul className="divide-y divide-border rounded-2xl border border-border bg-card lg:hidden">
         {shown.map((l) => (
-          <li key={l.id} className={`flex items-start gap-3 px-3 py-2.5 ${picked.has(l.id) ? "bg-[#161310]" : ""}`}>
+          <li key={l.id} className={`flex items-start gap-3 px-3 py-2.5 ${picked.has(l.id) ? "bg-[#161310]" : ""} ${l.temperature === "dead" ? "opacity-60" : ""}`}>
             <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} aria-label={`Select ${l.first_name} ${l.last_name}`} className="mt-1 size-[18px] shrink-0 accent-[var(--accent)]" />
-            <button type="button" onClick={() => { setEdit({ id: l.id, f: { first_name: l.first_name, last_name: l.last_name, email: l.email ?? "", phone: l.phone ?? "", city: l.city ?? "", goals: l.goals ?? "", notes: l.notes ?? "" } }); setErr(""); }} className="min-w-0 flex-1 text-left">
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[15px] font-semibold">{`${l.first_name} ${l.last_name}`.trim() || l.email || l.phone}</span>
-                <span className="shrink-0 text-[11px] text-dim">{l.city ? `${l.city} · ` : ""}{nice(l.created_at)}</span>
-              </span>
-              <span className="block truncate text-[12px] text-dim">{[fmtPhone(l.phone), l.email].filter(Boolean).join(" · ") || "No phone or email"}</span>
-              {(l.goals || l.notes) && <span className="mt-0.5 block line-clamp-2 text-[13px] text-[#cfcfcf]">{l.goals}{l.goals && l.notes ? " · " : ""}<span className="text-dim">{l.notes}</span></span>}
-            </button>
+            <div className="min-w-0 flex-1 space-y-1">
+              <button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="block w-full text-left">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[15px] font-semibold">{`${l.first_name} ${l.last_name}`.trim() || l.email || l.phone}</span>
+                  <span className="shrink-0 text-[11px] text-dim">{[l.time_slot, l.city].filter(Boolean).join(" · ")}</span>
+                </span>
+                <span className="block truncate text-[12px] text-dim">{[fmtPhone(l.phone), l.email].filter(Boolean).join(" · ") || "No phone or email"}</span>
+                <span className="block truncate text-[12px] text-dim">{[l.lead_source, l.contact_method].filter(Boolean).join(" · ")}</span>
+                {l.notes && <span className="mt-0.5 block line-clamp-2 text-[13px] text-[#cfcfcf]">{l.notes}</span>}
+              </button>
+              <div className="flex flex-wrap gap-1.5"><TypePick v={l.lead_type ?? ""} onPick={(v) => mark([l.id], { lead_type: v })} /><TempPick v={l.temperature ?? ""} onPick={(v) => mark([l.id], { temperature: v })} /></div>
+            </div>
           </li>
         ))}
         {!shown.length && <li className="p-6 text-center text-[14px] text-dim">{leads.length ? "Nobody matches." : "No leads yet. Add one, or upload a list (a CSV from GoHighLevel or a spreadsheet)."}</li>}
@@ -121,12 +197,14 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
 
       {picked.size > 0 && (
         <div className="fixed inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+57px)] border-t border-border bg-bg/95 px-4 py-2.5 backdrop-blur">
-          <div className="mx-auto max-w-5xl space-y-2">
+          <div className="mx-auto max-w-7xl space-y-2">
             <div className="flex items-center gap-2">
               <span className="flex-1 truncate text-sm">{one ? <b>{`${one.first_name} ${one.last_name}`.trim()}</b> : <><b>{picked.size}</b> selected</>}</span>
               <button type="button" onClick={() => { setPicked(new Set()); setSure(false); }} className="min-h-10 rounded-xl px-3 text-sm text-dim">Clear</button>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-0.5">
+              {TEMPS.map((t) => <button key={t.v} type="button" disabled={pending} onClick={() => mark([...picked], { temperature: t.v })} className={act}>{t.icon} {t.label}</button>)}
+              {TYPES.map((t) => <button key={t.v} type="button" disabled={pending} onClick={() => mark([...picked], { lead_type: t.v })} className={act}>{t.label}</button>)}
               <Link href={`/coach/text?kind=leads&ids=${[...picked].join(",")}`} className={`${act} border-accent bg-accent text-black`}>📱 Text {one ? one.first_name || "her" : picked.size} from my phone</Link>
               <button type="button" onClick={async () => {
                 const list = pickedRows.map((r) => r.email).filter(Boolean).join(", ");
@@ -148,9 +226,13 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
               <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">{edit.id ? "Edit lead" : "Add a lead"}</h2>
               <button type="button" onClick={() => setEdit(null)} className="min-h-9 px-2 text-dim" aria-label="Close">✕</button>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <TypePick v={edit.f.lead_type} onPick={(v) => setEdit({ ...edit, f: { ...edit.f, lead_type: v } })} />
+              <TempPick v={edit.f.temperature} onPick={(v) => setEdit({ ...edit, f: { ...edit.f, temperature: v } })} />
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {FIELDS.map(([k, label, kind]) => (
-                <label key={k} className={`flex flex-col gap-1 text-[12px] text-dim ${kind === "area" || k === "email" || k === "city" ? "col-span-2" : ""}`}>
+                <label key={k} className={`flex flex-col gap-1 text-[12px] text-dim ${kind === "area" || k === "email" || k === "lead_source" || k === "contact_method" ? "col-span-2" : ""}`}>
                   {label}
                   {kind === "area"
                     ? <textarea value={edit.f[k]} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, [k]: e.target.value } })} rows={3} className="rounded-xl border border-border bg-card p-2.5 text-[15px] text-text outline-none focus:border-accent" />
@@ -172,7 +254,7 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
               <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">Upload a list</h2>
               <button type="button" onClick={() => setUpload(null)} className="min-h-9 px-2 text-dim" aria-label="Close">✕</button>
             </div>
-            <p className="text-[13px] text-dim">A CSV from GoHighLevel or a spreadsheet, with columns like First Name, Last Name, Email, Phone, City, Goals, Notes. Or paste the rows below. People already in your leads (same email or phone) are skipped.</p>
+            <p className="text-[13px] text-dim">A CSV from GoHighLevel or a spreadsheet, with columns like First Name, Last Name, Phone, Email, Time Slot, City, Source, Method of Communication, Notes (and Online/In person, Hot/Warm/Cold/Dead). Or paste the rows below. People already in your leads (same email or phone) are skipped.</p>
             <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-dashed border-accent text-[14px] font-semibold text-accent">
               Choose a CSV file
               <input type="file" accept=".csv,.tsv,.txt,text/csv" className="hidden" onChange={(e) => readFile(e.target.files?.[0])} />
@@ -195,5 +277,30 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** November 17: online or in person, tap to set (tap again to clear). */
+function TypePick({ v, onPick }: { v: LeadType; onPick: (v: LeadType) => void }) {
+  return (
+    <span className="inline-flex overflow-hidden rounded-full border border-border text-[11px]">
+      {TYPES.map((t) => (
+        <button key={t.v} type="button" onClick={() => onPick(v === t.v ? "" : t.v)} aria-pressed={v === t.v}
+          className={`min-h-7 whitespace-nowrap px-2 ${v === t.v ? "bg-accent font-semibold text-black" : "text-dim"}`}>{t.label}</button>
+      ))}
+    </span>
+  );
+}
+/** November 17: hot, warm, cold or dead, tap to set (tap again to clear). */
+function TempPick({ v, onPick }: { v: Temp; onPick: (v: Temp) => void }) {
+  return (
+    <span className="inline-flex gap-1">
+      {TEMPS.map((t) => (
+        <button key={t.v} type="button" onClick={() => onPick(v === t.v ? "" : t.v)} aria-pressed={v === t.v} title={t.label} aria-label={t.label}
+          className={`min-h-7 whitespace-nowrap rounded-full border px-1.5 text-[12px] ${v === t.v ? `${t.on} font-semibold` : "border-border opacity-50 grayscale"}`}>
+          {t.icon}{v === t.v ? ` ${t.label}` : ""}
+        </button>
+      ))}
+    </span>
   );
 }
