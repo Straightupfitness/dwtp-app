@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
     viewAsInfo(),
   ]);
   const { data } = await supabase.from("notifications").select("id, title, body, url, read_at, created_at")
-    .eq("user_id", user!.id).order("created_at", { ascending: false }).limit(50);
+    .eq("user_id", user!.id).not("url", "like", "/coach/inbox%").order("created_at", { ascending: false }).limit(50);
   const rows = data ?? [];
   const tz = profile?.timezone ?? "America/Los_Angeles";
   return (

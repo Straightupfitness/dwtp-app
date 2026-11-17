@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!coach) q = q.eq("client_id", user?.id ?? "");
   const { count } = user ? await q : { count: 0 };
   // November 11: notifications she hasn't opened (the number on the app icon). Missing table before 0040: 0.
-  const { count: alerts } = user ? await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null) : { count: 0 };
+  const { count: alerts } = user ? await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null).not("url", "like", "/coach/inbox%") : { count: 0 };
   return (
     <>
       {viewing && (

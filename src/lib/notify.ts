@@ -53,9 +53,14 @@ async function notifyOne(userId: string, note: Note) {
   // November 11: keep it in her Notifications list too, and send how many she hasn't read, so the number on the
   // app icon matches that list. (Before migration 0040 the table isn't there: skipped quietly.)
   let unread: number | undefined;
-  const { error: kept } = await db.from("notifications").insert({ user_id: userId, title: note.title.slice(0, 200), body: note.body.slice(0, 1000), url: note.url });
+  // November 17 (Michael): a client's chat message to him isn't kept in his Alerts (he sees it in his Inbox);
+  // the push banner still comes.
+  const chatToCoach = note.url.startsWith("/coach/inbox");
+  const { error: kept } = chatToCoach
+    ? await db.from("notifications").select("id", { head: true }).limit(1)
+    : await db.from("notifications").insert({ user_id: userId, title: note.title.slice(0, 200), body: note.body.slice(0, 1000), url: note.url });
   if (!kept) {
-    const { count } = await db.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null);
+    const { count } = await db.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null).not("url", "like", "/coach/inbox%");
     unread = count ?? undefined;
   }
 
