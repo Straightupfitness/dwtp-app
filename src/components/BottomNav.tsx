@@ -29,6 +29,16 @@ export default function BottomNav({ coach = false }: { coach?: boolean }) {
   useEffect(() => {
     try { sessionStorage.setItem("dwtp:screens", String(Number(sessionStorage.getItem("dwtp:screens") ?? 0) + 1)); } catch {}
   }, [path]);
+  // November 17 (Claudia): on iPhone, after a date or day picker (or the keyboard) closes, the bar at the bottom
+  // could stay stuck halfway up the screen over her meals. Nudging the scroll after it closes puts it back.
+  useEffect(() => {
+    const fix = () => setTimeout(() => window.scrollTo(window.scrollX, window.scrollY), 60);
+    const vv = window.visualViewport;
+    document.addEventListener("focusout", fix);
+    document.addEventListener("change", fix);
+    vv?.addEventListener("resize", fix);
+    return () => { document.removeEventListener("focusout", fix); document.removeEventListener("change", fix); vv?.removeEventListener("resize", fix); };
+  }, []);
   const tabs = coach ? COACH : CLIENT;
   // The circles live inside Progress (October 29), so a circle page lights up Progress.
   const here = path.startsWith("/circles") ? "/progress" : path;

@@ -97,6 +97,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ cps: number } | null>(session?.completed ? { cps: 0 } : null);
+  // November 17 (Claudia): look back through a finished workout (her sets and weights) without reopening it.
+  const [reviewing, setReviewing] = useState(false);
   const finishRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -191,7 +193,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   }
 
   async function finish() {
-    if (preview || !sessionId) { setStep(steps.length); return; }
+    if (preview || !sessionId || reviewing) { setReviewing(false); setStep(steps.length); return; }
     setBusy(true);
     const r = await finishWorkout(sessionId);
     setBusy(false);
@@ -293,15 +295,16 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
         <Bottom>
           {error && <p className="mb-2 text-sm text-[var(--red)]">{error}</p>}
           <button type="button" disabled={busy} onClick={begin} className="min-h-[56px] w-full rounded-[16px] bg-accent text-[18px] font-semibold text-black disabled:opacity-50">
-            {busy ? "Starting…" : doneSets > 0 ? "Continue workout" : "Start workout"}
+            {busy ? "Starting…" : reviewing ? "Go through my sets" : doneSets > 0 ? "Continue workout" : "Start workout"}
           </button>
+          {reviewing && <button type="button" onClick={() => setReviewing(false)} className="mt-2 min-h-11 w-full text-[14px] text-dim underline">Back to the summary</button>}
         </Bottom>
       </div>
     );
   }
 
   // ── Finished ──────────────────────────────────────────────
-  if (step >= steps.length || (result && step === -1)) {
+  if (step >= steps.length || (result && step === -1 && !reviewing)) {
     return (
       <div className={shell}>
         {header}
@@ -317,7 +320,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           {!preview && (
             <div className="grid w-full grid-cols-2 gap-2.5">
               <div className="rounded-[16px] border border-border bg-card p-3"><p className={`${display} text-[28px] leading-none`}>{doneSets}</p><p className="mt-1 text-[12px] text-dim">{doneSets === 1 ? "set" : "sets"} logged</p></div>
-              <div className="rounded-[16px] border border-border bg-card p-3"><p className={`${display} text-[28px] leading-none text-accent`}>+{result?.cps ?? 0}</p><p className="mt-1 text-[12px] text-dim">CPs</p></div>
+              {result?.cps ? <div className="rounded-[16px] border border-border bg-card p-3"><p className={`${display} text-[28px] leading-none text-accent`}>+{result.cps}</p><p className="mt-1 text-[12px] text-dim">CPs</p></div>
+                : <button type="button" onClick={() => { setReviewing(true); setStep(-1); }} className="rounded-[16px] border border-border bg-card p-3 text-[14px] font-semibold text-accent">See my sets ›<span className="mt-1 block text-[12px] font-normal text-dim">reps and weights</span></button>}
             </div>
           )}
           {prs.length > 0 && (
@@ -326,11 +330,12 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
               {prs.map((p) => <p key={p.name} className="mt-1 text-[14px]">{p.name}: <span className="text-dim">{p.from} →</span> <b>{p.to} lb</b></p>)}
             </div>
           )}
+          {!preview && sessionId && result?.cps ? <button type="button" onClick={() => { setReviewing(true); setStep(-1); }} className="min-h-11 text-[14px] font-semibold text-accent">See my sets (reps and weights) ›</button> : null}
           <Link href="/workouts" className="mt-2 min-h-[52px] w-full rounded-[16px] bg-accent py-3.5 text-[17px] font-semibold text-black">Back to workouts</Link>
           {/* November 11: marked done by mistake? Take it back. */}
           {!preview && sessionId && (
             <button type="button" disabled={busy} onClick={reopen} className="min-h-11 px-3 text-[14px] text-[#a8a8a8] underline disabled:opacity-50">
-              {busy ? "Reopening…" : "Marked done by mistake? Reopen this workout"}
+              {busy ? "Reopening…" : "Marked done by mistake? Reopen this workout (your sets stay saved)"}
             </button>
           )}
           {error && <p className="text-sm text-[var(--red)]">{error}</p>}
@@ -498,7 +503,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           <button type="button" onClick={() => setStep(step - 1)} className="min-h-[54px] rounded-[16px] border border-border px-5 text-[16px]">{step === 0 ? "Start" : "Back"}</button>
           {last ? (
             <button type="button" disabled={busy} onClick={finish} className="min-h-[54px] flex-1 rounded-[16px] bg-accent text-[17px] font-semibold text-black disabled:opacity-50">
-              {busy ? "Saving…" : preview ? "Finish preview" : `Finish workout${totalSets ? ` · ${doneSets}/${totalSets} sets` : ""}`}
+              {busy ? "Saving…" : reviewing ? "Done" : preview ? "Finish preview" : `Finish workout${totalSets ? ` · ${doneSets}/${totalSets} sets` : ""}`}
             </button>
           ) : (
             <button type="button" onClick={() => setStep(step + 1)} className={`min-h-[54px] flex-1 rounded-[16px] text-[17px] font-semibold ${stepDone(s) ? "bg-accent text-black" : "border border-accent text-accent"}`}>

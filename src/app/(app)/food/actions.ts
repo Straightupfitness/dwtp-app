@@ -131,13 +131,14 @@ export async function deleteGoTo(id: string) {
 
 /**
  * Copy a meal she logged onto another day (October 29: "copy meals from the previous day"), at the same time of day.
- * The copy has no photo, so deleting one never takes the other's picture with it.
+ * November 17 (Claudia): the photo comes too, as its own copy of the picture, so deleting one meal never takes the
+ * other's picture with it.
  */
 export async function copyMeal(id: string, toDay: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !/^\d{4}-\d{2}-\d{2}$/.test(toDay)) return { error: "Not signed in" };
-  const { data: m } = await supabase.from("food_logs").select("eaten_at, meal_slot, source, description, items, calories, protein_g, fiber_g, potassium_mg")
+  const { data: m } = await supabase.from("food_logs").select("eaten_at, meal_slot, source, description, photo_path, items, calories, protein_g, fiber_g, potassium_mg")
     .eq("id", id).eq("client_id", user.id).maybeSingle();
   if (!m) return { error: "Meal not found" };
   const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
@@ -147,9 +148,15 @@ export async function copyMeal(id: string, toDay: string) {
   let at = new Date(new Date(m.eaten_at).getTime() + shift * 86_400_000);
   if (at.getTime() > Date.now()) at = new Date();
   if (Date.now() - at.getTime() > MAX_BACK_MS) return { error: "That day is too far back." };
+  let photo: string | null = null;
+  if (m.photo_path) {
+    const to = `${user.id}/${crypto.randomUUID()}.jpg`;
+    const { error: pe } = await supabase.storage.from("food-photos").copy(m.photo_path as string, to);
+    if (!pe) photo = to; // if the copy fails, the meal still copies (just without its picture)
+  }
   const { error } = await supabase.from("food_logs").insert({
-    client_id: user.id, eaten_at: at.toISOString(), meal_slot: m.meal_slot, source: m.source === "photo" ? "text" : m.source,
-    description: m.description, photo_path: null, items: m.items, calories: m.calories, protein_g: m.protein_g, fiber_g: m.fiber_g,
+    client_id: user.id, eaten_at: at.toISOString(), meal_slot: m.meal_slot, source: photo ? m.source : m.source === "photo" ? "text" : m.source,
+    description: m.description, photo_path: photo, items: m.items, calories: m.calories, protein_g: m.protein_g, fiber_g: m.fiber_g,
     potassium_mg: m.potassium_mg, confirmed: true,
   });
   if (error) return { error: error.message };
