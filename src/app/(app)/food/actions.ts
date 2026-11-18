@@ -245,3 +245,14 @@ export async function uploadFoodPhoto(fd: FormData): Promise<{ path?: string; er
   const { error } = await supabase.storage.from("food-photos").upload(path, f, { contentType: "image/jpeg" });
   return error ? { error: error.message } : { path };
 }
+
+/** November 18 (Heather): her food rules ("no pork", "gluten-free"…), which the AI always follows. */
+export async function saveFoodRules(rules: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { error } = await supabase.from("profiles").update({ food_rules: rules.trim().slice(0, 600) || null }).eq("id", user.id);
+  if (error) return { error: /does not exist|schema cache/i.test(error.message) ? "Food rules aren't switched on yet." : error.message };
+  revalidatePath("/food");
+  return { ok: true };
+}

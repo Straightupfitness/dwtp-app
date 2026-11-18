@@ -2,8 +2,24 @@
 import { useEffect, useState } from "react";
 import { scaleFood, type DbFood, type FoodItem } from "@/lib/food";
 
-/** Search foods and brands, pick one, say how much (eggs, scoops, cups, oz, grams…), add it. */
-export default function FoodSearch({ onAdd }: { onAdd: (item: FoodItem) => void }) {
+const r1 = (x: number) => Math.round(x * 10) / 10;
+const fmtK = (k: number) => (k === 0.5 ? "½" : k === 1.5 ? "1½" : String(k));
+/** "2 links" × 1.5 → "3 links"; anything it can't read becomes "1½ × 2 links". */
+function times(amount: string, k: number) {
+  if (k === 1) return amount;
+  const m = amount.match(/^\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (m) { const n = Number(m[1]) * k; return `${Math.round(n * 100) / 100} ${m[2]}`.trim(); }
+  return `${fmtK(k)} × ${amount}`;
+}
+
+/**
+ * Search foods and brands, pick one, say how much (eggs, scoops, cups, oz, grams…), add it.
+ * November 18 (Heather): her own foods come first ("Your foods"), the ones she logged before, so she never re-enters
+ * them: tap, pick how much compared with last time, add.
+ */
+export default function FoodSearch({ onAdd, mine = [] }: { onAdd: (item: FoodItem) => void; mine?: FoodItem[] }) {
+  const [mineAt, setMineAt] = useState<FoodItem | null>(null);
+  const [k, setK] = useState(1);
   const [q, setQ] = useState("");
   const [foods, setFoods] = useState<DbFood[]>([]);
   const [busy, setBusy] = useState(false);
@@ -26,6 +42,44 @@ export default function FoodSearch({ onAdd }: { onAdd: (item: FoodItem) => void 
     }, 450);
     return () => clearTimeout(t);
   }, [q]);
+
+  if (mineAt) {
+    const item: FoodItem = { ...mineAt, amount: times(mineAt.amount, k), calories: Math.round(mineAt.calories * k), protein_g: r1(mineAt.protein_g * k), fiber_g: r1(mineAt.fiber_g * k), potassium_mg: Math.round(mineAt.potassium_mg * k) };
+    return (
+      <div className="space-y-3 rounded-2xl border border-accent/60 bg-bg p-3">
+        <p className="text-[15px] font-medium">{mineAt.name} <span className="text-[12px] text-dim">· last time {mineAt.amount}</span></p>
+        <div className="flex flex-wrap gap-1.5">
+          {[0.5, 1, 1.5, 2, 3].map((x) => (
+            <button key={x} type="button" aria-pressed={k === x} onClick={() => setK(x)}
+              className={`min-h-10 rounded-lg border px-3 text-[13px] ${k === x ? "border-accent bg-accent font-semibold text-black" : "border-border text-dim"}`}>{x === 1 ? "Same as last time" : `${fmtK(x)}×`}</button>
+          ))}
+        </div>
+        <p className="text-xs text-[#a8a8a8]">{item.amount}: {item.calories} kcal · {item.protein_g} g protein · {item.fiber_g} g fiber · {item.potassium_mg} mg potassium</p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setMineAt(null)} className="min-h-11 flex-1 rounded-lg border border-border text-sm">Back</button>
+          <button type="button" onClick={() => { onAdd(item); setMineAt(null); setK(1); setQ(""); setFoods([]); }} className="min-h-11 flex-1 rounded-lg bg-accent text-sm font-semibold text-black">Add</button>
+        </div>
+      </div>
+    );
+  }
+  const query = q.trim().toLowerCase();
+  const myHits = query.length >= 1 ? mine.filter((f) => f.name.toLowerCase().includes(query)).slice(0, 8) : mine.slice(0, 10);
+  const myList = myHits.length > 0 && (
+    <div className="space-y-1">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">{query ? "Your foods" : "Your usual foods"}</p>
+      <ul className="divide-y divide-border rounded-xl border border-accent/40 bg-card">
+        {myHits.map((f) => (
+          <li key={f.name}>
+            <button type="button" onClick={() => { setMineAt(f); setK(1); }} className="flex min-h-12 w-full items-center gap-2 px-3 text-left">
+              <span className="flex-1 text-sm">{f.name} <span className="text-dim">· {f.amount}</span></span>
+              <span className="shrink-0 text-xs text-dim">{f.calories} kcal</span>
+              <span className="shrink-0 text-accent" aria-hidden="true">+</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
   if (picked) {
     const units = unitsFor(picked);
@@ -62,10 +116,12 @@ export default function FoodSearch({ onAdd }: { onAdd: (item: FoodItem) => void 
   }
   return (
     <div className="space-y-2">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search foods or brands, e.g. eggs, Ghost whey" aria-label="Search the food database"
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={mine.length ? "Search your foods, or any food or brand" : "Search foods or brands, e.g. eggs, Ghost whey"} aria-label="Search the food database"
         className="min-h-12 w-full rounded-xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
+      {myList}
       {busy && <p className="text-xs text-dim">Searching…</p>}
       {error && <p className="text-xs text-[var(--red)]">{error}</p>}
+      {q.trim().length >= 2 && foods.length > 0 && myHits.length > 0 && <p className="pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">All foods</p>}
       {q.trim().length >= 2 && foods.length > 0 && (
         <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-xl border border-border bg-card">
           {foods.map((f) => (

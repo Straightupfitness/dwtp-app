@@ -26,7 +26,7 @@ function scaleItem(base: FoodItem, k: number, amount: string): FoodItem {
   return { ...base, amount, calories: Math.round(base.calories * k), protein_g: r1(base.protein_g), fiber_g: r1(base.fiber_g), potassium_mg: Math.round(base.potassium_mg * k) };
 }
 
-export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }: { userId: string; defaultSlot: Slot; goTos: GoTo[]; day: string; isToday: boolean }) {
+export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, myFoods = [] }: { userId: string; defaultSlot: Slot; goTos: GoTo[]; day: string; isToday: boolean; myFoods?: FoodItem[] }) {
   // Logging on a past day she's looking at: start at noon that day (she can change the time).
   const defaultWhen = () => (isToday ? null : new Date(`${day}T12:00:00`));
   const [mode, setMode] = useState<"home" | "describe" | "review">("home");
@@ -208,7 +208,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
           <button type="button" onClick={() => { setItems([]); setSavedId(null); setText(""); setNotes(""); setPhoto(null); setPreview(null); setAdder("search"); setMode("review"); }}
             className="flex min-h-[118px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#2a2a2a] bg-card px-2 text-center">
             <span className="text-accent"><Pencil /></span><span className="text-base font-semibold">Manual</span>
-            <span className="text-[11px] leading-tight text-[#a8a8a8]">Log it yourself, ingredient by ingredient.</span>
+            <span className="text-[11px] leading-tight text-[#a8a8a8]">Your usual foods, or search, one by one.</span>
           </button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -334,7 +334,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
         {busy !== "estimating" && (
           <div className="space-y-2.5">
             <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-border bg-card p-1">
-              {([["type", "Type it"], ["search", "Search"], ["scan", "Barcode"], ["own", "From label"]] as const).map(([v, l]) => (
+              {([["type", "Type it"], ["search", myFoods.length ? "My foods" : "Search"], ["scan", "Barcode"], ["own", "From label"]] as const).map(([v, l]) => (
                 <button key={v} type="button" onClick={() => setAdder(v)} aria-pressed={adder === v}
                   className={`min-h-10 rounded-[10px] text-[13px] ${adder === v ? "bg-[#2a2a2a] font-semibold text-text" : "text-dim"}`}>{l}</button>
               ))}
@@ -349,7 +349,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday }:
             )}
             {adder === "type" && <p className="-mt-1 text-[11px] text-dim">Type a food and how much, then tap Calculate. The numbers fill in for you.</p>}
             {adder === "own" && <OwnNumbers onAdd={(it) => setItems((l) => [...l, it])} />}
-            {adder === "search" && <FoodSearch onAdd={(it) => setItems((l) => [...l, it])} />}
+            {adder === "search" && <FoodSearch mine={myFoods} onAdd={(it) => setItems((l) => [...l, it])} />}
             {adder === "scan" && <BarcodeScanner onAdd={(it) => setItems((l) => [...l, it])} onClose={() => setAdder("type")} />}
           </div>
         )}

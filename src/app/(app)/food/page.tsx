@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/program";
 import { DAILY_TARGETS, type FoodItem } from "@/lib/food";
 import MealLogger, { type GoTo } from "./MealLogger";
+import FoodRules from "./FoodRules";
+import { loadFoodRules, loadMyFoods } from "@/lib/my-foods";
 import DeleteMeal from "./DeleteMeal";
 import EditMeal from "./EditMeal";
 import Link from "next/link";
@@ -36,12 +38,14 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
   const isToday = day === today;
   const prev = addDays(day, -1);
 
-  const [{ data: rows }, { data: target }, { data: saved }] = await Promise.all([
+  const [{ data: rows }, { data: target }, { data: saved }, myFoods, foodRules] = await Promise.all([
     // The day before through the day after (UTC), then her own time zone picks the day.
     supabase.from("food_logs").select("id, eaten_at, meal_slot, source, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
       .eq("client_id", user!.id).gte("eaten_at", addDays(day, -2) + "T00:00:00Z").lt("eaten_at", addDays(day, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     supabase.from("saved_meals").select("id, name, items, last_used_at").eq("client_id", user!.id).order("last_used_at", { ascending: false, nullsFirst: false }).limit(20),
+    loadMyFoods(supabase, user!.id),
+    loadFoodRules(supabase, user!.id),
   ]);
   const meals = (rows ?? []).filter((r) => todayIn(tz, new Date(r.eaten_at)) === day);
   const dayName = isToday ? "Today" : day === addDays(today, -1) ? "Yesterday"
@@ -96,7 +100,8 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[] })) as GoTo[]} />
+      <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} myFoods={myFoods} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[] })) as GoTo[]} />
+      <FoodRules initial={foodRules} />
 
       {/* Recipes (October 29): Michael's and the library, to cook and log in a tap. */}
       <Link href="/food/recipes" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">

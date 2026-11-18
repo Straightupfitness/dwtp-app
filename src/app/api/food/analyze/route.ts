@@ -4,6 +4,7 @@ import { askClaude, parseJson, type ContentBlock } from "@/lib/ai/anthropic";
 import type { FoodEstimate } from "@/lib/food";
 import { coachIds, notify } from "@/lib/notify";
 import { adminClient } from "@/lib/supabase/admin";
+import { loadFoodRules, loadMyFoods } from "@/lib/my-foods";
 
 export const maxDuration = 60;
 
@@ -19,6 +20,7 @@ Rules:
 - Include sauces, oils, butter, dressings and drinks: the "tiny calories" count.
 - When unsure of portion size, assume a typical home portion and say so in "notes" (one short sentence).
 - Whole numbers for calories and potassium; one decimal for protein and fiber.
+- If her food rules or usual foods are given, they win over what a photo seems to show (a sausage she logs as turkey sausage IS turkey sausage).
 - If it isn't food, return {"items":[],"notes":"I couldn't see any food in this."}`;
 
 export async function POST(req: Request) {
@@ -35,6 +37,13 @@ export async function POST(req: Request) {
     if (!m) return NextResponse.json({ error: "Unreadable photo." }, { status: 400 });
     content.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } });
   }
+  // November 18 (Heather): her food rules and the foods she usually logs, so the guess fits her
+  // ("it's never pork sausage, it's turkey").
+  const [rules, mine] = await Promise.all([loadFoodRules(supabase, user.id), loadMyFoods(supabase, user.id, 40)]);
+  const about: string[] = [];
+  if (rules) about.push(`HER FOOD RULES (always true for her; never identify a food that breaks them, pick the version that fits, e.g. "no pork" means sausage or bacon is turkey or chicken, "gluten-free" means bread or pasta is gluten-free): ${rules}`);
+  if (mine.length) about.push(`FOODS SHE LOGS OFTEN (name, usual amount, calories, protein). When what you see or read matches one of these, use her name for it and scale its numbers to the amount: ${mine.map((f) => `${f.name} | ${f.amount} | ${f.calories} kcal | ${f.protein_g} g`).join("; ")}`);
+  if (about.length) content.push({ type: "text", text: about.join("\n\n") });
   content.push({ type: "text", text: text?.trim() ? `Her description: ${text.trim()}` : "Estimate this meal." });
 
   try {
