@@ -10,6 +10,9 @@
  * - "Weigh in daily" and "log every meal" check themselves off from her weight and food logs.
  * - Daily habits: 14-day streak. Weekly habits: 2 weeks in a row. Get / Learn: once.
  *   Hit: Michael signs it off.
+ * - November 19 (Claudia): event fix-its (Travel, Holidays & Events) are a checklist for the trip or the event, so
+ *   every habit there is checked off once, when she does it, never a 14-day streak.
+ * - "Log your symptoms every day" (Menopause Symptoms) also checks itself off on days she logs in the cycle tracker.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STREAK_DAYS, STREAK_WEEKS, dailyStreak, programWeek, todayIn } from "./program";
@@ -121,6 +124,9 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
     all<Row>((a, b) => supabase.from("weight_logs").select("log_date").eq("client_id", userId).range(a, b)),
     all<Row>((a, b) => supabase.from("food_logs").select("eaten_at").eq("client_id", userId).range(a, b)),
   ]);
+  // November 19: days she logged in the cycle tracker (a separate read, so nothing breaks without the table).
+  const cycRes = await supabase.from("cycle_days").select("day").eq("client_id", userId);
+  const cycleDays = new Set<string>(cycRes.error ? [] : (cycRes.data ?? []).map((r) => r.day as string));
   const autoDates: Record<string, Set<string>> = {
     "weigh-in": new Set(weights.map((w) => w.log_date as string)),
     "log-food": new Set(meals.map((m) => todayIn(tz, new Date(m.eaten_at as string)))),
@@ -166,14 +172,19 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
   const howRes = await supabase.from("ring_items").select("id, how_to").not("how_to", "is", null);
   const howTo = new Map<string, HowTo>(howRes.error ? [] : (howRes.data ?? []).map((h) => [h.id as string, h.how_to as HowTo]));
 
-  function itemState(i: Row, circleName: string): ItemState {
-    const id = i.id as string, cadence = i.cadence as string, type = i.item_type as string;
+  function itemState(i: Row, circleName: string, circleKind = "growth", circleSlug = ""): ItemState {
+    const id = i.id as string, type = i.item_type as string;
+    // Event fix-its: a checklist for the trip or the event, each habit checked off once.
+    const cadence = circleKind === "fixit_event" && type !== "hit" ? "once" : i.cadence as string;
     const key = (i.habit_key as string) ?? null;
-    const dates = key && autoDates[key] ? autoDates[key] : logsBy.get(id) ?? new Set<string>();
+    let dates = key && autoDates[key] ? autoDates[key] : logsBy.get(id) ?? new Set<string>();
+    const symptoms = circleSlug === "menopause" && /log your symptoms/i.test(i.title as string);
+    if (symptoms && cycleDays.size) dates = new Set([...dates, ...cycleDays]);
     const base = {
       auto: key ? AUTO_HABITS[key] ?? null : null,
       id, title: i.title as string, detail: (i.detail as string) ?? null, type, cadence, habitKey: (i.habit_key as string) ?? null,
       howTo: howTo.get(id) ?? null,
+      ...(symptoms ? { detail: "Log them in the Cycle tracker (Me → Cycle tracker, symptoms mode) and this checks itself off. Or check it off here." } : {}),
       alsoIn: i.habit_key ? [...(circlesOfKey.get(i.habit_key as string) ?? [])].filter((n) => n !== circleName) : [],
     };
     if (type === "hit") return { ...base, complete: ciDone.has(id), doneNow: ciDone.has(id), progress: ciDone.has(id) ? 1 : 0, target: 1 };
@@ -224,7 +235,7 @@ export async function loadProgram(supabase: SupabaseClient, userId: string): Pro
           opensOn = minDate(chain, planDate, saved);
         }
       }
-      const its = items.filter((i) => i.ring_id === rid).map((i) => itemState(i, name));
+      const its = items.filter((i) => i.ring_id === rid).map((i) => itemState(i, name, c.kind as string, slug));
       const status: RingState["status"] = row?.status === "complete" ? "complete"
         : opensOn && opensOn <= today ? "open" : opensOn || halfwayOf ? "upcoming" : "locked";
       if (status === "open" || status === "complete") halfwayOf = null;

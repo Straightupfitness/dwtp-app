@@ -28,11 +28,11 @@ function PreviewItem({ it, color }: { it: ItemState; color: string }) {
   );
 }
 
-function OpenRing({ r }: { r: RingState }) {
+function OpenRing({ r, kind }: { r: RingState; kind: string }) {
   return (
     <div className="flex-1 space-y-2 rounded-2xl border bg-card p-3.5" style={{ borderColor: r.color }}>
       <div>
-        <p className="text-xs uppercase tracking-[0.15em]" style={{ color: r.color }}>Medal {r.number} · day {Math.min(r.day, 14)} of 14</p>
+        <p className="text-xs uppercase tracking-[0.15em]" style={{ color: r.color }}>Medal {r.number}{kind === "growth" ? ` · day ${Math.min(r.day, 14)} of 14` : ""}</p>
         <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">{r.name}</h2>
       </div>
       {r.outcome && <p className="text-sm text-dim">{r.outcome}</p>}
@@ -96,6 +96,13 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
       </div>
 
       {banner && <p className="rounded-xl border border-border bg-card p-3 text-sm">{banner}</p>}
+      {/* November 19 (Claudia): how a fix-it's habits count. */}
+      {!banner && c.kind === "fixit_event" && (
+        <p className="rounded-xl border border-border bg-card p-3 text-sm text-dim">Use this for your next {c.slug === "travel" ? "trip" : "event"}: check each one off once, when you do it. Nothing to do on days in between.</p>
+      )}
+      {!banner && c.kind === "fixit_ongoing" && (
+        <p className="rounded-xl border border-border bg-card p-3 text-sm text-dim">Daily habits count days in a row: check one off on each day you do it (on Today or here). 14 days in a row and it&apos;s done. Doesn&apos;t apply to you? Tell Michael and he&apos;ll close it.</p>
+      )}
 
       <ol className="relative space-y-2.5">
         <div className="absolute bottom-5 left-[17px] top-5 w-0.5 bg-[#262626]" aria-hidden="true" />
@@ -110,7 +117,7 @@ export default async function CirclePage({ params }: { params: Promise<{ slug: s
               <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 bg-card" style={{ borderColor: `${r.color}73` }}><Lock color={r.color} /></span>
             )}
 
-            {r.status === "open" ? <OpenRing r={r} /> : (
+            {r.status === "open" ? <OpenRing r={r} kind={c.kind} /> : (
               <details className="group min-h-9 flex-1 pt-1.5">
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-2">
                   <span>

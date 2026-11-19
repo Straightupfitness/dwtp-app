@@ -30,7 +30,11 @@ export async function toggleHabit(itemId: string, done: boolean) {
   } else {
     // Daily: undo today. Weekly and one-time: undo this program week's check-off.
     let from = today;
-    if (item.cadence !== "daily" && profile?.program_start) {
+    // November 19: event fix-its (Travel, Holidays & Events) are checked off once, so undo clears it whenever it was done.
+    const { data: ring } = await supabase.from("ring_items").select("rings(circles(kind))").eq("id", itemId).maybeSingle();
+    const kind = (ring as unknown as { rings: { circles: { kind: string } | null } | null } | null)?.rings?.circles?.kind;
+    if (kind === "fixit_event") from = "2000-01-01";
+    else if (item.cadence !== "daily" && profile?.program_start) {
       const days = Math.floor((Date.parse(today) - Date.parse(profile.program_start)) / 86_400_000);
       from = new Date(Date.parse(profile.program_start) + Math.floor(days / 7) * 7 * 86_400_000).toISOString().slice(0, 10);
     }

@@ -82,6 +82,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     return b > a ? { start: a, end: b, letter: s.group, n: i - a + 1, size: b - a + 1, rounds: Math.max(...steps.slice(a, b + 1).map((x) => x.sets)) } : null;
   }), [steps]);
   const [step, setStep] = useState<number>(-1); // -1 = start screen, steps.length = finished
+  const [peek, setPeek] = useState<number | null>(null); // November 19 (Claudia): watch an exercise's video before starting
   const [sound, setSound] = useState(false); // clips start muted; one tap turns the sound on (November 1)
   const [sessionId, setSessionId] = useState<string | null>(session?.id ?? null);
   // A time box keeps exactly what she types ("1:3" on the way to "1:30") until she leaves it (October 30 fix).
@@ -96,6 +97,27 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   // November 10 (Esmeralda): extra sets beyond the program's, per exercise. A resumed workout keeps any she logged.
   const [extra, setExtra] = useState<Record<number, number>>(() =>
     Object.fromEntries(steps.map((s) => [s.position, Math.max(0, ...s.logged.map((l) => l.set_no - s.sets))])));
+  // November 19 (Joanna): numbers she's typed but not checked off yet, the extra sets and where she was, saved on this
+  // phone as she goes, so leaving the workout (or the app reloading) never loses them.
+  const draftKey = `dwtp-draft:${sessionId ?? `w${workout.id}`}`;
+  const resumeAt = useRef<number | null>(null);
+  const draftRead = useRef(false);
+  useEffect(() => {
+    if (draftRead.current) return;
+    draftRead.current = true;
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey) ?? "null") as { vals?: Record<string, SetVals>; extra?: Record<number, number>; step?: number } | null;
+      if (!d) return;
+      if (d.vals) setVals((cur) => { const n = { ...cur }; for (const [k, v] of Object.entries(d.vals!)) if (!n[k]?.done) n[k] = { ...v, done: false }; return n; }); // eslint-disable-line react-hooks/set-state-in-effect -- read once
+      if (d.extra) setExtra((cur) => { const n = { ...cur }; for (const [k, v] of Object.entries(d.extra!)) n[Number(k)] = Math.max(n[Number(k)] ?? 0, Number(v) || 0); return n; });
+      if (typeof d.step === "number" && d.step >= 0) resumeAt.current = d.step;
+    } catch {}
+  }, [draftKey]);
+  const saveDraft = (v: typeof vals, x: typeof extra, at: number) => {
+    if (result) return;
+    const typed = Object.fromEntries(Object.entries(v).filter(([, y]) => !y.done && (y.weight != null || y.reps != null || y.seconds != null || (y.note ?? "") !== "")));
+    try { localStorage.setItem(draftKey, JSON.stringify({ vals: typed, extra: x, step: at })); } catch {}
+  };
   const [rest, setRest] = useState<{ ends: number; total: number } | null>(null);
   const [now, setNow] = useState(nowMs);
   const [busy, setBusy] = useState(false);
@@ -137,6 +159,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   };
   const hms = (secs: number) => { const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = Math.floor(secs % 60); return `${h ? `${h}:` : ""}${h ? String(m).padStart(2, "0") : m}:${String(s).padStart(2, "0")}`; };
 
+  useEffect(() => { if (draftRead.current) saveDraft(vals, extra, step >= 0 && step < steps.length ? step : resumeAt.current ?? -1); }, [vals, extra, step]); // eslint-disable-line react-hooks/exhaustive-deps -- save on change
+
   // Rest timer tick, and a sound + buzz when it runs out.
   useEffect(() => {
     if (!rest) return;
@@ -157,13 +181,20 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   async function begin() {
     primeSounds(["set-done", "rest-over"]);
     startClock();
-    if (preview) { setStep(0); return; }
+    if (preview) { setStep(resumeAt.current !== null && resumeAt.current < steps.length ? Math.max(0, resumeAt.current) : 0); return; }
     setBusy(true); setError("");
     const r = await startSession(workout.id, ahead);
     setBusy(false);
     if ("error" in r && r.error) { setError(r.error); return; }
-    if ("id" in r && r.id) setSessionId(r.id);
-    setStep(0);
+    if ("id" in r && r.id) {
+      // Substitutes, typed numbers and the clock picked before she started move over to this session.
+      if (!sessionId) for (const k of ["dwtp-subs", "dwtp-draft", "dwtp-clock"]) {
+        try { const v = localStorage.getItem(`${k}:w${workout.id}`); if (v && !localStorage.getItem(`${k}:${r.id}`)) localStorage.setItem(`${k}:${r.id}`, v); } catch {}
+      }
+      setSessionId(r.id);
+    }
+    const at = resumeAt.current;
+    setStep(at !== null && at >= 0 && at < steps.length ? at : 0);
   }
 
   async function toggleSet(s: PlayerItem, setNo: number) {
@@ -203,7 +234,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
     setBusy(false);
     if ("error" in r && r.error) { setError(r.error); return; }
     setResult({ cps: ("cps" in r ? r.cps : 0) ?? 0 });
-    try { localStorage.removeItem(clockKey); } catch {}
+    try { localStorage.removeItem(clockKey); localStorage.removeItem(draftKey); } catch {}
     setStep(steps.length);
     setTimeout(() => celebrate("quiz-passed", finishRef.current), 150);
   }
@@ -230,9 +261,17 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
   const shell = "fixed inset-0 z-30 flex flex-col bg-bg";
   const header = (
     <div className="mx-auto flex w-full max-w-md items-center gap-3 px-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
-      <Link href="/workouts" aria-label="Close workout" className="grid size-11 shrink-0 place-items-center rounded-full text-[#a8a8a8]">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </Link>
+      {/* November 19 (Joanna): during a workout the X goes back to this workout's exercise list (nothing is lost);
+          from the list it leaves for the week's workouts. */}
+      {inWorkout ? (
+        <button type="button" onClick={() => { resumeAt.current = step; setRest(null); setStep(-1); }} aria-label="Back to the exercise list" className="grid size-11 shrink-0 place-items-center rounded-full text-[#a8a8a8]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      ) : (
+        <Link href="/workouts" aria-label="Close workout" className="grid size-11 shrink-0 place-items-center rounded-full text-[#a8a8a8]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </Link>
+      )}
       {step >= 0 && step < steps.length ? (
         <div className="flex flex-1 gap-1" aria-label={`Exercise ${step + 1} of ${steps.length}`}>
           {steps.map((s, i) => (
@@ -271,6 +310,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
                 {" "}No sound? Flip your silent switch off, or <a href={`https://www.youtube.com/watch?v=${overview.youtube}`} target="_blank" rel="noopener noreferrer" className="text-accent underline">watch it on YouTube</a>.</p>
             </div>
           )}
+          {!sessionId && !preview && <p className="-mb-2 text-[13px] text-dim">Tap any exercise to watch its video before you start.</p>}
           {cycle && !reviewing && <IntensityPick suggested={cycle.suggested} why={cycle.why} chosen={cycle.chosen} onChange={setIntensity} preview={preview} />}
           <ol className="divide-y divide-border rounded-[18px] border border-border bg-card">
             {steps.map((s, i) => (
@@ -280,7 +320,7 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
                     Superset {runs[i]!.letter} · {runs[i]!.rounds} rounds · back to back, then rest
                   </p>
                 )}
-                <button type="button" onClick={() => (sessionId || preview ? setStep(i) : undefined)} className="flex w-full items-center gap-3 p-2.5 text-left">
+                <button type="button" onClick={() => (sessionId || preview ? setStep(i) : setPeek(i))} className="flex w-full items-center gap-3 p-2.5 text-left">
                   <span className="relative size-14 shrink-0 overflow-hidden rounded-[12px] bg-[#1b1b1b]">
                     {/* eslint-disable-next-line @next/next/no-img-element -- poster */}
                     {s.poster && <img src={s.poster} alt="" className="size-full object-cover" />}
@@ -297,6 +337,8 @@ export default function Player({ workout, phase, overview, steps: baseSteps, ses
           </ol>
           {workout.notes && <p className="whitespace-pre-line text-[13px] text-dim">{workout.notes}</p>}
         </div>
+        {peek !== null && steps[peek] && <Peek s={steps[peek]} label={runs[peek] ? `${runs[peek]!.letter}${runs[peek]!.n}` : String(peek + 1)}
+          onClose={() => setPeek(null)} onNext={peek < steps.length - 1 ? () => setPeek(peek + 1) : null} />}
         <Bottom>
           {error && <p className="mb-2 text-sm text-[var(--red)]">{error}</p>}
           <button type="button" disabled={busy} onClick={begin} className="min-h-[56px] w-full rounded-[16px] bg-accent text-[18px] font-semibold text-black disabled:opacity-50">
@@ -612,6 +654,37 @@ function Substitute({ current, original, onPick, onUndo }: {
           {q.trim().length >= 2 && !busy && !shown.length && <p className="px-1 text-[12px] text-dim">No exercise matches &ldquo;{q.trim()}&rdquo;.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/** November 19 (Claudia): an exercise's video and notes from the start screen, without starting the workout. */
+function Peek({ s, label, onClose, onNext }: { s: PlayerItem; label: string; onClose: () => void; onNext: (() => void) | null }) {
+  const [sound, setSound] = useState(false);
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 sm:items-center" onClick={onClose} role="dialog" aria-modal="true" aria-label={s.name}>
+      <div className="w-full max-w-md space-y-3 rounded-t-[22px] border border-border bg-bg p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-[22px]" onClick={(e) => e.stopPropagation()}>
+        <div className="relative aspect-video overflow-hidden rounded-[16px] bg-black">
+          {s.clip ? (
+            <>
+              <video key={s.clip} src={s.clip} poster={s.poster ?? undefined} autoPlay muted={!sound} loop playsInline preload="auto" className="size-full object-cover" />
+              <button type="button" onClick={() => setSound((x) => !x)} aria-pressed={sound}
+                className="absolute bottom-2 right-2 min-h-9 rounded-full bg-black/65 px-3 text-[12px] font-semibold text-white">{sound ? "🔊 Sound on" : "🔇 Tap for sound"}</button>
+            </>
+          ) : s.youtube ? (
+            <iframe key={s.youtube} src={yt(s.youtube)} title={s.name} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="size-full" />
+          ) : <div className="grid size-full place-items-center text-dim">No video</div>}
+        </div>
+        <div>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent">{label} · {summary(s)}</p>
+          <h2 className={`${display} text-[24px] leading-tight`}>{s.name}</h2>
+          {s.notes && <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-line text-[14px] text-dim">{s.notes}</p>}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="min-h-12 flex-1 rounded-[14px] border border-border text-[15px] font-semibold">Close</button>
+          {onNext && <button type="button" onClick={onNext} className="min-h-12 flex-1 rounded-[14px] bg-accent text-[15px] font-semibold text-black">Next exercise</button>}
+        </div>
+      </div>
     </div>
   );
 }
