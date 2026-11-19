@@ -33,6 +33,26 @@ export async function stepsOn(date: string, steps: number | null) {
   return { ok: true };
 }
 
+/**
+ * November 19 (Sara): her sleep, typed in (hours). Saved on the day she woke up, like the iPhone sync.
+ * Sleep habits she reached ("Sleep 7+ hours") check themselves off. null clears it.
+ */
+export async function sleepOn(date: string, hours: number | null) {
+  const { user, ok } = await me();
+  if (!user || !ok(date)) return { error: "Pick a day in the past year." };
+  if (hours !== null && !(hours > 0 && hours <= 16)) return { error: "That doesn't look right. Hours of sleep, like 7.5." };
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const db = adminClient();
+  if (hours === null) {
+    await db.from("health_days").update({ sleep_minutes: null }).eq("client_id", user.id).eq("day", date);
+  } else {
+    const { applyDay } = await import("@/lib/health");
+    await applyDay(db, user.id, date, { sleepMin: Math.round(hours * 60) }, "max", "manual");
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function weightOn(date: string, weight: number | null) {
   const { supabase, user, ok } = await me();
   if (!user || !ok(date)) return { error: "Pick a day in the past year." };

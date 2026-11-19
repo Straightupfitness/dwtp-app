@@ -18,6 +18,7 @@ import { after } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { progressFor } from "@/lib/badges-server";
 import WaterCard from "./WaterCard";
+import SleepCard from "./SleepCard";
 import CirclesGlance from "@/components/CirclesGlance";
 import BookCall from "@/components/BookCall";
 import { BadWeekActive, BadWeekOffer } from "./BadWeek";
@@ -118,7 +119,7 @@ export default async function TodayPage() {
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     supabase.from("water_days").select("oz").eq("client_id", user!.id).eq("day", today).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("health_days").select("day, steps").eq("client_id", user!.id).gte("day", addDays(today, -8)),
+    supabase.from("health_days").select("day, steps, sleep_minutes").eq("client_id", user!.id).gte("day", addDays(today, -8)),
     supabase.from("profiles").select("step_goal").eq("id", user!.id).single(),
   ]);
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
@@ -190,9 +191,10 @@ export default async function TodayPage() {
         steps={stepsYesterday} stepGoal={goals?.step_goal ?? 10000} stepsWeek={stepsWeek}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
+      <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
       <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
-        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, food, water and habits</span></span><span className="text-accent">›</span>
+        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, sleep, food, water and habits</span></span><span className="text-accent">›</span>
       </Link>
       {!notStarted && <CirclesGlance state={state} />}
 

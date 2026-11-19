@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadProgram } from "@/lib/circles";
 import { todayIn } from "@/lib/program";
 import BackButton from "@/components/BackButton";
-import { HabitDay, StepsDay, WaterDay, WeightDay } from "./DayForms";
+import { HabitDay, SleepDay, StepsDay, WaterDay, WeightDay } from "./DayForms";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -11,7 +11,7 @@ const label = (d: string, today: string) => d === today ? "Today" : d === addDay
   : new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
 /**
- * Missed a day? (October 30) Fill in a past day: weight, steps, water and food for any day (November 2: up to a year back),
+ * Missed a day? (October 30) Fill in a past day: weight, steps, sleep, water and food for any day (November 2: up to a year back),
  * habits for the last two weeks.
  */
 export default async function LogDay({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
@@ -33,7 +33,7 @@ export default async function LogDay({ searchParams }: { searchParams: Promise<{
     supabase.from("water_days").select("oz").eq("client_id", user!.id).eq("day", day).maybeSingle(),
     habits.length ? supabase.from("habit_logs").select("item_id").eq("client_id", user!.id).eq("log_date", day).in("item_id", habits.map((h) => h.id)) : Promise.resolve({ data: [] }),
     supabase.from("food_logs").select("eaten_at, calories").eq("client_id", user!.id).gte("eaten_at", addDays(day, -1) + "T00:00:00Z").lt("eaten_at", addDays(day, 2) + "T00:00:00Z"),
-    supabase.from("health_days").select("steps").eq("client_id", user!.id).eq("day", day).maybeSingle(),
+    supabase.from("health_days").select("steps, sleep_minutes").eq("client_id", user!.id).eq("day", day).maybeSingle(),
   ]);
   const doneIds = new Set((logs ?? []).map((l) => l.item_id as string));
   const tz = p?.timezone ?? "America/Los_Angeles";
@@ -70,6 +70,11 @@ export default async function LogDay({ searchParams }: { searchParams: Promise<{
       <div className={card}>
         <p className={`${display} text-[17px]`}>Steps</p>
         <StepsDay key={day} date={day} value={hd?.steps ?? null} />
+      </div>
+
+      <div className={card}>
+        <p className={`${display} text-[17px]`}>Sleep <span className="text-[13px] normal-case text-dim">the night before</span></p>
+        <SleepDay key={day} date={day} value={(hd as { sleep_minutes?: number | null } | null)?.sleep_minutes ?? null} />
       </div>
 
       <div className={card}>

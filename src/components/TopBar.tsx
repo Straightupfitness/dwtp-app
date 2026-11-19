@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Avatar from "./Avatar";
-import { IconCalendar, IconChat, IconFaq } from "./Icons";
+import { IconCalendar, IconChat } from "./Icons";
 
 /** One top-bar button: icon over a word, so every button says what it is. */
 function Btn({ href, label, icon, badge, aria }: { href: string; label: string; icon: React.ReactNode; badge?: number; aria?: string }) {
@@ -16,7 +16,7 @@ function Btn({ href, label, icon, badge, aria }: { href: string; label: string; 
   );
 }
 
-/** Top of every screen: the lion (home) on the left; Calendar, FAQ, Chat and Account (her picture) on the right. */
+/** Top of every screen: the lion (home) on the left; Calendar, Alerts, Search (and the FAQ), Chat and Account (her picture) on the right. */
 export default function TopBar({ coach, unread, alerts = 0, name, avatarPath }: {
   coach: boolean; unread: number; alerts?: number; name: string | null; avatarPath: string | null;
 }) {
@@ -30,7 +30,7 @@ export default function TopBar({ coach, unread, alerts = 0, name, avatarPath }: 
           <Btn href={coach ? "/coach/calendar" : "/calendar"} label="Calendar" icon={<IconCalendar />} />
           {/* November 11: her notifications, so the number on the app icon means something. */}
           <Btn href="/notifications" label="Alerts" icon={<Bell />} badge={alerts} aria={alerts ? `Notifications, ${alerts} new` : "Notifications"} />
-          <Btn href="/faq" label="FAQ" icon={<IconFaq />} />
+          <Btn href="/faq" label="Search" icon={<Search />} aria="Search the app and the FAQ" />
           <Btn href={coach ? "/coach/inbox" : "/chat"} label={coach ? "Inbox" : "Chat"} icon={<IconChat />} badge={unread}
             aria={unread ? `${coach ? "Inbox" : "Chat with Michael"}, ${unread} unread` : coach ? "Inbox" : "Chat with Michael"} />
           <Btn href="/me" label="Account" icon={<Avatar name={name} path={avatarPath} size={22} coach={coach} />} />
@@ -42,4 +42,8 @@ export default function TopBar({ coach, unread, alerts = 0, name, avatarPath }: 
 
 function Bell() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2.2 2.2 0 0 0 4 0" /></svg>;
+}
+
+function Search() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>;
 }

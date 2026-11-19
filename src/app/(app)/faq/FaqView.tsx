@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
 import { ListIcon } from "@/components/ListIcon";
+import Link from "next/link";
 import type { FaqSection } from "@/lib/faq";
+import type { SearchHit } from "@/lib/app-search";
 
 const Play = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>;
 const Ext = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M19 14v5H5V5h5" /></svg>;
 
-export default function FaqView({ sections }: { sections: FaqSection[] }) {
+export default function FaqView({ sections, index = [] }: { sections: FaqSection[]; index?: SearchHit[] }) {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState(sections[0]?.id ?? "");
   const needle = q.trim().toLowerCase();
@@ -14,10 +16,14 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
   const list = needle
     ? sections.map((s) => ({ ...s, items: s.items.filter((i) => match(i.title) || match(i.body) || i.links.some((l) => match(l.label) || match(l.note))) })).filter((s) => s.items.length)
     : sections.filter((s) => s.id === tab);
+  // November 19: the whole app, not just the FAQ. Every word she types has to match (title, where it is, or keywords).
+  const terms = needle.split(/\s+/).filter(Boolean);
+  const inApp = terms.length ? index.filter((h) => { const t = `${h.title} ${h.where} ${h.words}`.toLowerCase(); return terms.every((w) => t.includes(w)); })
+    .sort((a, b) => Number(b.title.toLowerCase().includes(needle)) - Number(a.title.toLowerCase().includes(needle))).slice(0, 12) : [];
 
   return (
     <div className="space-y-3.5">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search questions, foods, supplements…" aria-label="Search the FAQ"
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the app: sleep, water, travel, protein…" aria-label="Search the app and the FAQ"
         className="min-h-12 w-full rounded-2xl border border-[#2a2a2a] bg-card px-4 text-[15px] outline-none focus:border-accent" />
       {!needle && (
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -25,6 +31,21 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
             <button key={s.id} type="button" onClick={() => setTab(s.id)} aria-pressed={tab === s.id}
               className={`min-h-10 shrink-0 rounded-full px-4 text-sm ${tab === s.id ? "bg-accent font-semibold text-black" : "border border-[#2a2a2a] text-[#d0d0d0]"}`}>{s.title}</button>
           ))}
+        </div>
+      )}
+      {inApp.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="pt-1 text-[11px] uppercase tracking-[0.15em] text-accent">In the app</h2>
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+            {inApp.map((h, k) => (
+              <li key={k}>
+                <Link href={h.href} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium leading-snug">{h.title}</span><span className="block text-[12px] text-dim">{h.where}</span></span>
+                  <span className="text-accent" aria-hidden="true">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {list.map((s) => (
@@ -66,7 +87,7 @@ export default function FaqView({ sections }: { sections: FaqSection[] }) {
           ))}
         </div>
       ))}
-      {needle && !list.length && <p className="text-dim">Nothing found. Ask Michael in Chat.</p>}
+      {needle && !list.length && !inApp.length && <p className="text-dim">Nothing found. Ask Michael in Chat.</p>}
     </div>
   );
 }

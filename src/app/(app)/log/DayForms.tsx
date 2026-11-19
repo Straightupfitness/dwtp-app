@@ -1,6 +1,6 @@
 "use client";
 import { useOptimistic, useState, useTransition } from "react";
-import { habitOn, stepsOn, waterOn, weightOn } from "./actions";
+import { sleepOn, habitOn, stepsOn, waterOn, weightOn } from "./actions";
 
 const input = "min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent";
 const btn = "min-h-11 shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-black disabled:opacity-40";
@@ -28,6 +28,22 @@ export function StepsDay({ date, value }: { date: string; value: number | null }
     <form onSubmit={(e) => { e.preventDefault(); start(async () => { const n = Number(v.replace(/[^\d]/g, "")); const r = await stepsOn(date, v.trim() ? n : null); setMsg(r?.error ?? "Saved."); }); }} className="space-y-1.5">
       <div className="flex gap-2">
         <input value={v} onChange={(e) => setV(e.target.value)} type="text" inputMode="numeric" placeholder="Steps that day" aria-label="Steps that day" className={input} />
+        <button disabled={pending} className={btn}>{pending ? "…" : "Save"}</button>
+      </div>
+      {msg && <p className="text-xs text-dim">{msg}</p>}
+    </form>
+  );
+}
+
+/** November 19: hours slept the night before this day. */
+export function SleepDay({ date, value }: { date: string; value: number | null }) {
+  const [v, setV] = useState(value ? String(Math.round(value / 6) / 10) : "");
+  const [msg, setMsg] = useState("");
+  const [pending, start] = useTransition();
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); start(async () => { const n = Number(v.replace(",", ".")); const r = await sleepOn(date, v.trim() ? n : null); setMsg(r?.error ?? "Saved."); }); }} className="space-y-1.5">
+      <div className="flex gap-2">
+        <input value={v} onChange={(e) => setV(e.target.value)} type="text" inputMode="decimal" placeholder="Hours, like 7.5" aria-label="Hours of sleep the night before" className={input} />
         <button disabled={pending} className={btn}>{pending ? "…" : "Save"}</button>
       </div>
       {msg && <p className="text-xs text-dim">{msg}</p>}
