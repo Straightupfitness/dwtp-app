@@ -127,7 +127,7 @@ function parseOutline(text: string) {
   });
 }
 
-type Box = 1 | 2 | 3 | 4 | null; // null = Projects
+type Box = 1 | 2 | 3 | 4 | null | string; // null = Projects; "g:<id>" = a Plan of attack goal
 const BOXES: { box: Box; title: string; sub: string; color: string }[] = [
   { box: 1, title: "Urgent & important", sub: "Do now", color: "#ef4444" },
   { box: 2, title: "Not urgent & important", sub: "Schedule", color: "#f5a623" },
@@ -139,16 +139,20 @@ const PROJECTS = { box: null as Box, title: "Projects", sub: "Your big projects.
 /** The whole matrix: four boxes and Projects, each an outline, with drag and drop between them. */
 export function Matrix({ plan, events = [] }: { plan: Plan; events?: CalEvent[] }) {
   const items = useMemo(() => plan.items.filter((i) => i.kind === "outline"), [plan.items]);
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // November 20: Plan of attack goals (kind "action": the goal's name, and its done-by date in sched_at). Their steps are
+  // outline lines under them.
+  const goals = useMemo(() => plan.items.filter((i) => i.kind === "action").sort(byPos), [plan.items]);
+  const byId = useMemo(() => new Map([...items, ...goals].map((i) => [i.id, i])), [items, goals]);
   const kids = useMemo(() => {
     const m = new Map<string, PlanItem[]>();
     for (const i of items) if (i.parent_id && byId.has(i.parent_id)) (m.get(i.parent_id) ?? m.set(i.parent_id, []).get(i.parent_id)!).push(i);
     for (const l of m.values()) l.sort(byPos);
     return m;
   }, [items, byId]);
-  const roots = useCallback((box: Box) => items.filter((i) => !(i.parent_id && byId.has(i.parent_id)) && (i.quadrant ?? null) === box).sort(byPos), [items, byId]);
+  const roots = useCallback((box: Box) => typeof box === "string" ? kids.get(box.slice(2)) ?? []
+    : items.filter((i) => !(i.parent_id && byId.has(i.parent_id)) && (i.quadrant ?? null) === box).sort(byPos), [items, byId, kids]);
   /** Which box a line is in (its top-level line's box). */
-  const boxOf = useCallback((i: PlanItem): Box => { let c = i; for (let n = 0; c.parent_id && byId.has(c.parent_id) && n < 60; n++) c = byId.get(c.parent_id)!; return (c.quadrant ?? null) as Box; }, [byId]);
+  const boxOf = useCallback((i: PlanItem): Box => { let c = i; for (let n = 0; c.parent_id && byId.has(c.parent_id) && n < 60; n++) c = byId.get(c.parent_id)!; return c.kind === "action" ? `g:${c.id}` : (c.quadrant ?? null) as Box; }, [byId]);
   const [showDone, setShowDone] = useState(false);
   const [q, setQ] = useState("");
 
@@ -177,17 +181,18 @@ export function Matrix({ plan, events = [] }: { plan: Plan; events?: CalEvent[] 
       plan.put(rows); return;
     }
     if (fromCal) return; // a block dropped off the scheduler stays where it was
-    const box = (zone === "box-p" ? null : Number(zone.replace("box-", ""))) as Box;
+    const goalZone = zone.startsWith("goal-") ? zone.slice(5) : null; // dropped into a Plan of attack goal
+    const box = (goalZone ? `g:${goalZone}` : zone === "box-p" ? null : Number(zone.replace("box-", ""))) as Box;
     const t = before ? byId.get(before) : undefined;
     if (t && ids.includes(t.id)) return;
     for (const x of ids) for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === x) return; // not into itself
-    const parent = t?.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
-    const list = (t && parent ? kids.get(parent) ?? [] : roots(box)).filter((x) => !ids.includes(x.id));
+    const parent = t?.parent_id && byId.has(t.parent_id) ? t.parent_id : goalZone;
+    const list = (parent ? kids.get(parent) ?? [] : roots(box)).filter((x) => !ids.includes(x.id));
     // Spread the moved bullets evenly between the bullet above the drop spot and the one they land in front of.
     const k = t ? list.findIndex((x) => x.id === t.id) : list.length;
     const lo = k > 0 ? list[k - 1].position : (list[0]?.position ?? 1) - ids.length - 1;
     const hi = k < list.length ? list[k].position : lo + ids.length + 1;
-    plan.put(ids.map((x, n) => { const m = byId.get(x)!; return { ...m, parent_id: parent, quadrant: parent ? m.quadrant : box, position: lo + ((hi - lo) * (n + 1)) / (ids.length + 1) }; }));
+    plan.put(ids.map((x, n) => { const m = byId.get(x)!; return { ...m, parent_id: parent, quadrant: parent ? null : (box as number | null), position: lo + ((hi - lo) * (n + 1)) / (ids.length + 1) }; }));
   });
   // Esc lets go of the picked bullets; Delete / Backspace removes them (when not typing).
   useEffect(() => {
@@ -223,6 +228,9 @@ export function Matrix({ plan, events = [] }: { plan: Plan; events?: CalEvent[] 
 
   return (
     <div data-planner className="space-y-4">
+      <Section title="Plan of attack" icon="targets" open>
+        <PlanOfAttack goals={goals} plan={plan} shared={shared} />
+      </Section>
       <Section title="Calendar" icon="calendar" open><Scheduler plan={plan} items={items} dnd={dnd} events={events} /></Section>
       <Section title="Eisenhower matrix" icon="checkins" open>
       <div className="flex flex-wrap items-center gap-2">
@@ -264,7 +272,8 @@ type Shared = {
 };
 
 /** One box of the matrix (or Projects): an outline that works like Workflowy. */
-function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle, sel, setSel, selMode }: { box: Box; title: string; sub: string; color: string } & Shared) {
+function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle, sel, setSel, selMode, header }: { box: Box; title: string; sub: string; color: string; header?: (shut: boolean, toggle: () => void) => React.ReactNode } & Shared) {
+  const goalId = typeof box === "string" ? box.slice(2) : null;
   const lastPick = useRef<string | null>(null);
   const [shut, setShut] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
@@ -306,7 +315,10 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
 
   const parentOf = (i: PlanItem) => (i.parent_id && byId.has(i.parent_id) ? i.parent_id : null);
   const siblings = (i: PlanItem) => childrenOf(parentOf(i));
-  const newLine = (parent: string | null, position: number, text = ""): PlanItem => ({ id: uid(), kind: "outline", parent_id: parent, text, note: null, quadrant: parent ? null : box, position, done: false, collapsed: false });
+  const newLine = (parent: string | null, position: number, text = ""): PlanItem => {
+    const p = parent ?? goalId; // a goal's top lines hang under the goal
+    return { id: uid(), kind: "outline", parent_id: p, text, note: null, quadrant: p ? null : (box as number | null), position, done: false, collapsed: false };
+  };
   const after = (i: PlanItem) => { const s = siblings(i); const k = s.findIndex((x) => x.id === i.id); return s[k + 1] ? (i.position + s[k + 1].position) / 2 : i.position + 1; };
 
   function enter(i: PlanItem, el: HTMLTextAreaElement) {
@@ -329,10 +341,10 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
   }
   function outdent(i: PlanItem) {
     const pid = parentOf(i);
-    if (!pid || pid === root) return;
+    if (!pid || pid === root || pid === goalId) return;
     const p = byId.get(pid)!;
     const gp = parentOf(p);
-    plan.put([{ ...i, parent_id: gp, quadrant: gp ? i.quadrant : box, position: after(p) }]); setFocus({ id: i.id });
+    plan.put([{ ...i, parent_id: gp, quadrant: gp ? null : (box as number | null), position: after(p) }]); setFocus({ id: i.id });
   }
   function move(i: PlanItem, dir: -1 | 1) {
     const s = siblings(i); const k = s.findIndex((x) => x.id === i.id); const o = s[k + dir];
@@ -390,22 +402,24 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
     }
   }
   const crumbs: PlanItem[] = [];
-  for (let c = root ? byId.get(root) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) crumbs.unshift(c);
+  for (let c = root ? byId.get(root) : undefined; c && c.kind !== "action"; c = c.parent_id ? byId.get(c.parent_id) : undefined) crumbs.unshift(c);
   const addLine = () => { const n = newLine(root, (childrenOf(root).at(-1)?.position ?? 0) + 1); plan.put([n]); setFocus({ id: n.id }); };
   const act = active ? byId.get(active) : undefined;
   const actIdx = act ? rows.findIndex((r) => r.i.id === act.id) : -1;
-  const zone = box === null ? "box-p" : `box-${box}`;
+  const zone = goalId ? `goal-${goalId}` : box === null ? "box-p" : `box-${box}`;
 
   return (
     <div data-drop={zone} className={`flex flex-col rounded-xl border bg-card p-2.5 transition ${shut ? "" : "min-h-40"}`}
       style={{ borderColor: `${color}88`, ...(dnd.over === zone ? { boxShadow: `0 0 0 2px ${color}` } : {}) }}>
       {/* November 20: each box opens and closes (a closed box still takes drops); titles in the display font. */}
+      {header ? header(shut, () => setShut((x) => !x)) : <>
       <button type="button" onClick={() => setShut((x) => !x)} aria-expanded={!shut} className="flex w-full items-center gap-1.5 text-left">
         <span className="font-[family-name:var(--font-display)] text-[15px] uppercase leading-tight tracking-[0.02em]" style={{ color }}>{title}</span>
         <span className={`text-dim transition ${shut ? "" : "rotate-180"}`}>⌄</span>
         <span className="ml-auto text-[11px] text-dim">{shut ? `${childrenOf(null).length}` : ""}</span>
       </button>
       <p className="text-[11px] uppercase tracking-[0.14em] text-dim">{sub}</p>
+      </>}
       {!shut && root && (
         <p className="mt-1 flex flex-wrap items-center gap-1 text-[12px]">
           <button type="button" onClick={() => setZoom(null)} className="text-accent underline">{title}</button>
@@ -687,5 +701,55 @@ function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: 
         </div>
       )}
     </>
+  );
+}
+
+// ── Plan of attack ──────────────────────────────────────────
+
+/**
+ * November 20 (Michael): up to 5 big things for the next 4 to 6 weeks, side by side. Each has a done-by date and its
+ * own outline (like Workflowy) that opens and closes; steps drag to and from the matrix and onto the calendar.
+ */
+function PlanOfAttack({ goals, plan, shared }: { goals: PlanItem[]; plan: Plan; shared: Shared }) {
+  const add = () => plan.put([{ id: uid(), kind: "action", parent_id: null, text: "", note: null, quadrant: null, position: (goals.at(-1)?.position ?? 0) + 1, done: false, collapsed: false, sched_at: null, sched_minutes: null }]);
+  const COLORS = ["#f5a623", "#22c55e", "#38bdf8", "#c084fc", "#fb7185"];
+  const [now] = useState(() => Date.now());
+  const cols = Math.min(5, goals.length + (goals.length < 5 ? 1 : 0));
+  return (
+    <div className="overflow-x-auto">
+      <div className="grid min-w-[40rem] gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, cols)}, minmax(0, 1fr))` }}>
+        {goals.map((g, k) => {
+          const due = g.sched_at ? g.sched_at.slice(0, 10) : "";
+          const left = due ? Math.ceil((Date.parse(due + "T12:00:00") - now) / 86_400_000) : null;
+          return (
+            <OutlineBox key={g.id} box={`g:${g.id}`} title={g.text} sub="" color={COLORS[k % 5]} {...shared}
+              header={(shut, toggle) => (
+                <div className="space-y-0.5">
+                  <div className="flex items-start gap-1">
+                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-black" style={{ background: COLORS[k % 5] }}>{k + 1}</span>
+                    <textarea value={g.text} rows={1} placeholder="What you'll get done" onChange={(e) => plan.patch(g.id, { text: e.target.value.replace(/\n/g, " ") })}
+                      ref={(el) => { if (el) { el.style.height = "0px"; el.style.height = `${el.scrollHeight}px`; } }}
+                      className={`min-w-0 flex-1 resize-none overflow-hidden bg-transparent font-[family-name:var(--font-display)] text-[15px] uppercase leading-tight outline-none ${g.done ? "text-dim line-through" : ""}`} style={{ color: g.done ? undefined : COLORS[k % 5] }} />
+                    <button type="button" onClick={toggle} aria-label={shut ? "Open" : "Close"} className={`shrink-0 px-1 text-dim transition ${shut ? "" : "rotate-180"}`}>⌄</button>
+                  </div>
+                  <div className="flex items-center gap-1.5 pl-6 text-[11px] text-dim">
+                    <span>Done by</span>
+                    <input type="date" value={due} onChange={(e) => plan.patch(g.id, { sched_at: e.target.value ? `${e.target.value}T12:00:00` : null })}
+                      className="min-h-6 rounded border border-border bg-bg px-1 text-[11px] text-text [color-scheme:dark]" aria-label="Done by" />
+                    {left !== null && !g.done && <span className={left < 0 ? "text-[#ff8a8a]" : left <= 7 ? "text-accent" : ""}>{left < 0 ? `${-left}d late` : left === 0 ? "today" : `${left}d left`}</span>}
+                  </div>
+                  <div className="flex gap-2 pl-6 text-[11px]">
+                    <button type="button" onClick={() => plan.patch(g.id, { done: !g.done })} className="text-dim underline">{g.done ? "Not done" : "Mark done"}</button>
+                    <button type="button" onClick={() => { if (window.confirm(`Delete "${g.text || "this goal"}" and everything under it?`)) plan.remove([g.id]); }} className="text-dim underline hover:text-[var(--red)]">Delete</button>
+                  </div>
+                </div>
+              )} />
+          );
+        })}
+        {goals.length < 5 && (
+          <button type="button" onClick={add} className="min-h-40 rounded-xl border border-dashed border-[#3a3a3a] text-[13px] font-semibold text-accent">+ Add {goals.length ? `a ${["", "second", "third", "fourth", "fifth"][goals.length]} goal` : "your first goal"}</button>
+        )}
+      </div>
+    </div>
   );
 }

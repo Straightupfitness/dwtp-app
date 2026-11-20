@@ -15,7 +15,15 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
   useEffect(() => { dropRef.current = onDrop; });
   const justDragged = useRef(false);
 
+  // November 20: while dragging near the top or bottom of the screen, the page scrolls (to reach the matrix from the
+  // Plan of attack, or the calendar from the matrix).
+  const edge = useRef<{ y: number; raf: number | null }>({ y: -1, raf: null });
   useEffect(() => {
+    const scroll = () => {
+      const e = edge.current, H = window.innerHeight, zone = 70;
+      const v = e.y < 0 ? 0 : e.y < zone ? -Math.ceil((zone - e.y) / 4) : e.y > H - zone ? Math.ceil((e.y - (H - zone)) / 4) : 0;
+      if (v && start.current?.live) { window.scrollBy(0, v); e.raf = requestAnimationFrame(scroll); } else e.raf = null;
+    };
     const target = (x: number, y: number) => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       const zone = el?.closest("[data-drop]") as HTMLElement | null;
@@ -33,10 +41,13 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
       setDrag({ id: s.id, label: s.label, x: e.clientX, y: e.clientY });
       const t = target(e.clientX, e.clientY);
       setOver(t.zone); setOverBefore(t.before);
+      edge.current.y = e.clientY;
+      if (edge.current.raf === null) edge.current.raf = requestAnimationFrame(scroll);
     };
     const up = (e: PointerEvent) => {
       const s = start.current;
       start.current = null;
+      edge.current.y = -1;
       if (!s?.live) return;
       document.body.style.userSelect = ""; document.body.style.webkitUserSelect = "";
       window.getSelection()?.removeAllRanges();
