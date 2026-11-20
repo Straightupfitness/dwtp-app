@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import PrompterRecorder, { groupsFromText } from "@/components/PrompterRecorder";
+import FloatingRecorder from "@/components/FloatingRecorder";
 import { saveReply } from "./actions";
 
 type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
@@ -87,10 +88,18 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
 
       <div className="space-y-2">
         <p className="text-sm">Your video reply</p>
-        {videoUrl && !video && <video src={videoUrl} controls playsInline className="w-full rounded-lg bg-black" />}
-        {/* November 13: record with the talking points on screen, like a teleprompter. */}
-        <PrompterRecorder points={groupsFromText(points)} bucket="checkin-videos" folder={`${clientId}/replies`} onUploaded={setVideo}
-          label={videoUrl ? "🎥 Record a new video (talking points on screen)" : "🎥 Record with your talking points"} />
+        {videoUrl && !video && <video src={videoUrl} controls playsInline className="max-h-[420px] w-full rounded-lg bg-black" />}
+        {video && <p className="rounded-lg border border-[#2f5d3a] p-2 text-[13px] text-[#7ddc8f]">Your new video is ready. Tap Send to her (or Save draft).</p>}
+        {/* November 20 (Michael): "Record yourself" floats in the corner: just his camera, while he scrolls through her data. */}
+        <FloatingRecorder folder={`${clientId}/replies`} onUploaded={setVideo} hasVideo={!!(videoUrl || video)} />
+        <p className="text-[12px] text-dim">Tap <b className="text-text">🎥 Record yourself</b> (bottom right) any time. It records only you, while you scroll through her check-in.</p>
+        <details className="text-[13px]">
+          <summary className="cursor-pointer text-dim">Or record full screen with your talking points (teleprompter)</summary>
+          <div className="mt-2">
+            <PrompterRecorder points={groupsFromText(points)} bucket="checkin-videos" folder={`${clientId}/replies`} onUploaded={setVideo}
+              label={videoUrl ? "🎥 Record a new video (talking points on screen)" : "🎥 Record with your talking points"} />
+          </div>
+        </details>
       </div>
 
       <div className="flex gap-2">

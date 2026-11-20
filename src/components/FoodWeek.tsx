@@ -64,7 +64,16 @@ export default function FoodWeek({ data, title = "Food · last 7 days", compact 
                   ))}
                 </span>
               )}
-            </> : <span className="py-6 text-center text-[12px] text-dim">Nothing logged</span>}
+            </> : <>
+              {/* November 20 (Michael): a day with nothing logged shows 0, so it's plain to see. */}
+              <span className={`${display} text-[24px] leading-none text-[#ff8a7e]`}>0<span className="ml-1 text-[11px] normal-case text-dim">kcal</span></span>
+              <span className="space-y-1 text-[11px] text-dim">
+                <span className="flex justify-between"><span>Protein</span><span>0 g</span></span>
+                <span className="flex justify-between"><span>Fiber</span><span>0 g</span></span>
+                <span className="flex justify-between"><span>Potassium</span><span>0</span></span>
+              </span>
+              <span className="border-t border-border pt-1.5 text-[11px] text-dim">Nothing logged</span>
+            </>}
           </button>
         ))}
       </div>

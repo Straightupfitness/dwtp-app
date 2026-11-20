@@ -1,7 +1,6 @@
 import type { Daily } from "@/lib/daily";
 
 const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
-const md = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "numeric", day: "numeric", timeZone: "UTC" });
 const wk = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
 
 /**
@@ -24,7 +23,6 @@ export default function DailyCombo({ days, goals }: { days: Daily["days"]; goals
   const H = 96, CAP = 1.5; // a bar at the dashed line = right on target; taller = over (capped at 1.5×)
   const vals = (r: Row) => days.map(r.get).filter((x): x is number => x !== null && x > 0);
   const avg = (r: Row) => { const v = vals(r); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
-  const every = days.length > 200 ? 30 : days.length > 100 ? 14 : days.length > 45 ? 7 : days.length > 20 ? 3 : 1;
   const fmtV = (r: Row, v: number) => (r.key === "pot" || r.key === "stp" ? k(v) : String(Math.round(v)));
 
   // November 15 (Michael): six separate graphs, one per number, each with its title, average and target.
@@ -47,15 +45,27 @@ export default function DailyCombo({ days, goals }: { days: Daily["days"]; goals
               <div className={`flex items-end ${days.length > 60 ? "gap-px" : "gap-[3px]"}`} style={{ height: H }}>
                 {days.map((d) => {
                   const v = r.get(d);
-                  if (v === null || v <= 0) return <span key={d.date} className="flex-1" />;
+                  // November 20 (Michael): a day with nothing logged gets a gray dash, so every day is visible.
+                  if (v === null || v <= 0) return <span key={d.date} className="flex-1 border-b-2 border-[#4a4a4a]" title={`${d.date}: nothing logged`} />;
                   const st = r.hit(v);
                   return <span key={d.date} className="flex-1 rounded-t-[3px]" title={`${d.date}: ${r.key === "stp" ? Math.round(v).toLocaleString() : Math.round(v)} ${r.unit}`}
                     style={{ height: Math.max(3, (Math.min(v / target, CAP) / CAP) * H), background: st === "over" ? "#ef4444" : r.color, opacity: st === "under" ? 0.32 : 1 }} />;
                 })}
               </div>
             </div>
-            <div className={`mt-0.5 flex text-[9px] text-dim ${days.length > 60 ? "gap-px" : "gap-[3px]"}`}>
-              {days.map((d, i) => <span key={d.date} className="flex-1 overflow-visible whitespace-nowrap text-center">{i % every === 0 ? (every === 1 ? wk(d.date) : md(d.date)) : ""}</span>)}
+            {/* November 20 (Michael): every day labeled, easy to read: the weekday letter over the date (up to a month),
+                or the day of the month (longer ranges), with the month at the 1st. */}
+            <div className={`mt-1 flex leading-tight ${days.length > 60 ? "gap-px" : "gap-[3px]"}`}>
+              {days.map((d) => {
+                const dom = Number(d.date.slice(8));
+                const has = r.get(d) !== null && (r.get(d) ?? 0) > 0;
+                return (
+                  <span key={d.date} className={`flex-1 overflow-visible whitespace-nowrap text-center ${has ? "text-[#d6d6d6]" : "text-[#6a6a6a]"} ${days.length > 60 ? "text-[8px]" : "text-[10px]"}`}>
+                    {days.length <= 31 && <span className="block font-semibold">{wk(d.date)}</span>}
+                    <span className="block">{dom === 1 ? new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) : dom}</span>
+                  </span>
+                );
+              })}
             </div>
           </div>
         );
