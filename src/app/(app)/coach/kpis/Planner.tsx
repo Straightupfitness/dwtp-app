@@ -318,6 +318,16 @@ export function Outline({ plan }: { plan: Plan }) {
   for (let c = root ? byId.get(root) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) crumbs.unshift(c);
   const addFirst = () => { const n = newLine(root, ((kids.get(root) ?? []).at(-1)?.position ?? 0) + 1); plan.put([n]); setFocus({ id: n.id }); };
   const setAll = (collapsed: boolean) => plan.put(items.filter((i) => (kids.get(i.id)?.length ?? 0) > 0 && i.collapsed !== collapsed).map((i) => ({ ...i, collapsed })));
+  // November 19 (Michael): drag a bullet up or down by its dots; everything under it comes along. It lands just above
+  // the bullet you drop it on (at that bullet's level), or at the end.
+  const dnd = useDnd((id, _t, before) => {
+    const m = byId.get(id); if (!m) return;
+    if (!before) { plan.put([{ ...m, parent_id: root, position: ((kids.get(root) ?? []).filter((x) => x.id !== id).at(-1)?.position ?? 0) + 1 }]); return; }
+    const t = byId.get(before); if (!t || t.id === id) return;
+    for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === id) return; // not into itself
+    const parent = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
+    plan.put([{ ...m, parent_id: parent, position: posAt(kids.get(parent) ?? [], t.id, id) }]);
+  });
   const act = active ? byId.get(active) : undefined;
   const actIdx = act ? rows.findIndex((r) => r.i.id === act.id) : -1;
 
@@ -340,11 +350,12 @@ export function Outline({ plan }: { plan: Plan }) {
         <textarea value={byId.get(root)!.text} onChange={(e) => plan.patch(root, { text: e.target.value })} rows={1} aria-label="Title"
           className="w-full resize-none bg-transparent font-[family-name:var(--font-display)] text-2xl uppercase outline-none" />
       )}
-      <div className="rounded-xl border border-border bg-card px-1 py-1.5">
+      <div data-drop="outline" className="rounded-xl border border-border bg-card px-1 py-1.5">
         {rows.map(({ i, depth }, idx) => {
           const has = (kids.get(i.id)?.length ?? 0) > 0;
           return (
-            <div key={i.id} className="group flex items-start" style={{ paddingLeft: depth * 22 }}>
+            <div key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text || "Untitled")} className={`group flex items-start ${dnd.overBefore === i.id && dnd.dragging !== i.id ? "shadow-[inset_0_2px_0_var(--accent)]" : ""}`} style={{ paddingLeft: depth * 22, ...dnd.bind(i.id, "").style }}>
+              <span className="flex h-7 items-center opacity-100 md:opacity-0 md:group-hover:opacity-100"><Grip /></span>
               <button type="button" onClick={() => has && plan.patch(i.id, { collapsed: !i.collapsed })} aria-label={has ? (i.collapsed ? "Expand" : "Collapse") : undefined} tabIndex={-1}
                 className={`grid h-7 w-5 shrink-0 place-items-center text-[10px] text-dim ${has ? "opacity-60 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" : "invisible"}`}>{i.collapsed ? "▶" : "▼"}</button>
               <button type="button" onClick={() => setZoom(i.id)} aria-label={`Zoom into ${i.text || "this line"}`} tabIndex={-1}
@@ -365,8 +376,9 @@ export function Outline({ plan }: { plan: Plan }) {
       </div>
       <details className="text-[12px] text-dim">
         <summary className="cursor-pointer">Keyboard shortcuts</summary>
-        <p className="mt-1 leading-relaxed">Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
+        <p className="mt-1 leading-relaxed">Drag a bullet by its dots to move it up or down (everything under it comes along) · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
       </details>
+      {dnd.ghost}
       {/* On a phone (no Tab key): the tools for the bullet she's on. */}
       {act && actIdx >= 0 && (
         <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+64px)] z-20 flex justify-center gap-1 rounded-xl border border-border bg-[#141414]/95 p-1 backdrop-blur md:hidden">

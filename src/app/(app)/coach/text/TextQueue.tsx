@@ -1,4 +1,5 @@
 "use client";
+import { markReachedOut } from "../leads/actions";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
@@ -90,7 +91,7 @@ export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[];
               <div className="flex items-center gap-2">
                 <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-semibold">{isSent ? "✓ " : ""}{r.name}</span>
                   <span className="block truncate text-[12px] text-dim">{body.replace(/\s+/g, " ").slice(0, 90)}</span></span>
-                <a href={smsHref(r.phone!, body)} onClick={() => save({ ...sent, [r.id]: Date.now() })}
+                <a href={smsHref(r.phone!, body)} onClick={() => { save({ ...sent, [r.id]: Date.now() }); if (kind === "leads") void markReachedOut(r.id).catch(() => {}); }}
                   className={`flex min-h-11 shrink-0 items-center rounded-xl px-3.5 text-[14px] font-semibold ${isNext ? "bg-accent text-black" : "border border-border"}`}>
                   {isSent ? "Again" : `📱 Text ${r.first}`}
                 </a>

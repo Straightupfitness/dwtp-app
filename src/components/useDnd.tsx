@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 export function useDnd(onDrop: (id: string, target: string, before: string | null) => void) {
   const [drag, setDrag] = useState<{ id: string; label: string; x: number; y: number } | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const [overBefore, setOverBefore] = useState<string | null>(null);
   const start = useRef<{ id: string; label: string; x: number; y: number; live: boolean } | null>(null);
   const dropRef = useRef(onDrop);
   useEffect(() => { dropRef.current = onDrop; });
@@ -28,7 +29,8 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
       s.live = true;
       e.preventDefault();
       setDrag({ id: s.id, label: s.label, x: e.clientX, y: e.clientY });
-      setOver(target(e.clientX, e.clientY).zone);
+      const t = target(e.clientX, e.clientY);
+      setOver(t.zone); setOverBefore(t.before);
     };
     const up = (e: PointerEvent) => {
       const s = start.current;
@@ -37,7 +39,7 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
       justDragged.current = true;
       setTimeout(() => { justDragged.current = false; }, 50);
       const t = target(e.clientX, e.clientY);
-      setDrag(null); setOver(null);
+      setDrag(null); setOver(null); setOverBefore(null);
       if (t.zone && t.before !== s.id) dropRef.current(s.id, t.zone, t.before);
     };
     window.addEventListener("pointermove", move, { passive: false });
@@ -61,7 +63,7 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
     <div className="pointer-events-none fixed z-50 max-w-[16rem] -translate-x-1/2 -translate-y-1/2 truncate rounded-lg border border-accent bg-[#1f1708] px-3 py-1.5 text-[13px] font-semibold text-text shadow-xl"
       style={{ left: drag.x, top: drag.y }}>{drag.label}</div>
   ) : null;
-  return { bind, ghost, over, dragging: drag?.id ?? null };
+  return { bind, ghost, over, overBefore, dragging: drag?.id ?? null };
 }
 
 /** The little grip to drag with on a phone. */

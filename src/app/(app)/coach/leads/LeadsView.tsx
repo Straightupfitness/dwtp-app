@@ -6,6 +6,7 @@ import { deleteLeads, importLeads, saveLead, setLeads, type LeadInput, type Lead
 export type Lead = {
   id: string; first_name: string; last_name: string; email: string | null; phone: string | null; city: string | null; goals: string | null; notes: string | null; source: string; created_at: string;
   lead_type?: "online" | "in_person" | null; time_slot?: string | null; lead_source?: string | null; contact_method?: string | null; temperature?: "hot" | "warm" | "cold" | "dead" | null;
+  last_heard_on?: string | null; last_reached_on?: string | null; // November 19: last time she reached out / he did
 };
 
 const EMPTY: LeadInput = { first_name: "", last_name: "", email: "", phone: "", city: "", goals: "", notes: "", lead_type: "", time_slot: "", lead_source: "", contact_method: "", temperature: "" };
@@ -102,9 +103,14 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
   // November 19: tap Status, First or Last to sort (tap again to flip). Newest first until she picks one.
   const [sort, setSort] = useState<{ by: SortBy; dir: 1 | -1 }>({ by: "new", dir: 1 });
   const sortBy = (by: SortBy) => setSort((cur) => ({ by, dir: cur.by === by ? (cur.dir === 1 ? -1 : 1) : 1 }));
-  const shown = useMemo(() => {
+  // November 19 (Michael): marking a lead (hot, warm…) never moves her. The order (and who's shown) is worked out only
+  // when he changes the sort, a filter or the search, or a lead is added or removed.
+  const idsKey = leads.map((l) => l.id).join(",");
+  const [snap, setSnap] = useState({ key: idsKey, leads });
+  if (snap.key !== idsKey) setSnap({ key: idsKey, leads });
+  const order = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = leads.filter((l) => (!q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes, l.lead_source, l.contact_method, l.time_slot].some((x) => (x ?? "").toLowerCase().includes(q)))
+    const list = snap.leads.filter((l) => (!q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes, l.lead_source, l.contact_method, l.time_slot].some((x) => (x ?? "").toLowerCase().includes(q)))
       && (tempF === "all" || (tempF === "none" ? !l.temperature : l.temperature === tempF))
       && (typeF === "all" || l.lead_type === typeF));
     const name = (x: string | null | undefined) => (x ?? "").trim().toLowerCase();
@@ -115,9 +121,12 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
       first: (a, b) => blankLast(name(a.first_name), name(b.first_name)) || name(a.first_name).localeCompare(name(b.first_name)) * sort.dir || name(a.last_name).localeCompare(name(b.last_name)),
       last: (a, b) => blankLast(name(a.last_name), name(b.last_name)) || name(a.last_name).localeCompare(name(b.last_name)) * sort.dir || name(a.first_name).localeCompare(name(b.first_name)),
     };
-    return [...list].sort(cmp[sort.by]);
-  }, [leads, search, tempF, typeF, sort]);
-  const mark = (ids: string[], patch: { temperature?: Temp; lead_type?: LeadType }) => start(async () => { const r = await setLeads(ids, patch); if (r?.error) setMsg(r.error); });
+    return [...list].sort(cmp[sort.by]).map((l) => l.id);
+  }, [snap, search, tempF, typeF, sort]);
+  const byId = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
+  const shown = useMemo(() => order.map((id) => byId.get(id)).filter((l): l is Lead => !!l), [order, byId]);
+  const [details, setDetails] = useState<Lead | null>(null);
+  const mark = (ids: string[], patch: { temperature?: Temp; lead_type?: LeadType; last_heard_on?: string | null; last_reached_on?: string | null }) => start(async () => { const r = await setLeads(ids, patch); if (r?.error) setMsg(r.error); });
   const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const pickedRows = leads.filter((l) => picked.has(l.id));
@@ -159,13 +168,13 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
         <span>{shown.length} lead{shown.length === 1 ? "" : "s"}{search ? " found" : ""}</span>
       </div>
 
-      {/* November 19 (Michael): Status, First, Last, Phone, Email, Type, then the rest; sized to fit a computer screen with no
-          side-scrolling; the labels stay at the top while he scrolls (like the client sheet). Tap a name to edit. */}
+      {/* November 19 (Michael): Status, First, Last, Phone, Email, Notes, the two contact dates, and Details (type, time
+          slot, city, source in a pop-up). Fits a computer screen; the labels stay on top while he scrolls. */}
       <div className="hidden rounded-2xl border border-border bg-card lg:block">
         <table className="w-full table-fixed text-left text-[12.5px]">
           <colgroup>
-            <col className="w-8" /><col className="w-[7.5rem]" /><col className="w-[6.5rem]" /><col className="w-[7rem]" /><col className="w-[7.25rem]" /><col className="w-[11rem]" />
-            <col className="w-[5.25rem]" /><col className="w-[4.75rem]" /><col className="w-[6rem]" /><col className="w-[6rem]" /><col className="w-[5rem]" /><col />
+            <col className="w-8" /><col className="w-[7.5rem]" /><col className="w-[6.5rem]" /><col className="w-[7rem]" /><col className="w-[5.75rem]" /><col className="w-[9rem]" />
+            <col /><col className="w-[6.25rem]" /><col className="w-[6.25rem]" /><col className="w-[5rem]" />
           </colgroup>
           <thead className="text-[11px] uppercase tracking-wide text-dim">
             <tr>
@@ -180,27 +189,27 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
                 );
                 return (<>
                   <th className={th} />{sortTh("status", "Status")}{sortTh("first", "First")}{sortTh("last", "Last")}
-                  <th className={th}>Phone</th><th className={th}>Email</th><th className={th}>Type</th><th className={th}>Time</th>
-                  <th className={th}>City</th><th className={th}>Source</th><th className={th}>Method</th><th className={th}>Notes</th>
+                  <th className={th}>Phone</th><th className={th}>Email</th><th className={th}>Notes</th>
+                  <th className={`${th} normal-case`} title="The last day she reached out to you">She reached out</th>
+                  <th className={`${th} normal-case`} title="The last day you reached out to her">I reached out</th>
+                  <th className={th}>Details</th>
                 </>);
               })()}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {shown.map((l) => (
-              <tr key={l.id} className={`align-top ${picked.has(l.id) ? "bg-[#161310]" : ""} ${l.temperature === "dead" ? "opacity-60" : ""}`}>
+              <tr key={l.id} className={`align-top ${picked.has(l.id) ? "bg-[#161310]" : ""}`}>
                 <td className="p-2"><input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} aria-label={`Select ${l.first_name} ${l.last_name}`} className="mt-0.5 size-[17px] accent-[var(--accent)]" /></td>
                 <td className="p-2"><TempPick compact v={l.temperature ?? ""} onPick={(v) => mark([l.id], { temperature: v })} /></td>
                 <td className="truncate p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="max-w-full truncate font-semibold hover:text-accent" title={l.first_name}>{l.first_name || "—"}</button></td>
                 <td className="truncate p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="max-w-full truncate font-semibold hover:text-accent" title={l.last_name}>{l.last_name || <span className="text-dim">—</span>}</button></td>
-                <td className="whitespace-nowrap p-2">{fmtPhone(l.phone) || <span className="text-dim">—</span>}</td>
-                <td className="truncate p-2" title={l.email ?? ""}>{l.email || <span className="text-dim">—</span>}</td>
-                <td className="p-2"><TypeToggle v={l.lead_type ?? ""} onPick={(v) => mark([l.id], { lead_type: v })} /></td>
-                <td className="truncate p-2" title={l.time_slot ?? ""}>{l.time_slot || <span className="text-dim">—</span>}</td>
-                <td className="truncate p-2" title={l.city ?? ""}>{l.city || <span className="text-dim">—</span>}</td>
-                <td className="truncate p-2" title={l.lead_source ?? ""}>{l.lead_source || <span className="text-dim">—</span>}</td>
-                <td className="truncate p-2" title={l.contact_method ?? ""}>{l.contact_method || <span className="text-dim">—</span>}</td>
+                <td className="whitespace-nowrap p-2 pt-[9px] text-[10px]">{fmtPhone(l.phone) || <span className="text-dim">—</span>}</td>
+                <td className="truncate p-2 pt-[9px] text-[10px]" title={l.email ?? ""}>{l.email || <span className="text-dim">—</span>}</td>
                 <td className="p-2 text-[#cfcfcf]"><span className="line-clamp-3" title={l.notes ?? ""}>{l.notes}</span></td>
+                <td className="p-2"><DateCell v={l.last_heard_on ?? null} label="She reached out" onPick={(d) => mark([l.id], { last_heard_on: d })} /></td>
+                <td className="p-2"><DateCell v={l.last_reached_on ?? null} label="I reached out" onPick={(d) => mark([l.id], { last_reached_on: d })} /></td>
+                <td className="p-2"><button type="button" onClick={() => setDetails(l)} className="min-h-7 rounded-full border border-border px-2.5 text-[11px] font-semibold hover:border-accent hover:text-accent">Details</button></td>
               </tr>
             ))}
           </tbody>
@@ -217,7 +226,7 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
       </div>
       <ul className="divide-y divide-border rounded-2xl border border-border bg-card lg:hidden">
         {shown.map((l) => (
-          <li key={l.id} className={`flex items-start gap-3 px-3 py-2.5 ${picked.has(l.id) ? "bg-[#161310]" : ""} ${l.temperature === "dead" ? "opacity-60" : ""}`}>
+          <li key={l.id} className={`flex items-start gap-3 px-3 py-2.5 ${picked.has(l.id) ? "bg-[#161310]" : ""}`}>
             <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} aria-label={`Select ${l.first_name} ${l.last_name}`} className="mt-1 size-[18px] shrink-0 accent-[var(--accent)]" />
             <div className="min-w-0 flex-1 space-y-1">
               <button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="block w-full text-left">
@@ -258,6 +267,8 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
           </div>
         </div>
       )}
+
+      {details && <DetailsBox l={byId.get(details.id) ?? details} onClose={() => setDetails(null)} onSaved={() => { setDetails(null); setMsg("Saved."); }} />}
 
       {edit && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={edit.id ? "Edit lead" : "Add a lead"}>
@@ -345,13 +356,58 @@ function TempPick({ v, onPick, compact = false }: { v: Temp; onPick: (v: Temp) =
     </span>
   );
 }
-/** November 19: online or in person in one small button for the table: tap to go Online → In person → not set. */
-function TypeToggle({ v, onPick }: { v: LeadType; onPick: (v: LeadType) => void }) {
-  const next: LeadType = v === "" ? "online" : v === "online" ? "in_person" : "";
+
+const dayNice = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: d.slice(0, 4) === String(new Date().getFullYear()) ? undefined : "2-digit", timeZone: "UTC" });
+const todayLA = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+
+/** November 19: a contact date. Tap it: Today, pick a day, or clear. */
+function DateCell({ v, label, onPick }: { v: string | null; label: string; onPick: (d: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const ago = v ? Math.round((Date.parse(todayLA()) - Date.parse(v)) / 86_400_000) : null;
   return (
-    <button type="button" onClick={() => onPick(next)} title="Tap to change: Online, In person, or not set"
-      className={`min-h-7 whitespace-nowrap rounded-full border px-2 text-[11px] ${v ? "border-accent bg-accent font-semibold text-black" : "border-border text-dim"}`}>
-      {v === "online" ? "Online" : v === "in_person" ? "In person" : "Set"}
-    </button>
+    <span className="relative inline-block">
+      <button type="button" onClick={() => setOpen((x) => !x)} aria-label={`${label}: ${v ? dayNice(v) : "not set"}`}
+        className={`min-h-7 whitespace-nowrap rounded-md px-1 text-left text-[12px] hover:text-accent ${v ? "" : "text-dim"}`}>
+        {v ? <>{dayNice(v)}{ago !== null && <span className="block text-[10px] text-dim">{ago === 0 ? "today" : ago === 1 ? "yesterday" : `${ago} days ago`}</span>}</> : "+ Add"}
+      </button>
+      {open && (
+        <span className="absolute right-0 top-full z-30 mt-1 flex w-48 flex-col gap-1.5 rounded-xl border border-border bg-[#121212] p-2 shadow-xl">
+          <span className="text-[11px] text-dim">{label}</span>
+          <button type="button" onClick={() => { onPick(todayLA()); setOpen(false); }} className="min-h-9 rounded-lg bg-accent text-[13px] font-semibold text-black">Today</button>
+          <input type="date" max={todayLA()} defaultValue={v ?? ""} onChange={(e) => { if (e.target.value) { onPick(e.target.value); setOpen(false); } }}
+            className="min-h-9 rounded-lg border border-border bg-bg px-2 text-[13px] [color-scheme:dark]" aria-label={`Pick the day: ${label}`} />
+          <span className="flex justify-between">
+            {v ? <button type="button" onClick={() => { onPick(null); setOpen(false); }} className="min-h-8 text-[12px] text-[var(--red)]">Clear</button> : <span />}
+            <button type="button" onClick={() => setOpen(false)} className="min-h-8 text-[12px] text-dim">Close</button>
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** November 19: her details in a pop-up: online or in person, then time slot, city and source (and how you talk). */
+function DetailsBox({ l, onClose, onSaved }: { l: Lead; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<LeadInput>(toInput(l));
+  const [err, setErr] = useState("");
+  const [pending, start] = useTransition();
+  const box = "min-h-11 rounded-xl border border-border bg-card px-3 text-[15px] text-text outline-none focus:border-accent";
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Details" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await saveLead(l.id, f); if (r?.error) setErr(r.error); else onSaved(); }); }}
+        className="w-full max-w-sm space-y-2.5 rounded-[20px] border border-border bg-[#121212] p-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-[family-name:var(--font-display)] text-xl uppercase">{`${l.first_name} ${l.last_name}`.trim() || "Details"}</h2>
+          <button type="button" onClick={onClose} className="min-h-9 px-2 text-dim" aria-label="Close">✕</button>
+        </div>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">Type<TypePick v={f.lead_type} onPick={(v) => setF({ ...f, lead_type: v })} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">Time slot<input value={f.time_slot} onChange={(e) => setF({ ...f, time_slot: e.target.value })} className={box} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">City<input value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} className={box} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">Source<input value={f.lead_source} onChange={(e) => setF({ ...f, lead_source: e.target.value })} className={box} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">How you talk (Txt, IG DM…)<input value={f.contact_method} onChange={(e) => setF({ ...f, contact_method: e.target.value })} className={box} /></label>
+        {err && <p className="text-sm text-[var(--red)]">{err}</p>}
+        <button disabled={pending} className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">{pending ? "Saving…" : "Save"}</button>
+      </form>
+    </div>
   );
 }

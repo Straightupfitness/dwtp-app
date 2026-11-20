@@ -39,6 +39,7 @@ export default function KpiView({ d }: { d: Data }) {
   const [sure, setSure] = useState(false);
   const [pending, start] = useTransition();
   const plan = usePlan(d.items);
+  const [expSort, setExpSort] = useState<"cost" | "az" | "day">("cost");
   const planReady = d.planReady;
 
   // November 19: drag a client to another time slot. Shown right away; saved in the background.
@@ -63,6 +64,7 @@ export default function KpiView({ d }: { d: Data }) {
     const inList = inSlots.flatMap((x) => x.list);
     const inIncome = inSlots.reduce((a, x) => a + x.income, 0), rent = inSlots.reduce((a, x) => a + n(x.s.rent), 0);
     const inPaying = inList.filter((c) => n(c.monthly) > 0).length;
+    const inFull = inList.filter((c) => !n(c.monthly) && n(c.paid_amount) > 0).length; // November 19: paid in full counts as $0 a month here
     // Online: monthly payers, plus paid-in-full spread over the months she paid for (while it's still running).
     const onSlot = new Set(d.slots.filter(isOnline).map((s) => s.id));
     const onList = clients.filter((c) => c.slot_id && onSlot.has(c.slot_id)).map((c) => {
@@ -79,7 +81,7 @@ export default function KpiView({ d }: { d: Data }) {
     const bizNow = sum(biz), perNow = sum(per), bizAfter = sum(biz.filter((e) => !e.canceling)), perAfter = sum(per.filter((e) => !e.canceling));
     const net = inIncome - rent + onIncome - bizNow - perNow, netAfter = inIncome - rent + onIncome - bizAfter - perAfter;
     return {
-      slotOf, inSlots, inList, inIncome, rent, inPaying, inFree: inList.length - inPaying, inAvg: inPaying ? (inIncome - rent) / inPaying : 0,
+      slotOf, inSlots, inList, inIncome, rent, inPaying, inFull, inFree: inList.length - inPaying - inFull, inAvg: inPaying ? (inIncome - rent) / inPaying : 0,
       onList, onIncome, onMonthly, onFull, onFree: onList.length - onMonthly - onFull, onAvg: onMonthly + onFull ? onIncome / (onMonthly + onFull) : 0,
       loose, biz, per, bizNow, perNow, bizAfter, perAfter, net, netAfter, canceling: d.expenses.filter((e) => e.canceling),
     };
@@ -135,9 +137,10 @@ export default function KpiView({ d }: { d: Data }) {
     <div className="space-y-4">
       {/* 1. In person */}
       <Summary label="In-person training income / mo" big={money(k.inIncome)}
-        small={<>{k.inList.length} in-person clients · {k.inPaying} paying · {k.inFree} free<br />{money(k.inIncome)} − {money(k.rent)} rent = {money(k.inIncome - k.rent)} profit · {money(Math.round(k.inAvg))} average profit per paying client</>}>
+        lines={[<>{k.inList.length} in-person clients: {k.inPaying} paying{k.inFull ? `, ${k.inFull} paid in full` : ""}, {k.inFree} free</>,
+          <>− {money(k.rent)} rent = <b>{money(k.inIncome - k.rent)} profit</b> · {money(Math.round(k.inAvg))} average profit per paying client</>]}>
         <p className="text-[12px] text-dim">Drag a name to another time slot (on a phone, use the dots). Tap a name to edit, tap a time slot to change its rent.</p>
-        <div className="grid gap-2.5 md:grid-cols-2">
+        <div className="space-y-2.5">
           {k.inSlots.map(({ s, list, income, paying, profit }) => (
             <div key={s.id} data-drop={s.id} className={`overflow-hidden rounded-xl border transition ${dnd.over === s.id ? "border-accent ring-2 ring-accent" : "border-border"}`}>
               <button type="button" onClick={() => open("kpi_slots", "Edit time slot", s)} className="flex w-full items-baseline justify-between gap-2 bg-[#151515] px-3 py-2 text-left text-[13px] hover:text-accent">
@@ -149,8 +152,12 @@ export default function KpiView({ d }: { d: Data }) {
                   <li key={c.id} {...dnd.bind(c.id, c.name)} className="flex items-center gap-2 px-2 hover:bg-[#161616]">
                     <Grip />
                     <button type="button" onClick={() => open("kpi_clients", "Edit client", c)} className="flex min-h-10 min-w-0 flex-1 items-center justify-between gap-2 text-left">
-                      <span className="truncate text-[14px]">{c.name}{c.notes && <span className="block truncate text-[11px] text-dim">{c.notes}</span>}</span>
-                      <span className={`shrink-0 text-[13px] tabular-nums ${n(c.monthly) ? "font-semibold" : "text-dim"}`}>{n(c.monthly) ? `${money(n(c.monthly))}/mo` : "free"}</span>
+                      <span className="min-w-0 truncate text-[14px]">{c.name}
+                        {!n(c.monthly) && n(c.paid_amount) > 0 && (
+                          <span className="block truncate text-[12px] text-[#cfcfcf]">Paid in full: {money(n(c.paid_amount))}{startOf(c) ? ` · signed up ${dateNice(startOf(c)!)}` : ""}{c.expires_on ? ` · ${c.expires_on < d.today ? "expired" : "expires"} ${dateNice(c.expires_on)}` : ""}</span>
+                        )}
+                        {c.notes && <span className="block truncate text-[11px] text-dim">{c.notes}</span>}</span>
+                      <span className={`shrink-0 text-[13px] tabular-nums ${n(c.monthly) ? "font-semibold" : "text-dim"}`}>{n(c.monthly) ? `${money(n(c.monthly))}/mo` : n(c.paid_amount) ? "$0/mo" : "free"}</span>
                     </button>
                   </li>
                 ))}
@@ -174,7 +181,8 @@ export default function KpiView({ d }: { d: Data }) {
 
       {/* 2. Online */}
       <Summary label="Online training income / mo" big={money(Math.round(k.onIncome))}
-        small={<>{k.onList.length} online clients · {k.onMonthly} paying monthly · {k.onFull} paid in full{k.onFree ? ` · ${k.onFree} free or expired` : ""}<br />{money(Math.round(k.onAvg))} average profit per paying client · paid in full is spread over the months she paid for</>}>
+        lines={[<>{k.onList.length} online clients: {k.onMonthly} paying monthly, {k.onFull} paid in full{k.onFree ? `, ${k.onFree} free or expired` : ""}</>,
+          <>{money(Math.round(k.onAvg))} average profit per paying client · paid in full is spread over the months she paid for</>]}>
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-left text-[13px]">
             <thead className="bg-[#151515] text-[11px] uppercase tracking-wide text-dim"><tr><th className="p-2">Client</th><th className="p-2">Signed up</th><th className="p-2">Expires</th><th className="p-2 text-right">Paid</th><th className="p-2">For</th><th className="p-2 text-right">Per month</th></tr></thead>
@@ -197,9 +205,18 @@ export default function KpiView({ d }: { d: Data }) {
 
       {/* 3 and 4. Expenses */}
       {([["business", "Business expenses / mo", k.biz, k.bizNow, k.bizAfter], ["personal", "Personal expenses / mo", k.per, k.perNow, k.perAfter]] as const).map(([cat, title, list, now, after]) => (
-        <Summary key={cat} label={title} big={money(now)} small={<>{list.length} expense{list.length === 1 ? "" : "s"}{after !== now ? ` · ${money(after)} after canceling ${list.filter((e) => e.canceling).length}` : ""}</>}>
+        <Summary key={cat} label={title} big={money(now)} lines={[<>{list.length} expense{list.length === 1 ? "" : "s"}{list.some((e) => e.draw_day) ? "" : " · tap one to add the day it comes out"}</>,
+          after !== now ? <>{money(after)} a month after canceling {list.filter((e) => e.canceling).length}</> : <>Nothing marked to cancel</>]}>
+          {/* November 19: sort by cost, A to Z, or the day it comes out. */}
+          <div className="flex items-center gap-1.5 text-[12px]">
+            <span className="text-dim">Sort:</span>
+            {([["cost", "Cost"], ["az", "A–Z"], ["day", "Day of the month"]] as const).map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setExpSort(v)} aria-pressed={expSort === v}
+                className={`min-h-8 rounded-full border px-3 ${expSort === v ? "border-accent font-semibold text-accent" : "border-border text-dim"}`}>{l}</button>
+            ))}
+          </div>
           <ul className="divide-y divide-border rounded-xl border border-border">
-            {list.map((e) => (
+            {[...list].sort(expSort === "az" ? (a, b) => a.name.localeCompare(b.name) : expSort === "day" ? byDay : (a, b) => perMonth(b) - perMonth(a) || a.name.localeCompare(b.name)).map((e) => (
               <li key={e.id}>
                 <button type="button" onClick={() => open("kpi_expenses", "Edit expense", e)} className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[#161616] ${e.canceling ? "opacity-60" : ""}`}>
                   <span className="w-16 shrink-0 text-[12px] text-dim">{e.draw_day ? `the ${ordinal(e.draw_day)}` : "day ?"}</span>
@@ -215,11 +232,9 @@ export default function KpiView({ d }: { d: Data }) {
       ))}
 
       {/* 5. Net */}
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <p className="text-[11px] uppercase tracking-[0.12em] text-dim">Net profit / loss per month</p>
-        <p className={`mt-1 font-[family-name:var(--font-display)] text-[34px] leading-none tabular-nums ${k.net < 0 ? "text-[#ff8a8a]" : "text-[#7ddc8f]"}`}>{money(Math.round(k.net))}</p>
-        <p className="mt-1 text-[12px] text-dim">{money(k.inIncome - k.rent)} in person (after rent) + {money(Math.round(k.onIncome))} online − {money(k.bizNow)} business − {money(k.perNow)} personal{k.canceling.length ? ` · ${money(Math.round(k.netAfter))} after canceling ${k.canceling.length}` : ""}</p>
-      </div>
+      <Summary label="Net profit / loss per month" big={money(Math.round(k.net))} tone={k.net < 0 ? "bad" : "good"}
+        lines={[<>{money(k.inIncome - k.rent)} in person (after rent) + {money(Math.round(k.onIncome))} online</>,
+          <>− {money(k.bizNow)} business − {money(k.perNow)} personal{k.canceling.length ? ` · ${money(Math.round(k.netAfter))} after canceling ${k.canceling.length}` : ""}</>]} />
 
       {/* 6–8. The planner */}
       {planReady ? <>
@@ -266,17 +281,29 @@ export default function KpiView({ d }: { d: Data }) {
   );
 }
 
-/** One of the big numbers at the top. Tap it to open the details (it slides open). */
-function Summary({ label, big, small, children }: { label: string; big: string; small: React.ReactNode; children: React.ReactNode }) {
+/**
+ * One of the big numbers at the top. November 19: the number on the left, two easy-to-read lines on the right, as tall
+ * as the number. Tap it to open the details (it slides open).
+ */
+function Summary({ label, big, lines, children, tone }: { label: string; big: string; lines: [React.ReactNode, React.ReactNode]; children?: React.ReactNode; tone?: "good" | "bad" }) {
+  const head = (
+    <>
+      <span className="shrink-0">
+        <span className="block text-[11px] uppercase tracking-[0.12em] text-dim">{label}</span>
+        <span className={`mt-0.5 block font-[family-name:var(--font-display)] text-[34px] leading-[36px] tabular-nums ${tone === "good" ? "text-[#7ddc8f]" : tone === "bad" ? "text-[#ff8a8a]" : ""}`}>{big}</span>
+      </span>
+      <span className="min-w-0 flex-1 self-end text-[14px] leading-[18px] text-[#e2e2e2]">
+        <span className="block">{lines[0]}</span>
+        <span className="block">{lines[1]}</span>
+      </span>
+    </>
+  );
+  if (!children) return <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3">{head}</div>;
   return (
     <details data-drawer className="group rounded-2xl border border-border bg-card">
-      <summary className="flex cursor-pointer list-none items-start gap-3 p-4">
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] uppercase tracking-[0.12em] text-dim">{label}</span>
-          <span className="mt-1 block font-[family-name:var(--font-display)] text-[34px] leading-none tabular-nums">{big}</span>
-          <span className="mt-1.5 block text-[12px] leading-snug text-dim">{small}</span>
-        </span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="mt-1 shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+      <summary className="flex cursor-pointer list-none items-center gap-4 px-4 py-3">
+        {head}
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
       </summary>
       <div className="space-y-2.5 px-3 pb-3">{children}</div>
     </details>

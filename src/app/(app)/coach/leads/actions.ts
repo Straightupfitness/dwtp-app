@@ -28,12 +28,16 @@ const clean = (l: Partial<LeadInput>) => ({
 const missingTable = (m: string) => /relation .*leads|does not exist|schema cache/i.test(m) ? "Run the leads SQL files in Supabase first." : m;
 
 /** November 17: mark one or more leads hot, warm, cold or dead (or online / in person), in one tap. */
-export async function setLeads(ids: string[], patch: { temperature?: Temp; lead_type?: LeadType }) {
+export async function setLeads(ids: string[], patch: { temperature?: Temp; lead_type?: LeadType; last_heard_on?: string | null; last_reached_on?: string | null }) {
   const db = await coach();
   if (!db) return { error: "Coach only" };
   const row: Record<string, string | null> = { updated_at: new Date().toISOString() };
   if (patch.temperature !== undefined) row.temperature = patch.temperature || null;
   if (patch.lead_type !== undefined) row.lead_type = patch.lead_type || null;
+  // November 19: the last day she reached out to him, and the last day he reached out to her.
+  const day = (d: string | null | undefined) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
+  if (patch.last_heard_on !== undefined) row.last_heard_on = day(patch.last_heard_on);
+  if (patch.last_reached_on !== undefined) row.last_reached_on = day(patch.last_reached_on);
   const { error } = await db.from("leads").update(row).in("id", ids);
   if (error) return { error: missingTable(error.message) };
   revalidatePath("/coach/leads");
@@ -89,4 +93,13 @@ export async function importLeads(rows: Partial<LeadInput>[]) {
   }
   revalidatePath("/coach/leads");
   return { ok: true, added: add.length, skipped };
+}
+
+/** November 19: he texted her from the app (Text from my phone), so "I reached out" becomes today. */
+export async function markReachedOut(id: string) {
+  const db = await coach();
+  if (!db) return { error: "Coach only" };
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const { error } = await db.from("leads").update({ last_reached_on: today }).eq("id", id);
+  return error ? { error: error.message } : { ok: true };
 }

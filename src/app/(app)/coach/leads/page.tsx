@@ -8,7 +8,10 @@ export default async function LeadsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
   if (me?.role !== "coach") redirect("/today");
-  const { data, error } = await supabase.from("leads").select("id, first_name, last_name, email, phone, city, goals, notes, source, created_at, lead_type, time_slot, lead_source, contact_method, temperature").order("created_at", { ascending: false });
+  const cols = "id, first_name, last_name, email, phone, city, goals, notes, source, created_at, lead_type, time_slot, lead_source, contact_method, temperature";
+  // November 19: the contact dates (SQL 33), read with everything else; without that column yet, the rest still loads.
+  const withDates = await supabase.from("leads").select(`${cols}, last_heard_on, last_reached_on`).order("created_at", { ascending: false });
+  const { data, error } = withDates.error ? await supabase.from("leads").select(cols).order("created_at", { ascending: false }) : withDates;
   return (
     <section className="mx-auto max-w-7xl space-y-3.5 pb-28">
       <header>
