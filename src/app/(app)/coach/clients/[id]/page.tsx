@@ -7,7 +7,6 @@ import CoachProgress from "@/components/CoachProgress";
 import AdminStuff from "@/components/AdminStuff";
 import { BadgesCard } from "@/components/ProgressView";
 import { loadDaily } from "@/lib/daily";
-import PageRecorder from "@/components/PageRecorder";
 import OpenOnHash from "@/components/OpenOnHash";
 import CoachWorkoutDays from "@/components/CoachWorkoutDays";
 import { loadSchedule, loadWorkoutWeek } from "@/lib/workouts";
@@ -188,7 +187,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             <Link href={`/coach/text?ids=${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#7a7a7a] px-3 text-[13px] font-semibold">📱 Text from my phone</Link>
           ) : <span className="text-[12px] text-dim">No phone number to text</span>}
           <SeeHerApp clientId={id} />
-          <PageRecorder clientId={id} first={first} />
+          {/* November 20: the app-wide "Record myself" (bottom right) sends to her chat from this page. */}
+          <span hidden data-record-client={id} data-record-first={first} />
           <AdminStuff first={first}>
             <WelcomeButton clientId={id} failed={welcome === "failed"} />
             <SignInCodeButton clientId={id} first={first} phone={(p.phone as string | null) ?? null} />

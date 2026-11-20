@@ -8,7 +8,7 @@ const wk = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US",
  * potassium, water, steps. A bar is solid when she hit the target and faded when she was under it; calories over
  * the target are red. The dashed line is the target (every bar is drawn against its own target). Averages on the left.
  */
-export default function DailyCombo({ days, goals }: { days: Daily["days"]; goals: Daily["goals"] }) {
+export default function DailyCombo({ days, goals, withWeight = false }: { days: Daily["days"]; goals: Daily["goals"]; withWeight?: boolean }) {
   const g = goals;
   type Row = { key: string; label: string; color: string; unit: string; goal: number | null; get: (d: Daily["days"][number]) => number | null; hit: (v: number) => "hit" | "under" | "over" };
   const rows: Row[] = [
@@ -28,6 +28,7 @@ export default function DailyCombo({ days, goals }: { days: Daily["days"]; goals
   // November 15 (Michael): six separate graphs, one per number, each with its title, average and target.
   return (
     <div className="space-y-4">
+      {withWeight && <WeightRow days={days} goal={g.goalWeight} />}
       {rows.map((r) => {
         const a = avg(r), logged = vals(r).length, hit = vals(r).filter((v) => r.hit(v) === "hit").length;
         const target = r.goal ?? Math.max(1, ...vals(r)) / CAP; // no target yet (calories): against her highest day
@@ -53,23 +54,71 @@ export default function DailyCombo({ days, goals }: { days: Daily["days"]; goals
                 })}
               </div>
             </div>
-            {/* November 20 (Michael): every day labeled, easy to read: the weekday letter over the date (up to a month),
-                or the day of the month (longer ranges), with the month at the 1st. */}
-            <div className={`mt-1 flex leading-tight ${days.length > 60 ? "gap-px" : "gap-[3px]"}`}>
-              {days.map((d) => {
-                const dom = Number(d.date.slice(8));
-                const has = r.get(d) !== null && (r.get(d) ?? 0) > 0;
-                return (
-                  <span key={d.date} className={`flex-1 overflow-visible whitespace-nowrap text-center ${has ? "text-[#d6d6d6]" : "text-[#6a6a6a]"} ${days.length > 60 ? "text-[8px]" : "text-[10px]"}`}>
-                    {days.length <= 31 && <span className="block font-semibold">{wk(d.date)}</span>}
-                    <span className="block">{dom === 1 ? new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) : dom}</span>
-                  </span>
-                );
-              })}
-            </div>
+            <Labels days={days} has={(d) => (r.get(d) ?? 0) > 0} />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * November 20 (Michael): the day labels under each chart: every day, easy to read. Up to a month: the weekday letter
+ * over the date; up to ~3 months: the date only; longer: the month at the 1st and the date on Mondays.
+ */
+function Labels({ days, has }: { days: Daily["days"]; has: (d: Daily["days"][number]) => boolean }) {
+  return (
+    <div className={`mt-1 flex leading-tight ${days.length > 60 ? "gap-px" : "gap-[3px]"}`}>
+      {days.map((d) => {
+        const dom = Number(d.date.slice(8));
+        const month = new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+        const monday = new Date(d.date + "T12:00:00Z").getUTCDay() === 1;
+        const text = dom === 1 ? month : days.length > 100 ? (monday ? String(dom) : "") : String(dom);
+        return (
+          <span key={d.date} className={`flex-1 overflow-visible whitespace-nowrap text-center ${has(d) ? "text-[#d6d6d6]" : "text-[#6a6a6a]"} ${days.length > 60 ? "text-[8px]" : "text-[10px]"}`}>
+            {days.length <= 31 && <span className="block font-semibold">{wk(d.date)}</span>}
+            <span className="block">{text}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** November 20 (Michael): her weight on the same day-by-day timeline as the other charts (a dot on each weigh-in day). */
+function WeightRow({ days, goal }: { days: Daily["days"]; goal: number | null }) {
+  const H = 110;
+  const ws = days.map((d) => d.weight).filter((w): w is number => w !== null);
+  if (!ws.length) return (
+    <div>
+      <p className="mb-1 flex items-center gap-1.5 font-[family-name:var(--font-display)] text-[13px] uppercase tracking-wide"><span className="size-2.5 rounded-sm bg-[#f5a623]" />Weight</p>
+      <p className="text-[12px] text-dim">No weigh-ins in this time.</p>
+    </div>
+  );
+  // Scaled to her own weigh-ins (at least a 4 lb window) so small changes show; the goal line only shows when it fits.
+  const mid = (Math.min(...ws) + Math.max(...ws)) / 2, half = Math.max(2, (Math.max(...ws) - Math.min(...ws)) / 2 + 0.5);
+  const lo = mid - half, hi = mid + half;
+  const y = (v: number) => H - 8 - ((v - lo) / Math.max(1, hi - lo)) * (H - 16);
+  const n = days.length, x = (i: number) => ((i + 0.5) / n) * 100;
+  const pts = days.map((d, i) => (d.weight !== null ? { i, v: d.weight, date: d.date } : null)).filter((p): p is { i: number; v: number; date: string } => !!p);
+  const first = pts[0], last = pts[pts.length - 1];
+  const ch = first && last && first !== last ? Math.round((last.v - first.v) * 10) / 10 : null;
+  return (
+    <div>
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
+        <p className="flex items-center gap-1.5 font-[family-name:var(--font-display)] text-[13px] uppercase tracking-wide"><span className="size-2.5 rounded-sm bg-[#f5a623]" />Weight</p>
+        <p className="text-[12px] text-dim">latest <b className="text-text">{Math.round(last.v * 10) / 10} lbs</b>{ch !== null ? <> · <span className={ch < 0 ? "text-[#7ee2a8]" : ""}>{ch > 0 ? "+" : ""}{ch} lbs</span> in this time</> : ""} · {pts.length} of {n} days weighed{goal ? ` · goal ${goal}` : ""}</p>
+      </div>
+      <div className="relative" style={{ height: H }}>
+        <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+          {goal && goal >= lo && goal <= hi && <line x1="0" x2="100" y1={y(goal)} y2={y(goal)} stroke="#7ee2a8" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.6" />}
+          <path d={pts.map((p, k) => `${k ? "L" : "M"}${x(p.i)},${y(p.v)}`).join(" ")} fill="none" stroke="#f5a623" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        </svg>
+        {days.map((d, i) => d.weight === null
+          ? <span key={d.date} className="absolute bottom-0 h-0.5 bg-[#4a4a4a]" style={{ left: `calc(${(i / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)` }} title={`${d.date}: no weigh-in`} />
+          : <span key={d.date} className={`absolute ${n > 60 ? "size-1.5" : "size-2"} -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f5a623]`} style={{ left: `${x(i)}%`, top: y(d.weight) }} title={`${d.date}: ${d.weight} lbs`} />)}
+      </div>
+      <Labels days={days} has={(d) => d.weight !== null} />
     </div>
   );
 }

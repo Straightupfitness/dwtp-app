@@ -1,7 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PrompterRecorder, { groupsFromText } from "@/components/PrompterRecorder";
-import FloatingRecorder from "@/components/FloatingRecorder";
 import { saveReply } from "./actions";
 
 type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
@@ -39,6 +38,12 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
   const [points, setPoints] = useState(initialDraft);
   const [summary, setSummary] = useState<Summary>(initialSummary);
   const [video, setVideo] = useState<string | null>(null);
+  // November 20 (Michael): the app-wide "Record myself" hands its video here when he taps "Use as her check-in reply".
+  useEffect(() => {
+    const on = (e: Event) => setVideo((e as CustomEvent<string>).detail);
+    window.addEventListener("dwtp-reply-video", on);
+    return () => window.removeEventListener("dwtp-reply-video", on);
+  }, []);
   const [busy, setBusy] = useState<"" | "draft" | "save" | "send">("");
   const [msg, setMsg] = useState("");
   const [sent, setSent] = useState(sentAt);
@@ -90,9 +95,7 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
         <p className="text-sm">Your video reply</p>
         {videoUrl && !video && <video src={videoUrl} controls playsInline className="max-h-[420px] w-full rounded-lg bg-black" />}
         {video && <p className="rounded-lg border border-[#2f5d3a] p-2 text-[13px] text-[#7ddc8f]">Your new video is ready. Tap Send to her (or Save draft).</p>}
-        {/* November 20 (Michael): "Record yourself" floats in the corner: just his camera, while he scrolls through her data. */}
-        <FloatingRecorder folder={`${clientId}/replies`} onUploaded={setVideo} hasVideo={!!(videoUrl || video)} />
-        <p className="text-[12px] text-dim">Tap <b className="text-text">🎥 Record yourself</b> (bottom right) any time. It records only you, while you scroll through her check-in.</p>
+        <p className="text-[12px] text-dim">Tap <b className="text-text">🎥 Record myself</b> (bottom right) any time: only you, or the screen with you in a bubble. When you stop, tap <b className="text-text">Use as her check-in reply</b>.</p>
         <details className="text-[13px]">
           <summary className="cursor-pointer text-dim">Or record full screen with your talking points (teleprompter)</summary>
           <div className="mt-2">

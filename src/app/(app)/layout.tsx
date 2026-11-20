@@ -1,5 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import UndoKeys from "@/components/UndoKeys";
+import RecordMyself from "@/components/RecordMyself";
 import TopBar from "@/components/TopBar";
 import TimezoneSync from "@/components/TimezoneSync";
 import AppBadge from "@/components/AppBadge";
@@ -56,6 +57,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <InstallCatcher />
       {user && !viewing && <AppBadge count={alerts ?? 0} />}
       {user && !viewing && <UndoKeys />}
+      {/* November 20 (Michael): "Record myself" on every page of his app, and while he looks at hers. */}
+      {user && (coach || viewing) && <RecordMyself viewing={viewing ? { id: viewing.id, first: (viewing.name ?? "her").split(" ")[0] } : null} />}
       {user && !coach && !viewing && <StillHere />}
     </>
   );

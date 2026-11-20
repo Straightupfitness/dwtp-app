@@ -9,7 +9,6 @@ import { loadBadWeeks } from "@/lib/bad-weeks";
 import { loadDaily } from "@/lib/daily";
 import { loadFoodWeek } from "@/lib/food-week";
 import FoodWeek from "@/components/FoodWeek";
-import WeightDots from "@/components/WeightDots";
 import DailyCombo from "@/components/DailyCombo";
 import { BAD_WEEK_SCREEN, screensFor } from "@/lib/checkin-screens";
 import TranscribeButton from "./TranscribeButton";
@@ -18,8 +17,13 @@ export const maxDuration = 120;
 
 const SCORES = ["sleep", "energy", "stress", "hunger"] as const;
 
-export default async function CheckinReview({ params }: { params: Promise<{ id: string }> }) {
+// November 20 (Michael): the graphs default to the last 28 days; he can widen them to 30 days, 90 days or 6 months.
+const RANGES = [{ r: 28, label: "Default" }, { r: 30, label: "30 days" }, { r: 90, label: "90 days" }, { r: 180, label: "6 months" }];
+
+export default async function CheckinReview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ r?: string }> }) {
   const { id } = await params;
+  const { r } = await searchParams;
+  const range = RANGES.find((x) => String(x.r) === r)?.r ?? 28;
   const supabase = await createClient();
   const { data: c } = await supabase.from("checkins").select("*, checkin_replies(*)").eq("id", id).single();
   if (!c) notFound();
@@ -29,13 +33,11 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   const [d, { data: baseline }, daily] = await Promise.all([
     weekData(supabase, c.client_id, c.week_number),
     supabase.from("checkins").select("sleep, energy, stress, hunger").eq("client_id", c.client_id).order("week_number").limit(1).maybeSingle(),
-    loadDaily(supabase, c.client_id, 60),
+    loadDaily(supabase, c.client_id, Math.max(range, 60)),
   ]);
   // November 1: everything Michael used to have open in Trainerize next to VideoAsk, on this one screen.
   const foodWeek = await loadFoodWeek(supabase, c.client_id, { end: d.end });
   const badWeeks = await loadBadWeeks(supabase, c.client_id); // November 6
-  const weights60 = daily.weights.filter((w) => w.date >= daily.days[0].date);
-  const firstW = weights60[0], lastW = weights60[weights60.length - 1];
   const last = d.previous[0] ?? null;
   const sleepShots = ((c.answers?.sleep_photos ?? []) as string[]);
   // November 10: a video can come with any answer in the new check-in.
@@ -59,8 +61,12 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
   const shown = new Set<string>();
   const val = (id: string) => (answerMap[id] !== undefined ? answerMap[id] : (c as Record<string, unknown>)[id]);
   const fmtAnswer = (v: unknown) => (Array.isArray(v) ? v.join(" · ") : v === null || v === undefined ? "" : String(v));
+  // November 20 (Michael): a list answer (like "Your habits right now") shows as bullets, one under the other.
+  const answerView = (v: unknown) => Array.isArray(v)
+    ? (v.length ? <ul className="list-disc space-y-0.5 pl-5 text-[15px] marker:text-accent">{v.map((x, i) => <li key={i}>{String(x)}</li>)}</ul> : null)
+    : fmtAnswer(v) ? <p className="whitespace-pre-line text-[15px]">{fmtAnswer(v)}</p> : null;
   const leftover = answers.filter(([k]) => !screens.some((sc) => sc.fields.some((f) => f.id === k)));
-  const combo = daily.days.slice(-28);
+  const combo = daily.days.slice(-range);
   const workouts = await loadWeekWorkouts(supabase, c.client_id, d.start, d.end);
 
   return (
@@ -104,7 +110,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
                       {score ? (
                         <p className="text-[15px]"><b className="font-[family-name:var(--font-display)] text-2xl">{String(v ?? "–")}</b><span className="text-dim">/10</span>
                           <span className="ml-2 text-[12px] text-dim">{prev !== null && typeof v === "number" ? `${v - prev > 0 ? "+" : ""}${v - prev} vs last week` : "first check-in"}{base && base !== v ? ` · started at ${base}` : ""}</span></p>
-                      ) : fmtAnswer(v) && <p className="whitespace-pre-line text-[15px]">{fmtAnswer(v)}</p>}
+                      ) : answerView(v)}
                       {answerVideos[f.id] && signed.get(answerVideos[f.id]) && <video src={signed.get(answerVideos[f.id])} controls playsInline preload="metadata" className="mt-1 max-h-[420px] rounded-xl bg-black" />}
                     </div>
                   );
@@ -115,7 +121,7 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
           {leftover.filter(([k]) => !shown.has(k)).map(([k, v]) => (
             <li key={k} className="border-t border-border pt-3">
               <p className="text-[13px] font-semibold text-accent">{labels[k] ?? k}</p>
-              {fmtAnswer(v) && <p className="whitespace-pre-line text-[15px]">{fmtAnswer(v)}</p>}
+              {answerView(v)}
               {answerVideos[k] && signed.get(answerVideos[k]) && <video src={signed.get(answerVideos[k])} controls playsInline preload="metadata" className="mt-1 max-h-[420px] rounded-xl bg-black" />}
             </li>
           ))}
@@ -141,18 +147,19 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
             </div>)}
       </div>
 
-      {/* 2. Her graphs */}
-      <div className="space-y-3 rounded-[18px] border border-border bg-card p-4">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">Weight · 60 days</h2>
-          {firstW && lastW && firstW !== lastW && <span className={`text-[13px] font-semibold ${lastW.lbs < firstW.lbs ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lastW.lbs < firstW.lbs ? "−" : "+"}{Math.abs(Math.round((lastW.lbs - firstW.lbs) * 10) / 10)} lbs</span>}
+      {/* 2. Her graphs: weight on the same day-by-day timeline as everything else */}
+      <div id="graphs" className="scroll-mt-20 space-y-3 rounded-[18px] border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">Her graphs · last {range === 180 ? "6 months" : `${range} days`}</h2>
+          <div className="flex gap-1 rounded-full border border-border p-0.5 text-[12px]">
+            {RANGES.map((x) => (
+              <Link key={x.r} href={x.r === 28 ? `/coach/checkins/${id}#graphs` : `/coach/checkins/${id}?r=${x.r}#graphs`} scroll={false}
+                className={`rounded-full px-3 py-1 ${x.r === range ? "bg-accent font-semibold text-black" : "text-dim hover:text-text"}`}>{x.label}</Link>
+            ))}
+          </div>
         </div>
-        <p className="text-[13px] text-[#a8a8a8]">{d.weekWeights.length}/7 weigh-ins this week{lastW ? <> · latest <b className="text-text">{lastW.lbs} lbs</b></> : ""}{d.profile?.goal_weight_lbs ? ` · goal ${d.profile.goal_weight_lbs}` : ""}</p>
-        <WeightDots points={weights60} goal={daily.goals.goalWeight} />
-      </div>
-      <div className="space-y-3 rounded-[18px] border border-border bg-card p-4">
-        <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">Calories, protein, fiber, potassium, water, steps · 28 days</h2>
-        <DailyCombo days={combo} goals={daily.goals} />
+        <p className="text-[13px] text-[#a8a8a8]">{d.weekWeights.length}/7 weigh-ins in her check-in week</p>
+        <DailyCombo days={combo} goals={daily.goals} withWeight />
         <p className="text-[11px] text-dim">Solid = hit the target · faded = under it · red = over her calories · a gray dash = nothing logged that day.</p>
       </div>
 
@@ -185,6 +192,8 @@ export default async function CheckinReview({ params }: { params: Promise<{ id: 
 
       {/* 5. Talking points and his reply */}
       <div className="rounded-[18px] border border-[#3a3020] bg-card p-4">
+        {/* "Record myself" (in the layout) offers "Use as her check-in reply" on this page. */}
+        <span hidden data-record-checkin={c.id} data-record-client={c.client_id} data-record-first={(d.profile?.full_name ?? "her").split(" ")[0]} />
         <ReplyEditor checkinId={c.id} clientId={c.client_id} initialText={reply?.final_text ?? ""} initialDraft={reply?.ai_draft ?? ""}
           initialSummary={(c.ai_summary as never) ?? null} videoUrl={reply?.video_path ? signed.get(reply.video_path) ?? null : null} sentAt={reply?.sent_at ?? null} />
       </div>
