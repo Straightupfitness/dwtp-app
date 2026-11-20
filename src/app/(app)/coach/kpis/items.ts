@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 export type PlanItem = {
   id: string; kind: "action" | "matrix" | "outline"; parent_id: string | null; text: string; note: string | null;
   quadrant: number | null; position: number; done: boolean; collapsed: boolean;
+  sched_at?: string | null; sched_minutes?: number | null; // November 20: on the scheduler (when, and how long)
 };
 
 async function coach() {
@@ -24,6 +25,8 @@ export async function saveItems(rows: PlanItem[]) {
     id: r.id, kind: r.kind, parent_id: r.parent_id && UUID.test(r.parent_id) ? r.parent_id : null, text: String(r.text ?? "").slice(0, 5000),
     note: r.note ? String(r.note).slice(0, 10000) : null, quadrant: r.quadrant == null || r.kind === "action" ? (r.kind === "matrix" ? 1 : null) : Math.min(4, Math.max(1, Math.round(Number(r.quadrant) || 1))), // November 20: outline lines carry their box too
     position: Number.isFinite(Number(r.position)) ? Number(r.position) : 0, done: !!r.done, collapsed: !!r.collapsed, updated_at: new Date().toISOString(),
+    ...(r.sched_at !== undefined ? { sched_at: r.sched_at && !Number.isNaN(Date.parse(r.sched_at)) ? new Date(r.sched_at).toISOString() : null,
+      sched_minutes: r.sched_at ? Math.min(720, Math.max(15, Math.round(Number(r.sched_minutes) || 60))) : null } : {}),
   }));
   if (!clean.length) return { ok: true };
   // Parents first, so a new line's parent exists before it does.

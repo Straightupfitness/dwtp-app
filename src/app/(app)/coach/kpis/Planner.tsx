@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Grip, useDnd } from "@/components/useDnd";
+import { useDnd } from "@/components/useDnd";
 import { deleteItems, saveItems, type PlanItem } from "./items";
 
 /**
@@ -113,14 +113,6 @@ type Plan = ReturnType<typeof usePlan>;
 
 const Saved = ({ s }: { s: string }) => s ? <span className={`text-[11px] ${s === "saving" || s === "saved" ? "text-dim" : "text-[var(--red)]"}`}>{s === "saving" ? "Saving…" : s === "saved" ? "Saved" : s}</span> : null;
 
-/** Place a line at a position: before `before`, or at the end. */
-function posAt(list: PlanItem[], before: string | null, moving?: string) {
-  const l = list.filter((i) => i.id !== moving).sort(byPos);
-  if (!before) return (l.at(-1)?.position ?? 0) + 1;
-  const i = l.findIndex((x) => x.id === before);
-  if (i < 0) return (l.at(-1)?.position ?? 0) + 1;
-  return i === 0 ? l[0].position - 1 : (l[i - 1].position + l[i].position) / 2;
-}
 
 /** Indented text (tabs, spaces, "- " or "• " bullets) → lines with their depth. Workflowy's plain-text export works too. */
 function parseOutline(text: string) {
@@ -159,16 +151,54 @@ export function Matrix({ plan }: { plan: Plan }) {
   const [showDone, setShowDone] = useState(false);
   const [q, setQ] = useState("");
 
-  // Drag a bullet (and everything under it) within a box or into another one.
-  const dnd = useDnd((id, zone, before) => {
-    const m = byId.get(id); if (!m) return;
+  // November 20: several bullets can be picked (⇧ or ⌘-click their dots, or Select on a phone) and dragged together.
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [selMode, setSelMode] = useState(false);
+  const picked = useCallback((id: string) => {
+    if (!sel.has(id) || sel.size < 2) return [id];
+    // In screen order, and not a bullet whose parent is also picked (it comes along anyway).
+    const list = [...sel].map((x) => byId.get(x)).filter((x): x is PlanItem => !!x)
+      .filter((x) => { for (let c = x.parent_id ? byId.get(x.parent_id) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (sel.has(c.id)) return false; return true; });
+    const order = (x: PlanItem) => { const path: number[] = []; for (let c: PlanItem | undefined = x; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) path.unshift(c.position); return path; };
+    return list.sort((a, b) => { const pa = order(a), pb = order(b); for (let k = 0; k < Math.min(pa.length, pb.length); k++) if (pa[k] !== pb[k]) return pa[k] - pb[k]; return pa.length - pb.length; }).map((x) => x.id);
+  }, [sel, byId]);
+
+  // Drag bullets (and everything under them) within a box, into another one, or onto the scheduler.
+  const dnd = useDnd((rawId, zone, before) => {
+    const fromCal = rawId.startsWith("cal:");
+    const id = fromCal ? rawId.slice(4) : rawId;
+    const ids = fromCal ? [id] : picked(id);
+    if (zone.startsWith("slot|")) { // onto a day and time: one after another, each keeping its length
+      const [, day, mins] = zone.split("|");
+      let at = new Date(`${day}T00:00:00`).getTime() + Number(mins) * 60_000;
+      const rows: PlanItem[] = [];
+      for (const x of ids) { const m = byId.get(x); if (!m) continue; const len = m.sched_minutes ?? 60; rows.push({ ...m, sched_at: new Date(at).toISOString(), sched_minutes: len }); at += len * 60_000; }
+      plan.put(rows); return;
+    }
+    if (fromCal) return; // a block dropped off the scheduler stays where it was
     const box = (zone === "box-p" ? null : Number(zone.replace("box-", ""))) as Box;
-    if (!before) { plan.put([{ ...m, parent_id: null, quadrant: box, position: posAt(roots(box), null, id) }]); return; }
-    const t = byId.get(before); if (!t || t.id === id) return;
-    for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === id) return; // not into itself
-    const parent = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
-    plan.put([{ ...m, parent_id: parent, quadrant: parent ? m.quadrant : box, position: posAt(parent ? kids.get(parent) ?? [] : roots(box), t.id, id) }]);
+    const t = before ? byId.get(before) : undefined;
+    if (t && ids.includes(t.id)) return;
+    for (const x of ids) for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === x) return; // not into itself
+    const parent = t?.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
+    const list = (t && parent ? kids.get(parent) ?? [] : roots(box)).filter((x) => !ids.includes(x.id));
+    // Spread the moved bullets evenly between the bullet above the drop spot and the one they land in front of.
+    const k = t ? list.findIndex((x) => x.id === t.id) : list.length;
+    const lo = k > 0 ? list[k - 1].position : (list[0]?.position ?? 1) - ids.length - 1;
+    const hi = k < list.length ? list[k].position : lo + ids.length + 1;
+    plan.put(ids.map((x, n) => { const m = byId.get(x)!; return { ...m, parent_id: parent, quadrant: parent ? m.quadrant : box, position: lo + ((hi - lo) * (n + 1)) / (ids.length + 1) }; }));
   });
+  // Esc lets go of the picked bullets; Delete / Backspace removes them (when not typing).
+  useEffect(() => {
+    if (!sel.size) return;
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (document.activeElement as HTMLElement | null)?.matches("input, textarea");
+      if (e.key === "Escape") { setSel(new Set()); return; }
+      if (!typing && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); plan.remove([...sel]); setSel(new Set()); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sel, plan]);
   // ⌘Z / Ctrl+Z undoes the last step here (and ⇧⌘Z / Ctrl+Y redoes it), unless she's typing in some other box on the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,7 +218,7 @@ export function Matrix({ plan }: { plan: Plan }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [plan]);
   const setAll = (collapsed: boolean) => plan.put(items.filter((i) => (kids.get(i.id)?.length ?? 0) > 0 && i.collapsed !== collapsed).map((i) => ({ ...i, collapsed })));
-  const shared = { plan, items, byId, kids, roots, boxOf, dnd, showDone, needle: q.trim().toLowerCase() };
+  const shared = { plan, items, byId, kids, roots, boxOf, dnd, showDone, needle: q.trim().toLowerCase(), sel, setSel, selMode };
 
   return (
     <div data-planner className="space-y-2">
@@ -199,15 +229,24 @@ export function Matrix({ plan }: { plan: Plan }) {
         <button type="button" onClick={() => setShowDone((x) => !x)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">{showDone ? "Hide completed" : "Show completed"}</button>
         <button type="button" onClick={() => setAll(false)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Expand all</button>
         <button type="button" onClick={() => setAll(true)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Collapse all</button>
+        <button type="button" onClick={() => { setSelMode((x) => !x); setSel(new Set()); }} aria-pressed={selMode} className={`min-h-10 rounded-xl border px-3 text-[12px] ${selMode ? "border-accent text-accent" : "border-border text-dim"}`}>{selMode ? "Done picking" : "Pick several"}</button>
         <Saved s={plan.status} />
       </div>
+      {sel.size > 0 && (
+        <p className="flex flex-wrap items-center gap-2 rounded-xl border border-accent/60 bg-[#1f1708] px-3 py-1.5 text-[13px]">
+          <b>{sel.size} picked</b><span className="text-dim">Drag one of them to move them all, or onto a day.</span>
+          <button type="button" onClick={() => { plan.remove([...sel]); setSel(new Set()); }} className="min-h-8 text-[var(--red)]">Delete</button>
+          <button type="button" onClick={() => setSel(new Set())} className="min-h-8 text-dim underline">Clear</button>
+        </p>
+      )}
+      <Scheduler plan={plan} items={items} dnd={dnd} />
       <div className="grid gap-2 md:grid-cols-2">
         {BOXES.map((b) => <OutlineBox key={b.box} {...b} {...shared} />)}
       </div>
       <OutlineBox {...PROJECTS} {...shared} />
       <details className="text-[12px] text-dim">
         <summary className="cursor-pointer">How it works (keyboard shortcuts)</summary>
-        <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dots into another box, or up and down, and everything under it comes along · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · ⌘Z / Ctrl+Z: undo · ⇧⌘Z / Ctrl+Y: redo · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
+        <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dot into another box, up or down, or onto a day and time in the scheduler; everything under it comes along · ⇧ or ⌘-click dots to pick several, then drag one to move them all (Esc lets go, Delete removes them) · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓ (or → at the end of a line, ← at the start): move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · ⌘Z / Ctrl+Z: undo · ⇧⌘Z / Ctrl+Y: redo · Click a bullet&apos;s dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
       </details>
       {dnd.ghost}
     </div>
@@ -217,10 +256,12 @@ export function Matrix({ plan }: { plan: Plan }) {
 type Shared = {
   plan: Plan; items: PlanItem[]; byId: Map<string, PlanItem>; kids: Map<string, PlanItem[]>; roots: (b: Box) => PlanItem[]; boxOf: (i: PlanItem) => Box;
   dnd: ReturnType<typeof useDnd>; showDone: boolean; needle: string;
+  sel: Set<string>; setSel: (s: Set<string>) => void; selMode: boolean;
 };
 
 /** One box of the matrix (or Projects): an outline that works like Workflowy. */
-function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle }: { box: Box; title: string; sub: string; color: string } & Shared) {
+function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle, sel, setSel, selMode }: { box: Box; title: string; sub: string; color: string } & Shared) {
+  const lastPick = useRef<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ id: string; at?: number } | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -335,6 +376,13 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
     if (e.key === "ArrowDown" && !e.shiftKey && el.selectionStart === el.selectionEnd && !el.value.slice(el.selectionEnd).includes("\n")) {
       const n = rows[idx + 1]; if (n) { e.preventDefault(); setFocus({ id: n.i.id, at: 0 }); } return;
     }
+    // November 20: → at the end of a line goes to the start of the next one; ← at the start goes to the end of the last one.
+    if (e.key === "ArrowRight" && !e.shiftKey && el.selectionStart === el.selectionEnd && el.selectionEnd === el.value.length) {
+      const n = rows[idx + 1]; if (n) { e.preventDefault(); setFocus({ id: n.i.id, at: 0 }); } return;
+    }
+    if (e.key === "ArrowLeft" && !e.shiftKey && el.selectionStart === el.selectionEnd && el.selectionStart === 0) {
+      const p = rows[idx - 1]; if (p) { e.preventDefault(); setFocus({ id: p.i.id }); } return;
+    }
   }
   const crumbs: PlanItem[] = [];
   for (let c = root ? byId.get(root) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) crumbs.unshift(c);
@@ -359,19 +407,32 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
         {rows.map(({ i, depth }, idx) => {
           const has = (kids.get(i.id)?.length ?? 0) > 0;
           return (
-            <div key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text || "Untitled")}
-              className={`group flex items-start ${dnd.overBefore === i.id && dnd.dragging !== i.id ? "shadow-[inset_0_2px_0_var(--accent)]" : ""}`}
-              style={{ paddingLeft: depth * 20, ...dnd.bind(i.id, "").style }}>
-              <span className="flex h-7 items-center opacity-100 md:opacity-0 md:group-hover:opacity-100"><Grip /></span>
+            <div key={i.id} data-before={i.id} {...dnd.bind(i.id, sel.has(i.id) && sel.size > 1 ? `${sel.size} bullets` : i.text || "Untitled")}
+              className={`group flex items-start rounded-md ${sel.has(i.id) ? "bg-accent/15" : ""} ${dnd.overBefore === i.id && dnd.dragging !== i.id ? "shadow-[inset_0_2px_0_var(--accent)]" : ""}`}
+              style={{ paddingLeft: depth * 20, ...(dnd.dragging && (dnd.dragging === i.id || (sel.has(dnd.dragging) && sel.has(i.id))) ? { opacity: 0.35 } : {}) }}>
               <button type="button" onClick={() => has && plan.patch(i.id, { collapsed: !i.collapsed })} aria-label={has ? (i.collapsed ? "Expand" : "Collapse") : undefined} tabIndex={-1}
                 className={`grid h-7 w-4 shrink-0 place-items-center text-[9px] text-dim ${has ? "opacity-60 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" : "invisible"}`}>{i.collapsed ? "▶" : "▼"}</button>
-              <button type="button" onClick={() => setZoom(i.id)} aria-label={`Zoom into ${i.text || "this line"}`} tabIndex={-1} className="grid h-7 w-5 shrink-0 place-items-center">
-                <span className={`block size-[7px] rounded-full ${i.done ? "bg-[#5a5a5a]" : "bg-[#d0d0d0]"} ${has && i.collapsed ? "outline outline-[5px] outline-[#3a3a3a]" : ""}`} />
+              {/* November 20: the dot is the handle: drag it to move the bullet (and what's under it); click it to zoom in;
+                  ⇧ or ⌘-click (or Pick several) to pick it. */}
+              <button type="button" data-grip tabIndex={-1} title="Drag to move · click to zoom in · ⇧ or ⌘-click to pick"
+                aria-label={`Move or zoom into ${i.text || "this line"}`}
+                onClick={(e) => {
+                  if (e.shiftKey && lastPick.current) { // a range, on screen in this box
+                    const a = rows.findIndex((r) => r.i.id === lastPick.current), b = rows.findIndex((r) => r.i.id === i.id);
+                    if (a >= 0) { const n = new Set(sel); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) n.add(rows[k].i.id); setSel(n); return; }
+                  }
+                  if (e.shiftKey || e.metaKey || e.ctrlKey || selMode) { const n = new Set(sel); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); setSel(n); lastPick.current = i.id; return; }
+                  setZoom(i.id);
+                }}
+                className="grid h-7 w-6 shrink-0 cursor-grab touch-none place-items-center">
+                <span className={`block size-[8px] rounded-full transition group-hover:scale-125 ${sel.has(i.id) ? "bg-accent" : i.done ? "bg-[#5a5a5a]" : "bg-[#d0d0d0]"} ${has && i.collapsed ? "outline outline-[5px] outline-[#3a3a3a]" : ""}`} />
               </button>
               <textarea ref={(el) => { if (el) { refs.current.set(i.id, el); el.style.height = "0px"; el.style.height = `${el.scrollHeight}px`; } else refs.current.delete(i.id); }}
                 value={i.text} rows={1} onChange={(e) => plan.patch(i.id, { text: e.target.value.replace(/\n/g, " ") })}
                 onKeyDown={(e) => key(e, i, idx)} onPaste={(e) => paste(i, e)} onFocus={() => setActive(i.id)}
                 className={`min-h-7 flex-1 resize-none overflow-hidden bg-transparent py-[3px] pr-1 text-[14px] leading-[22px] outline-none ${i.done ? "text-dim line-through" : ""}`} />
+              {i.sched_at && <span className="mt-1 shrink-0 rounded bg-accent/15 px-1.5 text-[10.5px] leading-5 text-accent" title="On your schedule">
+                {new Date(i.sched_at).toLocaleDateString("en-US", { weekday: "short" })} {new Date(i.sched_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(":00", "").replace(" ", "").toLowerCase()}</span>}
             </div>
           );
         })}
@@ -385,6 +446,108 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
             ["✓", act.done ? "Not done" : "Complete", () => plan.patch(act.id, { done: !act.done })], ["🗑", "Delete", () => del(act, actIdx)]] as [string, string, () => void][]).map(([icon, label, fn]) => (
             <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={fn} aria-label={label} className="min-h-10 min-w-10 rounded-lg px-2 text-[15px] text-[#d0d0d0] active:bg-[#262626]">{icon}</button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Scheduler ───────────────────────────────────────────────
+
+const HOUR_PX = 34, FIRST = 5, LAST = 21; // 5 AM to 9 PM (the last row runs to 10)
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+const timeLabel = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(":00", "");
+
+/**
+ * November 20 (Michael): a week (today first) from 5 AM to 9 PM. Drag a task from the matrix onto a day and time; drag a
+ * block to move it; tap it to change how long it is, finish it, or take it off. The task stays in its box too.
+ */
+function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: ReturnType<typeof useDnd> }) {
+  const [offset, setOffset] = useState(0); // days from today
+  const [open, setOpen] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t); }, []);
+  const days = Array.from({ length: 7 }, (_, k) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset + k); return d; });
+  const today = ymd(now);
+  const blocks = items.filter((i) => i.sched_at);
+  const height = (LAST - FIRST + 1) * HOUR_PX;
+  const of = (day: string) => {
+    const list = blocks.map((i) => { const at = new Date(i.sched_at!); return { i, day: ymd(at), start: at.getHours() * 60 + at.getMinutes(), len: i.sched_minutes ?? 60 }; })
+      .filter((b) => b.day === day).sort((a, b) => a.start - b.start || b.len - a.len);
+    // Side by side when they overlap.
+    const lanes: number[] = []; const placed = list.map((b) => { let lane = lanes.findIndex((end) => end <= b.start); if (lane < 0) { lane = lanes.length; lanes.push(0); } lanes[lane] = b.start + b.len; return { ...b, lane }; });
+    return placed.map((b) => ({ ...b, lanes: Math.max(1, ...placed.filter((o) => o.start < b.start + b.len && b.start < o.start + o.len).map((o) => o.lane + 1)) }));
+  };
+  const openItem = open ? items.find((i) => i.id === open) : undefined;
+  return (
+    <div className="rounded-xl border border-border bg-card p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-[13px] font-semibold">Schedule <span className="font-normal text-dim">· drag a task onto a day and time</span></p>
+        <span className="flex gap-1">
+          <button type="button" onClick={() => setOffset((x) => x - 7)} className="min-h-8 rounded-lg border border-border px-2.5 text-[13px]" aria-label="Previous week">‹</button>
+          <button type="button" onClick={() => setOffset(0)} disabled={offset === 0} className="min-h-8 rounded-lg border border-border px-2.5 text-[12px] disabled:opacity-40">Today</button>
+          <button type="button" onClick={() => setOffset((x) => x + 7)} className="min-h-8 rounded-lg border border-border px-2.5 text-[13px]" aria-label="Next week">›</button>
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[44rem]" style={{ gridTemplateColumns: "3rem repeat(7, minmax(0, 1fr))" }}>
+          <div />
+          {days.map((d) => (
+            <p key={ymd(d)} className={`pb-1 text-center text-[12px] ${ymd(d) === today ? "font-semibold text-accent" : "text-dim"}`}>
+              {ymd(d) === today ? "Today" : d.toLocaleDateString("en-US", { weekday: "short" })} {d.getDate()}
+            </p>
+          ))}
+          {/* The hours down the side */}
+          <div className="relative" style={{ height }}>
+            {Array.from({ length: LAST - FIRST + 1 }, (_, k) => <span key={k} className="absolute right-1 -translate-y-1/2 text-[10px] text-dim" style={{ top: k * HOUR_PX + (k ? 0 : 6) }}>{hourLabel(FIRST + k)}</span>)}
+          </div>
+          {days.map((d) => {
+            const day = ymd(d);
+            return (
+              <div key={day} className="relative border-l border-border" style={{ height }}>
+                {/* Half-hour spots to drop on */}
+                {Array.from({ length: (LAST - FIRST + 1) * 2 }, (_, k) => {
+                  const mins = FIRST * 60 + k * 30, zone = `slot|${day}|${mins}`;
+                  return <div key={k} data-drop={zone} className={`absolute inset-x-0 ${k % 2 ? "border-b border-border/70" : "border-b border-dashed border-border/30"} ${dnd.over === zone ? "bg-accent/25" : ""}`} style={{ top: k * (HOUR_PX / 2), height: HOUR_PX / 2 }} />;
+                })}
+                {day === today && now.getHours() >= FIRST && now.getHours() <= LAST && (
+                  <div className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-[#ef4444]" style={{ top: ((now.getHours() - FIRST) * 60 + now.getMinutes()) / 60 * HOUR_PX }} />
+                )}
+                {of(day).map(({ i, start, len, lane, lanes }) => {
+                  const top = Math.max(0, (start - FIRST * 60) / 60 * HOUR_PX), h = Math.max(16, len / 60 * HOUR_PX - 2);
+                  return (
+                    <button key={i.id} type="button" data-grip {...dnd.bind(`cal:${i.id}`, i.text || "Untitled")} onClick={() => setOpen(i.id)}
+                      title={`${timeLabel(new Date(i.sched_at!))} · ${i.text}`}
+                      className={`absolute z-20 touch-none overflow-hidden rounded-md border border-accent/70 bg-[#2a1f0c] px-1 py-0.5 text-left text-[10.5px] leading-tight text-text ${i.done ? "opacity-50 line-through" : ""}`}
+                      style={{ top, height: h, left: `calc(${(lane / lanes) * 100}% + 1px)`, width: `calc(${100 / lanes}% - 2px)` }}>
+                      <span className="block text-[9px] text-accent">{timeLabel(new Date(i.sched_at!))}</span>
+                      <span className="line-clamp-3">{i.text || "Untitled"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {openItem && openItem.sched_at && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label="Scheduled task">
+          <div className="w-full max-w-sm space-y-2.5 rounded-[18px] border border-border bg-[#121212] p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[15px] font-semibold">{openItem.text || "Untitled"}</p>
+            <p className="text-[12px] text-dim">{new Date(openItem.sched_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} · {timeLabel(new Date(openItem.sched_at))}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[15, 30, 45, 60, 90, 120, 180].map((m) => (
+                <button key={m} type="button" onClick={() => plan.patch(openItem.id, { sched_minutes: m })} aria-pressed={(openItem.sched_minutes ?? 60) === m}
+                  className={`min-h-9 rounded-lg border px-2.5 text-[13px] ${(openItem.sched_minutes ?? 60) === m ? "border-accent font-semibold text-accent" : "border-border"}`}>{m < 60 ? `${m} min` : `${m / 60} h`}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => plan.patch(openItem.id, { done: !openItem.done })} className="min-h-10 flex-1 rounded-xl border border-border text-[13px] font-semibold">{openItem.done ? "Not done" : "✓ Done"}</button>
+              <button type="button" onClick={() => { plan.patch(openItem.id, { sched_at: null }); setOpen(null); }} className="min-h-10 flex-1 rounded-xl border border-border text-[13px] text-[var(--red)]">Take off the calendar</button>
+            </div>
+            <button type="button" onClick={() => setOpen(null)} className="min-h-10 w-full rounded-xl bg-accent text-[14px] font-semibold text-black">Close</button>
+          </div>
         </div>
       )}
     </div>

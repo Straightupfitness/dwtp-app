@@ -17,15 +17,17 @@ export default async function KpisPage() {
     supabase.from("kpi_clients").select("*").order("position").order("created_at"),
     supabase.from("kpi_payments").select("*").order("paid_on", { ascending: false }),
     supabase.from("leads").select("temperature"),
-    supabase.from("kpi_items").select("id, kind, parent_id, text, note, quadrant, position, done, collapsed").order("position"),
+    supabase.from("kpi_items").select("id, kind, parent_id, text, note, quadrant, position, done, collapsed, sched_at, sched_minutes").order("position"),
   ]);
   const missing = [ex, sl, cl, pa].some((r) => r.error);
+  // November 20: before the scheduler SQL (36), read the planner without its scheduling columns.
+  const items = it.error ? await supabase.from("kpi_items").select("id, kind, parent_id, text, note, quadrant, position, done, collapsed").order("position") : it;
   // Today in Los Angeles, so "this month" and "coming up" match his calendar.
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
   const data: Data = {
     expenses: (ex.data ?? []) as Data["expenses"], slots: (sl.data ?? []) as Data["slots"], clients: (cl.data ?? []) as Data["clients"],
     payments: (pa.data ?? []) as Data["payments"], leads: ((le.data ?? []) as { temperature: string | null }[]).map((l) => l.temperature), today,
-    items: (it.data ?? []) as Data["items"], planReady: !it.error,
+    items: (items.data ?? []) as Data["items"], planReady: !items.error,
   };
   return (
     <section className="mx-auto max-w-6xl space-y-3.5 pb-28">
