@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { IconDumbbell } from "@/components/Icons";
 import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
@@ -38,6 +39,9 @@ function DayCard({ w, next, week, preview, link = preview }: { w: WorkoutCard; n
 export default async function WorkoutsPage({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  // November 19: Michael's Workouts tab is his whole library (in "See her app" this is her, so she still sees hers).
+  const { data: role } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
+  if (role?.role === "coach") redirect("/coach/workouts");
   const sp = await searchParams;
   // November 7: a week can be 0 or negative before launch (next week is week 0 until Nov 16), so never treat 0 as "none".
   const asked = sp.w !== undefined && sp.w !== "" && Number.isFinite(Number(sp.w)) ? Math.trunc(Number(sp.w)) : undefined;

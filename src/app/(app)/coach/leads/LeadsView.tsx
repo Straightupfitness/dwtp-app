@@ -22,6 +22,9 @@ const TEMPS: { v: Exclude<Temp, "">; label: string; icon: string; on: string }[]
   { v: "dead", label: "Dead", icon: "🪦", on: "border-[#6b6b6b] bg-[#6b6b6b]/25 text-[#bdbdbd]" },
 ];
 const TYPES: { v: Exclude<LeadType, "">; label: string }[] = [{ v: "online", label: "Online" }, { v: "in_person", label: "In person" }];
+type SortBy = "new" | "status" | "first" | "last";
+/** Sorting by status: hottest first, dead last. */
+const TEMP_ORDER: Record<string, number> = { hot: 0, warm: 1, cold: 2, "": 3, dead: 4 };
 const toInput = (l: Lead): LeadInput => ({
   first_name: l.first_name, last_name: l.last_name, email: l.email ?? "", phone: l.phone ?? "", city: l.city ?? "", goals: l.goals ?? "", notes: l.notes ?? "",
   lead_type: l.lead_type ?? "", time_slot: l.time_slot ?? "", lead_source: l.lead_source ?? "", contact_method: l.contact_method ?? "", temperature: l.temperature ?? "",
@@ -96,12 +99,24 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
   const [sure, setSure] = useState(false);
   const [pending, start] = useTransition();
 
+  // November 19: tap Status, First or Last to sort (tap again to flip). Newest first until she picks one.
+  const [sort, setSort] = useState<{ by: SortBy; dir: 1 | -1 }>({ by: "new", dir: 1 });
+  const sortBy = (by: SortBy) => setSort((cur) => ({ by, dir: cur.by === by ? (cur.dir === 1 ? -1 : 1) : 1 }));
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return leads.filter((l) => (!q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes, l.lead_source, l.contact_method, l.time_slot].some((x) => (x ?? "").toLowerCase().includes(q)))
+    const list = leads.filter((l) => (!q || [l.first_name, l.last_name, l.email, l.phone, l.city, l.goals, l.notes, l.lead_source, l.contact_method, l.time_slot].some((x) => (x ?? "").toLowerCase().includes(q)))
       && (tempF === "all" || (tempF === "none" ? !l.temperature : l.temperature === tempF))
       && (typeF === "all" || l.lead_type === typeF));
-  }, [leads, search, tempF, typeF]);
+    const name = (x: string | null | undefined) => (x ?? "").trim().toLowerCase();
+    const blankLast = (a: string, b: string) => (a === "" ? 1 : 0) - (b === "" ? 1 : 0); // empty names go to the bottom either way
+    const cmp: Record<SortBy, (a: Lead, b: Lead) => number> = {
+      new: (a, b) => b.created_at.localeCompare(a.created_at),
+      status: (a, b) => (TEMP_ORDER[a.temperature ?? ""] - TEMP_ORDER[b.temperature ?? ""]) * sort.dir || name(a.first_name).localeCompare(name(b.first_name)),
+      first: (a, b) => blankLast(name(a.first_name), name(b.first_name)) || name(a.first_name).localeCompare(name(b.first_name)) * sort.dir || name(a.last_name).localeCompare(name(b.last_name)),
+      last: (a, b) => blankLast(name(a.last_name), name(b.last_name)) || name(a.last_name).localeCompare(name(b.last_name)) * sort.dir || name(a.first_name).localeCompare(name(b.first_name)),
+    };
+    return [...list].sort(cmp[sort.by]);
+  }, [leads, search, tempF, typeF, sort]);
   const mark = (ids: string[], patch: { temperature?: Temp; lead_type?: LeadType }) => start(async () => { const r = await setLeads(ids, patch); if (r?.error) setMsg(r.error); });
   const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -144,35 +159,61 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
         <span>{shown.length} lead{shown.length === 1 ? "" : "s"}{search ? " found" : ""}</span>
       </div>
 
-      {/* November 17: a table on a computer (one column per detail), cards on a phone. Tap a name to edit. */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card lg:block">
-        <table className="w-full text-left text-[13px]">
+      {/* November 19 (Michael): Status, First, Last, Phone, Email, Type, then the rest; sized to fit a computer screen with no
+          side-scrolling; the labels stay at the top while he scrolls (like the client sheet). Tap a name to edit. */}
+      <div className="hidden rounded-2xl border border-border bg-card lg:block">
+        <table className="w-full table-fixed text-left text-[12.5px]">
+          <colgroup>
+            <col className="w-8" /><col className="w-[7.5rem]" /><col className="w-[6.5rem]" /><col className="w-[7rem]" /><col className="w-[7.25rem]" /><col className="w-[11rem]" />
+            <col className="w-[5.25rem]" /><col className="w-[4.75rem]" /><col className="w-[6rem]" /><col className="w-[6rem]" /><col className="w-[5rem]" /><col />
+          </colgroup>
           <thead className="text-[11px] uppercase tracking-wide text-dim">
-            <tr className="border-b border-border">
-              <th className="w-8 p-2" /><th className="p-2">Type</th><th className="p-2">First</th><th className="p-2">Last</th><th className="p-2">Phone</th><th className="p-2">Email</th>
-              <th className="p-2">Time slot</th><th className="p-2">City</th><th className="p-2">Source</th><th className="p-2">Method</th><th className="p-2">Notes</th><th className="p-2">Status</th>
+            <tr>
+              {(() => {
+                const th = "sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 border-b border-border bg-card p-2 first:rounded-tl-2xl last:rounded-tr-2xl";
+                const sortTh = (by: SortBy, label: string) => (
+                  <th key={by} className={th} aria-sort={sort.by === by ? (sort.dir === 1 ? "ascending" : "descending") : undefined}>
+                    <button type="button" onClick={() => sortBy(by)} className={`inline-flex items-center gap-1 uppercase hover:text-accent ${sort.by === by ? "text-accent" : ""}`}>
+                      {label}<span aria-hidden="true">{sort.by === by ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
+                    </button>
+                  </th>
+                );
+                return (<>
+                  <th className={th} />{sortTh("status", "Status")}{sortTh("first", "First")}{sortTh("last", "Last")}
+                  <th className={th}>Phone</th><th className={th}>Email</th><th className={th}>Type</th><th className={th}>Time</th>
+                  <th className={th}>City</th><th className={th}>Source</th><th className={th}>Method</th><th className={th}>Notes</th>
+                </>);
+              })()}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {shown.map((l) => (
               <tr key={l.id} className={`align-top ${picked.has(l.id) ? "bg-[#161310]" : ""} ${l.temperature === "dead" ? "opacity-60" : ""}`}>
                 <td className="p-2"><input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} aria-label={`Select ${l.first_name} ${l.last_name}`} className="mt-0.5 size-[17px] accent-[var(--accent)]" /></td>
-                <td className="p-2"><TypePick v={l.lead_type ?? ""} onPick={(v) => mark([l.id], { lead_type: v })} /></td>
-                <td className="p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="font-semibold hover:text-accent">{l.first_name || "—"}</button></td>
-                <td className="p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="font-semibold hover:text-accent">{l.last_name}</button></td>
+                <td className="p-2"><TempPick compact v={l.temperature ?? ""} onPick={(v) => mark([l.id], { temperature: v })} /></td>
+                <td className="truncate p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="max-w-full truncate font-semibold hover:text-accent" title={l.first_name}>{l.first_name || "—"}</button></td>
+                <td className="truncate p-2"><button type="button" onClick={() => { setEdit({ id: l.id, f: toInput(l) }); setErr(""); }} className="max-w-full truncate font-semibold hover:text-accent" title={l.last_name}>{l.last_name || <span className="text-dim">—</span>}</button></td>
                 <td className="whitespace-nowrap p-2">{fmtPhone(l.phone) || <span className="text-dim">—</span>}</td>
-                <td className="max-w-[12rem] truncate p-2" title={l.email ?? ""}>{l.email || <span className="text-dim">—</span>}</td>
-                <td className="whitespace-nowrap p-2">{l.time_slot || <span className="text-dim">—</span>}</td>
-                <td className="p-2">{l.city || <span className="text-dim">—</span>}</td>
-                <td className="p-2">{l.lead_source || <span className="text-dim">—</span>}</td>
-                <td className="whitespace-nowrap p-2">{l.contact_method || <span className="text-dim">—</span>}</td>
-                <td className="min-w-[14rem] max-w-[22rem] p-2 text-[#cfcfcf]">{l.notes}</td>
-                <td className="p-2"><TempPick v={l.temperature ?? ""} onPick={(v) => mark([l.id], { temperature: v })} /></td>
+                <td className="truncate p-2" title={l.email ?? ""}>{l.email || <span className="text-dim">—</span>}</td>
+                <td className="p-2"><TypeToggle v={l.lead_type ?? ""} onPick={(v) => mark([l.id], { lead_type: v })} /></td>
+                <td className="truncate p-2" title={l.time_slot ?? ""}>{l.time_slot || <span className="text-dim">—</span>}</td>
+                <td className="truncate p-2" title={l.city ?? ""}>{l.city || <span className="text-dim">—</span>}</td>
+                <td className="truncate p-2" title={l.lead_source ?? ""}>{l.lead_source || <span className="text-dim">—</span>}</td>
+                <td className="truncate p-2" title={l.contact_method ?? ""}>{l.contact_method || <span className="text-dim">—</span>}</td>
+                <td className="p-2 text-[#cfcfcf]"><span className="line-clamp-3" title={l.notes ?? ""}>{l.notes}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
         {!shown.length && <p className="p-6 text-center text-[14px] text-dim">{leads.length ? "Nobody matches." : "No leads yet. Add one, or upload a list."}</p>}
+      </div>
+      {/* On a phone: sort with one tap too. */}
+      <div className="flex items-center gap-1.5 text-[13px] lg:hidden">
+        <span className="text-dim">Sort:</span>
+        {([["new", "Newest"], ["status", "Status"], ["first", "First"], ["last", "Last"]] as [SortBy, string][]).map(([by, label]) => (
+          <button key={by} type="button" onClick={() => sortBy(by)} aria-pressed={sort.by === by}
+            className={`min-h-9 rounded-full border px-3 ${sort.by === by ? "border-accent text-accent font-semibold" : "border-border text-dim"}`}>{label}{sort.by === by && by !== "new" ? (sort.dir === 1 ? " ▲" : " ▼") : ""}</button>
+        ))}
       </div>
       <ul className="divide-y divide-border rounded-2xl border border-border bg-card lg:hidden">
         {shown.map((l) => (
@@ -291,16 +332,26 @@ function TypePick({ v, onPick }: { v: LeadType; onPick: (v: LeadType) => void })
     </span>
   );
 }
-/** November 17: hot, warm, cold or dead, tap to set (tap again to clear). */
-function TempPick({ v, onPick }: { v: Temp; onPick: (v: Temp) => void }) {
+/** November 17: hot, warm, cold or dead, tap to set (tap again to clear). November 19: compact (icons only) in the table. */
+function TempPick({ v, onPick, compact = false }: { v: Temp; onPick: (v: Temp) => void; compact?: boolean }) {
   return (
-    <span className="inline-flex gap-1">
+    <span className={`inline-flex ${compact ? "gap-0.5" : "gap-1"}`}>
       {TEMPS.map((t) => (
         <button key={t.v} type="button" onClick={() => onPick(v === t.v ? "" : t.v)} aria-pressed={v === t.v} title={t.label} aria-label={t.label}
-          className={`min-h-7 whitespace-nowrap rounded-full border px-1.5 text-[12px] ${v === t.v ? `${t.on} font-semibold` : "border-border opacity-50 grayscale"}`}>
-          {t.icon}{v === t.v ? ` ${t.label}` : ""}
+          className={`min-h-7 whitespace-nowrap rounded-full border text-[12px] ${compact ? "px-1" : "px-1.5"} ${v === t.v ? `${t.on} font-semibold` : "border-border opacity-50 grayscale"}`}>
+          {t.icon}{v === t.v && !compact ? ` ${t.label}` : ""}
         </button>
       ))}
     </span>
+  );
+}
+/** November 19: online or in person in one small button for the table: tap to go Online → In person → not set. */
+function TypeToggle({ v, onPick }: { v: LeadType; onPick: (v: LeadType) => void }) {
+  const next: LeadType = v === "" ? "online" : v === "online" ? "in_person" : "";
+  return (
+    <button type="button" onClick={() => onPick(next)} title="Tap to change: Online, In person, or not set"
+      className={`min-h-7 whitespace-nowrap rounded-full border px-2 text-[11px] ${v ? "border-accent bg-accent font-semibold text-black" : "border-border text-dim"}`}>
+      {v === "online" ? "Online" : v === "in_person" ? "In person" : "Set"}
+    </button>
   );
 }

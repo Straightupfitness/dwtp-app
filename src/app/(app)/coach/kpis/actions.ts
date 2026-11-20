@@ -12,9 +12,9 @@ async function coach() {
 
 /** What can be saved in each KPI table (anything else is ignored). */
 const FIELDS = {
-  kpi_expenses: { name: "text", category: "text", amount: "num", frequency: "text", canceling: "bool", notes: "text", position: "int" },
+  kpi_expenses: { name: "text", category: "text", amount: "num", frequency: "text", canceling: "bool", notes: "text", position: "int", draw_day: "int" },
   kpi_slots: { name: "text", rent: "num", plan_2027: "num", plan_note: "text", position: "int" },
-  kpi_clients: { name: "text", slot_id: "text", monthly: "num", paid_amount: "num", paid_weeks: "int", expires_on: "date", renewal_offer: "num", notes: "text", position: "int" },
+  kpi_clients: { name: "text", slot_id: "text", monthly: "num", paid_amount: "num", paid_weeks: "int", expires_on: "date", renewal_offer: "num", notes: "text", position: "int", started_on: "date" },
   kpi_payments: { name: "text", client_id: "text", amount: "num", paid_on: "date", notes: "text" },
 } as const;
 export type KpiTable = keyof typeof FIELDS;

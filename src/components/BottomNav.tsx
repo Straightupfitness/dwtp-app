@@ -18,8 +18,8 @@ const COACH = [
   { href: "/coach/leads", label: "Leads", Icon: IconLeads }, // November 15: left of Clients
   { href: "/coach", label: "Clients", Icon: IconClients },
   // November 7: no Today tab for Michael. Today is her screen; he lands on Clients (use "See her app" to see hers).
-  { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
-  { href: "/lessons", label: "Lessons", Icon: IconLessons },
+  { href: "/coach/workouts", label: "Workouts", Icon: IconWorkouts }, // November 19: his whole library, not one client's week
+  { href: "/coach/program", label: "Program", Icon: IconLessons }, // November 19: the flow chart, every lesson and every circle
   { href: "/community", label: "Community", Icon: IconCommunity },
 ];
 
