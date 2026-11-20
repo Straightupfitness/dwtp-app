@@ -146,11 +146,11 @@ export default function KpiView({ d }: { d: Data }) {
                 <b>{s.name}</b>
                 <span className="text-right text-dim">{money(income)} income · {n(s.rent) ? `${money(n(s.rent))} rent` : "no rent"} · <b className="text-text">{money(profit)}</b> profit<span className="block text-[11px]">{list.length} client{list.length === 1 ? "" : "s"} · {paying} paying{s.plan_2027 != null ? ` · 2027 plan ${money(n(s.plan_2027))}` : ""}</span></span>
               </button>
-              <ul className="divide-y divide-border">
+              <ul className="divide-y divide-border/50">
                 {list.map((c) => (
-                  <li key={c.id} {...dnd.bind(c.id, c.name)} className="flex items-center gap-2 px-2 hover:bg-[#161616]">
+                  <li key={c.id} {...dnd.bind(c.id, c.name)} className="flex items-center gap-2 px-2 leading-tight hover:bg-[#161616]">
                     <Grip />
-                    <button type="button" onClick={() => open("kpi_clients", "Edit client", c)} className="flex min-h-10 min-w-0 flex-1 items-center justify-between gap-2 text-left">
+                    <button type="button" onClick={() => open("kpi_clients", "Edit client", c)} className="flex min-h-7 min-w-0 flex-1 items-center justify-between gap-2 py-0.5 text-left">
                       <span className="min-w-0 truncate text-[14px]">{c.name}
                         {!n(c.monthly) && n(c.paid_amount) > 0 && (
                           <span className="block truncate text-[12px] text-[#cfcfcf]">Paid in full: {money(n(c.paid_amount))}{startOf(c) ? ` · signed up ${dateNice(startOf(c)!)}` : ""}{c.expires_on ? ` · ${c.expires_on < d.today ? "expired" : "expires"} ${dateNice(c.expires_on)}` : ""}</span>
@@ -297,13 +297,13 @@ function Summary({ label, icon, big, stats = [], children, tone }: { label: stri
       <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent" aria-hidden="true">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[icon]}</svg>
       </span>
-      <span className="shrink-0">
+      <span className="shrink-0 md:w-[19rem]">
         <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-[#d6d6d6]">{label}</span>
         <span className={`mt-0.5 block font-[family-name:var(--font-display)] text-[34px] leading-[36px] tabular-nums ${tone === "good" ? "text-[#7ddc8f]" : tone === "bad" ? "text-[#ff8a8a]" : ""}`}>{big}</span>
       </span>
       {stats.length > 0 && (
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1 self-end pb-1 text-[15px] font-semibold text-[#ececec]">
-          {stats.map((t) => <span key={t} className="whitespace-nowrap">{t}</span>)}
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-y-1 self-end pb-1 text-[15px] font-semibold text-[#ececec]">
+          {stats.map((t, i) => <span key={t} className={`whitespace-nowrap ${i ? "ml-4 border-l border-[#3a3a3a] pl-4" : ""}`}>{t}</span>)}
         </span>
       )}
       {!stats.length && <span className="flex-1" />}

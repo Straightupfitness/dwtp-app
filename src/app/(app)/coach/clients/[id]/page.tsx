@@ -183,6 +183,10 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
           <Link href={`/coach/inbox/${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#7a7a7a] px-3 text-[13px] font-semibold">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z" /></svg>Chat
           </Link>
+          {/* November 20: text her from his own phone (same as on the client overview: a message with fill-ins). */}
+          {p.phone ? (
+            <Link href={`/coach/text?ids=${id}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#7a7a7a] px-3 text-[13px] font-semibold">📱 Text from my phone</Link>
+          ) : <span className="text-[12px] text-dim">No phone number to text</span>}
           <SeeHerApp clientId={id} />
           <PageRecorder clientId={id} first={first} />
           <AdminStuff first={first}>
