@@ -209,7 +209,7 @@ export default function KpiView({ d }: { d: Data }) {
           {/* November 20: tap Name, Day of the month or Cost to sort (tap again to flip). */}
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="flex items-center gap-3 bg-[#151515] px-3 py-1.5 text-[11px] uppercase tracking-wide text-dim">
-              {([["az", "Name", "min-w-0 flex-1 text-left"], ["day", "Day of the month", "w-28 shrink-0 text-left"], ["cost", "Cost", "w-20 shrink-0 text-right"]] as const).map(([v, l, cls]) => (
+              {([["az", "Name", "min-w-0 flex-1 text-left"], ["day", "Day of the month", "w-36 shrink-0 whitespace-nowrap text-left"], ["cost", "Cost", "w-20 shrink-0 text-right"]] as const).map(([v, l, cls]) => (
                 <button key={v} type="button" onClick={() => setExpSort((cur) => ({ by: v, dir: cur.by === v ? (cur.dir === 1 ? -1 : 1) : 1 }))}
                   className={`${cls} min-h-8 uppercase hover:text-accent ${expSort.by === v ? "text-accent" : ""}`}>{l} {expSort.by === v ? (expSort.dir === 1 ? "▲" : "▼") : "↕"}</button>
               ))}
@@ -220,7 +220,7 @@ export default function KpiView({ d }: { d: Data }) {
                   <button type="button" onClick={() => open("kpi_expenses", "Edit expense", e)} className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[#161616] ${e.canceling ? "opacity-60" : ""}`}>
                     <span className="min-w-0 flex-1 text-[14px]">{e.name}{e.canceling && <span className="ml-1.5 rounded bg-[#3a1d1d] px-1.5 text-[11px] text-[#ff8a8a]">canceling</span>}
                       {e.frequency !== "monthly" && <span className="block text-[12px] text-dim">{money(n(e.amount))} every {e.frequency === "biweekly" ? "2 weeks" : e.frequency === "weekly" ? "week" : "year"}</span>}</span>
-                    <span className="w-28 shrink-0 text-[13px] text-[#cfcfcf]">{e.draw_day ? `the ${ordinal(e.draw_day)}` : <span className="text-dim">tap to add</span>}</span>
+                    <span className="w-36 shrink-0 text-[13px] text-[#cfcfcf]">{e.draw_day ? `the ${ordinal(e.draw_day)}` : <span className="text-dim">tap to add</span>}</span>
                     <span className={`w-20 shrink-0 text-right text-[14px] tabular-nums ${e.canceling ? "line-through" : ""}`}>{money(perMonth(e))}</span>
                   </button>
                 </li>
