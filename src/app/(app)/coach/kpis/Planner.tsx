@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDnd } from "@/components/useDnd";
+import Section from "@/components/Section";
 import { deleteItems, saveItems, type PlanItem } from "./items";
 
 /**
@@ -221,7 +222,9 @@ export function Matrix({ plan }: { plan: Plan }) {
   const shared = { plan, items, byId, kids, roots, boxOf, dnd, showDone, needle: q.trim().toLowerCase(), sel, setSel, selMode };
 
   return (
-    <div data-planner className="space-y-2">
+    <div data-planner className="space-y-4">
+      <Section title="Calendar" icon="calendar" open><Scheduler plan={plan} items={items} dnd={dnd} /></Section>
+      <Section title="Eisenhower matrix" icon="checkins" open>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={plan.undo} disabled={!plan.canUndo} title="Undo (⌘Z)" aria-label="Undo" className="min-h-10 rounded-xl border border-border px-3 text-[13px] disabled:opacity-35">↶ Undo</button>
         <button type="button" onClick={plan.redo} disabled={!plan.canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className="min-h-10 rounded-xl border border-border px-3 text-[13px] disabled:opacity-35">↷ Redo</button>
@@ -239,7 +242,7 @@ export function Matrix({ plan }: { plan: Plan }) {
           <button type="button" onClick={() => setSel(new Set())} className="min-h-8 text-dim underline">Clear</button>
         </p>
       )}
-      <Scheduler plan={plan} items={items} dnd={dnd} />
+
       <div className="grid gap-2 md:grid-cols-2">
         {BOXES.map((b) => <OutlineBox key={b.box} {...b} {...shared} />)}
       </div>
@@ -248,6 +251,7 @@ export function Matrix({ plan }: { plan: Plan }) {
         <summary className="cursor-pointer">How it works (keyboard shortcuts)</summary>
         <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dot into another box, up or down, or onto a day and time in the scheduler; everything under it comes along · ⇧ or ⌘-click dots to pick several, then drag one to move them all (Esc lets go, Delete removes them) · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓ (or → at the end of a line, ← at the start): move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · ⌘Z / Ctrl+Z: undo · ⇧⌘Z / Ctrl+Y: redo · Click a bullet&apos;s dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
       </details>
+      </Section>
       {dnd.ghost}
     </div>
   );
@@ -262,6 +266,7 @@ type Shared = {
 /** One box of the matrix (or Projects): an outline that works like Workflowy. */
 function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle, sel, setSel, selMode }: { box: Box; title: string; sub: string; color: string } & Shared) {
   const lastPick = useRef<string | null>(null);
+  const [shut, setShut] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ id: string; at?: number } | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -392,18 +397,23 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
   const zone = box === null ? "box-p" : `box-${box}`;
 
   return (
-    <div data-drop={zone} className="flex min-h-40 flex-col rounded-xl border bg-card p-2.5 transition"
+    <div data-drop={zone} className={`flex flex-col rounded-xl border bg-card p-2.5 transition ${shut ? "" : "min-h-40"}`}
       style={{ borderColor: `${color}88`, ...(dnd.over === zone ? { boxShadow: `0 0 0 2px ${color}` } : {}) }}>
-      <p className="text-[13px] font-semibold" style={{ color }}>{title}</p>
+      {/* November 20: each box opens and closes (a closed box still takes drops); titles in the display font. */}
+      <button type="button" onClick={() => setShut((x) => !x)} aria-expanded={!shut} className="flex w-full items-center gap-1.5 text-left">
+        <span className="font-[family-name:var(--font-display)] text-[15px] uppercase leading-tight tracking-[0.02em]" style={{ color }}>{title}</span>
+        <span className={`text-dim transition ${shut ? "" : "rotate-180"}`}>⌄</span>
+        <span className="ml-auto text-[11px] text-dim">{shut ? `${childrenOf(null).length}` : ""}</span>
+      </button>
       <p className="text-[11px] uppercase tracking-[0.14em] text-dim">{sub}</p>
-      {root && (
+      {!shut && root && (
         <p className="mt-1 flex flex-wrap items-center gap-1 text-[12px]">
           <button type="button" onClick={() => setZoom(null)} className="text-accent underline">{title}</button>
           {crumbs.map((c, k) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">›</span>
             <button type="button" onClick={() => setZoom(c.id)} className={k === crumbs.length - 1 ? "max-w-[12rem] truncate font-semibold" : "max-w-[8rem] truncate text-accent underline"}>{c.text || "Untitled"}</button></span>)}
         </p>
       )}
-      <div className="mt-1 flex-1">
+      {!shut && <div className="mt-1 flex-1">
         {rows.map(({ i, depth }, idx) => {
           const has = (kids.get(i.id)?.length ?? 0) > 0;
           return (
@@ -437,8 +447,8 @@ function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dn
           );
         })}
         {!rows.length && <p className="py-1 text-[12px] text-dim">{needle ? "Nothing matches." : box === null ? "Add a project, or paste one in (indented lines become its tasks)." : "Nothing here. Add one, or drag one in."}</p>}
-      </div>
-      {!needle && <button type="button" onClick={addLine} className="mt-1 min-h-8 self-start rounded-lg px-2 text-[13px] text-dim hover:text-accent">+ Add</button>}
+      </div>}
+      {!shut && !needle && <button type="button" onClick={addLine} className="mt-1 min-h-8 self-start rounded-lg px-2 text-[13px] text-dim hover:text-accent">+ Add</button>}
       {/* On a phone (no Tab key): the tools for the bullet she's on. */}
       {act && actIdx >= 0 && (
         <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+64px)] z-20 mt-1 flex justify-center gap-1 rounded-xl border border-border bg-[#141414]/95 p-1 backdrop-blur md:hidden">
@@ -481,9 +491,9 @@ function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: R
   };
   const openItem = open ? items.find((i) => i.id === open) : undefined;
   return (
-    <div className="rounded-xl border border-border bg-card p-2">
+    <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-[13px] font-semibold">Schedule <span className="font-normal text-dim">· drag a task onto a day and time</span></p>
+        <p className="text-[12px] text-dim">Drag a task from the matrix onto a day and time.</p>
         <span className="flex gap-1">
           <button type="button" onClick={() => setOffset((x) => x - 7)} className="min-h-8 rounded-lg border border-border px-2.5 text-[13px]" aria-label="Previous week">‹</button>
           <button type="button" onClick={() => setOffset(0)} disabled={offset === 0} className="min-h-8 rounded-lg border border-border px-2.5 text-[12px] disabled:opacity-40">Today</button>

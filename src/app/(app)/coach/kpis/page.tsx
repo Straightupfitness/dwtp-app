@@ -31,10 +31,7 @@ export default async function KpisPage() {
   };
   return (
     <section className="mx-auto max-w-6xl space-y-3.5 pb-28">
-      <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your business</p>
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-[30px] font-semibold uppercase">KPIs</h1>
-      </header>
+      {/* November 20: the KPIs and Schedule titles are collapsible (inside KpiView). */}
       {missing ? <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the KPIs SQL file in Supabase to turn this on.</p> : <KpiView d={data} />}
       <SmoothDrawers />
     </section>

@@ -14,6 +14,7 @@ const P: Record<string, React.ReactNode> = {
   badges: <><circle cx="12" cy="14" r="6" /><path d="M8.5 9 6 3h4l2 4 2-4h4l-2.5 6" /></>,
   targets: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5.5" /><path d="M12 12 20 4M16.5 4H20v3.5" /></>,
   details: <><circle cx="12" cy="8" r="4" /><path d="M4.5 21c.8-4 3.8-6 7.5-6s6.7 2 7.5 6" /></>,
+  calendar: <><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
 };
 
 export default function SectionIcon({ name }: { name: keyof typeof P | string }) {

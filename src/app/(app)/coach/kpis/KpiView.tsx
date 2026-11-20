@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import Section from "@/components/Section";
 import { Grip, useDnd } from "@/components/useDnd";
 import { deleteKpi, saveKpi, type KpiTable } from "./actions";
 import { Matrix, usePlan } from "./Planner";
@@ -138,17 +137,21 @@ export default function KpiView({ d }: { d: Data }) {
   const add = "inline-flex min-h-9 items-center rounded-lg border border-dashed border-[#3a3a3a] px-3 text-[13px] font-semibold text-accent";
   return (
     <div className="space-y-4">
+      <BigSection eyebrow="Your business" title="KPIs">
       {/* 1. In person */}
       <Summary label="In-person training income / mo" icon="inperson" big={money(k.inIncome)}
         stats={[`${k.inList.length} clients`, `${money(k.inIncome - k.rent)} profit`, `${money(Math.round(k.inAvg))} profit per client`]}>
-        <p className="text-[12px] text-dim">Drag a name to another time slot (on a phone, use the dots). Tap a name to edit, tap a time slot to change its rent.</p>
+        <p className="text-[12px] text-dim">Drag a name to another time slot (on a phone, use the dots). Tap a time slot to see its clients. Tap a name to edit it, or Edit to change the slot&apos;s rent.</p>
         <div className="space-y-2.5">
           {k.inSlots.map(({ s, list, income, paying, profit }) => (
             <div key={s.id} data-drop={s.id} className={`overflow-hidden rounded-xl border transition ${dnd.over === s.id ? "border-accent ring-2 ring-accent" : "border-border"}`}>
-              <button type="button" onClick={() => open("kpi_slots", "Edit time slot", s)} className="flex w-full items-baseline justify-between gap-2 bg-[#151515] px-3 py-2 text-left text-[13px] hover:text-accent">
-                <b>{s.name}</b>
+              {/* November 20: each time slot opens to show its clients (you can still drop a name on it closed). */}
+              <details data-drawer className="group/slot">
+              <summary className="flex w-full cursor-pointer list-none items-center justify-between gap-2 bg-[#151515] px-3 py-2 text-left text-[13px]">
+                <span className="flex items-center gap-2"><b>{s.name}</b><span className="text-dim transition group-open/slot:rotate-180">⌄</span>
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); open("kpi_slots", "Edit time slot", s); }} className="min-h-7 rounded-md border border-border px-2 text-[11px] text-dim hover:text-accent">Edit</button></span>
                 <span className="text-right text-dim">{money(income)} income · {n(s.rent) ? `${money(n(s.rent))} rent` : "no rent"} · <b className="text-text">{money(profit)}</b> profit<span className="block text-[11px]">{list.length} client{list.length === 1 ? "" : "s"} · {paying} paying{s.plan_2027 != null ? ` · 2027 plan ${money(n(s.plan_2027))}` : ""}</span></span>
-              </button>
+              </summary>
               <ul className="divide-y divide-border/50">
                 {list.map((c) => (
                   <li key={c.id} {...dnd.bind(c.id, c.name)} className="flex items-center gap-2 px-2 leading-tight hover:bg-[#161616]">
@@ -166,6 +169,7 @@ export default function KpiView({ d }: { d: Data }) {
                 {!list.length && <li className="px-3 py-2 text-[12px] text-dim">Nobody yet. Drag someone here.</li>}
               </ul>
               <div className="px-3 py-2"><button type="button" onClick={() => open("kpi_clients", `Add a client to ${s.name}`, undefined, { slot_id: s.id })} className={add}>+ Client</button></div>
+              </details>
             </div>
           ))}
         </div>
@@ -237,10 +241,13 @@ export default function KpiView({ d }: { d: Data }) {
       {/* 5. Net */}
       <Summary label="Net profit / loss per month" icon="net" big={money(Math.round(k.net))} tone={k.net < 0 ? "bad" : "good"} />
 
-      {/* 6–8. The planner */}
-      {planReady ? <>
-        <Section title="Eisenhower matrix" icon="checkins" open><Matrix plan={plan} /></Section>
-      </> : <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the 32 KPI planner SQL file in Supabase to turn on the Eisenhower matrix.</p>}
+      </BigSection>
+
+      {/* November 20: Schedule (the calendar, then the Eisenhower matrix). */}
+      <BigSection eyebrow="Your week" title="Schedule">
+        {planReady ? <Matrix plan={plan} />
+          : <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the 32 KPI planner SQL file in Supabase to turn on the Eisenhower matrix.</p>}
+      </BigSection>
 
       {edit && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={edit.title}>
@@ -319,6 +326,22 @@ function Summary({ label, icon, big, stats = [], children, tone }: { label: stri
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
       </summary>
       <div className="space-y-2.5 px-3 pb-3">{children}</div>
+    </details>
+  );
+}
+
+/** November 20: a big collapsible title (KPIs, Schedule), in the same style as the page title. */
+function BigSection({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <details open data-drawer className="group/big">
+      <summary className="flex cursor-pointer list-none items-end gap-2 pb-1">
+        <span>
+          <span className="block text-[11px] uppercase tracking-[0.15em] text-accent">{eyebrow}</span>
+          <span className="mt-1 block font-[family-name:var(--font-display)] text-[30px] font-semibold uppercase leading-none">{title}</span>
+        </span>
+        <span className="pb-0.5 text-[22px] text-dim transition group-open/big:rotate-180">⌄</span>
+      </summary>
+      <div className="mt-3 space-y-4">{children}</div>
     </details>
   );
 }
