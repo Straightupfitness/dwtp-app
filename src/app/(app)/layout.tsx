@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import UndoKeys from "@/components/UndoKeys";
 import TopBar from "@/components/TopBar";
 import TimezoneSync from "@/components/TimezoneSync";
 import AppBadge from "@/components/AppBadge";
@@ -54,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {user && !viewing && <TimezoneSync saved={me?.timezone ?? null} />}
       <InstallCatcher />
       {user && !viewing && <AppBadge count={alerts ?? 0} />}
+      {user && !viewing && <UndoKeys />}
       {user && !coach && !viewing && <StillHere />}
     </>
   );

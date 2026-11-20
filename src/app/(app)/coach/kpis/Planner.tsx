@@ -30,8 +30,11 @@ export function usePlan(initial: PlanItem[]) {
     dirty.current.clear(); gone.current.clear();
     if (!rows.length && !del.length) return;
     setStatus("saving");
+    const w = window as Window & { __dwtpPlannerSaving?: boolean };
+    w.__dwtpPlannerSaving = true; // the app-wide Undo button ignores the planner's own saves
     const a = rows.length ? await saveItems(rows) : { ok: true as const };
     const b = del.length ? await deleteItems(del) : { ok: true as const };
+    w.__dwtpPlannerSaving = false;
     const err = ("error" in a && a.error) || ("error" in b && b.error);
     setStatus(err ? String(err) : "saved");
   }, []);
@@ -51,6 +54,7 @@ export function usePlan(initial: PlanItem[]) {
   const [steps, setSteps] = useState({ undo: 0, redo: 0 });
   const record = useCallback((typingIn?: string) => {
     const now = Date.now();
+    (window as Window & { __dwtpPlannerAt?: number }).__dwtpPlannerAt = now; // ⌘Z goes to whichever was changed last
     if (typingIn && lastType.current?.id === typingIn && now - lastType.current.at < 1500) { lastType.current.at = now; return; }
     lastType.current = typingIn ? { id: typingIn, at: now } : null;
     past.current.push(latest.current);
@@ -174,6 +178,9 @@ export function Matrix({ plan }: { plan: Plan }) {
       const el = document.activeElement as HTMLElement | null;
       const typingElsewhere = el && el.matches("input, textarea, select, [contenteditable=true]") && !el.closest("[data-planner]");
       if (typingElsewhere) return;
+      // Something else on the page changed more recently (a client moved to another slot…): the app-wide undo takes it.
+      const w = window as Window & { __dwtpPlannerAt?: number; __dwtpServerAt?: number };
+      if (!el?.closest("[data-planner]") && (w.__dwtpServerAt ?? 0) > (w.__dwtpPlannerAt ?? 0)) return;
       e.preventDefault();
       if (k === "y" || e.shiftKey) plan.redo(); else plan.undo();
     };

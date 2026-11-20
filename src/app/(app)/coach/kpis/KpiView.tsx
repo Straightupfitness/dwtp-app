@@ -44,6 +44,9 @@ export default function KpiView({ d }: { d: Data }) {
 
   // November 19: drag a client to another time slot. Shown right away; saved in the background.
   const [moved, setMoved] = useState<Record<string, string>>({});
+  // Fresh numbers from the server (after a save, or an undo) replace what was shown for the move.
+  const [seenClients, setSeenClients] = useState(d.clients);
+  if (seenClients !== d.clients) { setSeenClients(d.clients); setMoved({}); }
   const clients = useMemo(() => d.clients.map((c) => (moved[c.id] ? { ...c, slot_id: moved[c.id] } : c)), [d.clients, moved]);
   const dnd = useDnd((id, target) => {
     if (target === "none") return;
