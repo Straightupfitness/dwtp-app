@@ -32,6 +32,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   const [mode, setMode] = useState<"home" | "describe" | "review">("home");
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [photoGone, setPhotoGone] = useState(false); // November 19: she removed the photo while editing a meal
   const [text, setText] = useState("");
   const [slot, setSlot] = useState<Slot>(defaultSlot);
   const [items, setItems] = useState<FoodItem[]>([]);
@@ -56,7 +57,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   useEffect(() => {
     const open = (e: Event) => {
       const m = (e as CustomEvent<MealToEdit>).detail;
-      setEditId(m.id); setItems(m.items); setSlot(m.slot); setWhen(new Date(m.eatenAt)); setPreview(m.photoUrl); setPhoto(null);
+      setEditId(m.id); setItems(m.items); setSlot(m.slot); setWhen(new Date(m.eatenAt)); setPreview(m.photoUrl); setPhoto(null); setPhotoGone(false);
       setSavedId(null); setText(""); setNotes(""); setSaveAs(null); setEditing(null); setExtra(""); setError(""); setAdder("type"); setMode("review");
     };
     window.addEventListener(EDIT_EVENT, open);
@@ -64,7 +65,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   }, []);
 
   function reset() {
-    setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setPhotoGone(false); setText(""); setItems([]); setNotes(""); setSavedId(null);
     setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null); setFavEdit(null); setBatch(null);
   }
   async function estimate(image: Blob | null, description: string) {
@@ -87,6 +88,12 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
     const small = await shrinkImage(f, 1024, 0.8);
     setPhoto(small); setPreview(URL.createObjectURL(small));
     estimate(small, "");
+  }
+  /** November 19: a picture for a meal she typed (or is editing). It's only attached: the foods she entered stay as they are. */
+  async function attachPhoto(f?: File) {
+    if (!f) return;
+    const small = await shrinkImage(f, 1024, 0.8);
+    setPhoto(small); setPreview(URL.createObjectURL(small)); setPhotoGone(false);
   }
   const dictation = useDictation((t) => { voice.current = true; setText(t); });
   const listening = dictation.listening;
@@ -152,9 +159,13 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
       return;
     }
     if (editId) {
-      const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs });
+      const newPath = photo ? await uploadPhoto(photo) : null;
+      const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs,
+        ...(newPath ? { photoPath: newPath } : photoGone ? { photoPath: null } : {}) });
       setBusy("");
-      if (r?.error) setError(r.error); else reset();
+      if (r?.error) { setError(r.error); return; }
+      reset();
+      if (photo && !newPath) alert0("Your changes are saved, but the photo didn't upload. Check your connection and try again.");
       return;
     }
     const photoPath = photo ? await uploadPhoto(photo) : null;
@@ -271,6 +282,17 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
       <div className="mx-auto w-full max-w-md flex-1 space-y-3.5 overflow-y-auto px-4 pb-4 pt-1">
         {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
         {preview && <img src={preview} alt="Your meal" className="max-h-44 w-full rounded-[18px] object-cover" />}
+        {/* November 19 (Michael): add a picture to a meal she typed, spoke or searched, or change it. */}
+        {!favEdit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-[#3a3a3a] px-3.5 text-[13px] font-semibold text-[#cfcfcf]">
+              📷 {preview ? "Change photo" : "Add a photo"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => { void attachPhoto(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+            {preview && <button type="button" onClick={() => { setPhoto(null); setPreview(null); if (editId) setPhotoGone(true); }} className="min-h-10 px-2 text-[13px] text-dim underline">Remove photo</button>}
+            {!preview && <span className="text-[12px] text-dim">Optional. Your foods stay as you entered them.</span>}
+          </div>
+        )}
 
         {favEdit ? <p className="rounded-[14px] border border-border bg-card p-3 text-[13px] text-[#a8a8a8]">Changing your favorite <b className="text-text">{favEdit.name}</b>. Add, remove or change foods, then save. Meals you already logged stay the same.</p> : <>
         <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-border bg-card p-1">

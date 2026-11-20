@@ -8,6 +8,7 @@ import DeleteMeal from "./DeleteMeal";
 import EditMeal from "./EditMeal";
 import Link from "next/link";
 import { CopyMeal, CopyMealTo, FavoriteMeal } from "./MealButtons";
+import AddMealPhoto from "./AddMealPhoto";
 import CopyFromDay from "./CopyFromDay";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -119,11 +120,9 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
               // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL
               <img src={photoUrls.get(m.photo_path)} alt="" className="size-[72px] shrink-0 rounded-xl object-cover" />
             ) : (
-              <span className="grid size-[72px] shrink-0 place-items-center rounded-xl bg-[#1b1b1b] text-dim" aria-hidden="true">
-                {m.source === "voice"
-                  ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
-                  : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /></svg>}
-              </span>
+              <AddMealPhoto id={m.id} icon={m.source === "voice"
+                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>} />
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">

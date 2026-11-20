@@ -50,8 +50,11 @@ export async function saveMeal(input: {
   return { ok: true };
 }
 
-/** Change a meal she already saved: its foods, which meal it was, and when she ate it. The photo stays. */
-export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt?: string | null; saveAs?: string | null }) {
+/**
+ * Change a meal she already saved: its foods, which meal it was, and when she ate it. The photo stays, unless she
+ * adds, changes or removes it (November 19: photoPath a new picture, null to remove, left out to keep).
+ */
+export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt?: string | null; saveAs?: string | null; photoPath?: string | null }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in" };
@@ -60,8 +63,15 @@ export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlo
   const t = totals(items);
   const at = input.eatenAt ? new Date(input.eatenAt) : null;
   const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= MAX_BACK_MS ? at.toISOString() : undefined;
+  let oldPhoto: string | null = null;
+  if (input.photoPath !== undefined) {
+    if (input.photoPath && !input.photoPath.startsWith(`${user.id}/`)) return { error: "That photo isn't yours." };
+    const { data: was } = await supabase.from("food_logs").select("photo_path").eq("id", id).eq("client_id", user.id).maybeSingle();
+    oldPhoto = (was?.photo_path as string | null) ?? null;
+  }
   const { error } = await supabase.from("food_logs").update({
     ...(eatenAt ? { eaten_at: eatenAt } : {}),
+    ...(input.photoPath !== undefined ? { photo_path: input.photoPath } : {}),
     meal_slot: input.mealSlot,
     items,
     calories: Math.round(t.calories),
@@ -70,6 +80,7 @@ export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlo
     potassium_mg: Math.round(t.potassium_mg),
   }).eq("id", id).eq("client_id", user.id);
   if (error) return { error: error.message };
+  if (oldPhoto && oldPhoto !== input.photoPath) await supabase.storage.from("food-photos").remove([oldPhoto]);
   if (input.saveAs?.trim()) await saveGoTo(input.saveAs, items);
   if (eatenAt) {
     const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).single();
@@ -232,6 +243,21 @@ export async function mealsOn(day: string) {
     id: m.id as string, slot: (m.meal_slot ?? "other") as string, calories: m.calories as number, protein: Math.round(Number(m.protein_g ?? 0)),
     foods: (m.items as FoodItem[]).map((i) => i.name).join(", "),
   }));
+}
+
+/** November 19: add a picture to a meal she already logged (typed, spoken or searched), or replace its picture. */
+export async function setMealPhoto(id: string, path: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  if (!path.startsWith(`${user.id}/`)) return { error: "That photo isn't yours." };
+  const { data: was } = await supabase.from("food_logs").select("photo_path").eq("id", id).eq("client_id", user.id).maybeSingle();
+  if (!was) return { error: "Meal not found" };
+  const { error } = await supabase.from("food_logs").update({ photo_path: path }).eq("id", id).eq("client_id", user.id);
+  if (error) return { error: error.message };
+  if (was.photo_path && was.photo_path !== path) await supabase.storage.from("food-photos").remove([was.photo_path as string]);
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /** The photo upload's backup route (November 11): through the server, with her sign-in from the cookie. */
