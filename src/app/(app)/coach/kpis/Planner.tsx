@@ -488,10 +488,13 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
   const today = ymd(now);
   const blocks = items.filter((i) => i.sched_at);
   const height = (LAST - FIRST + 1) * HOUR_PX;
-  const of = (day: string) => {
-    const list = blocks.map((i) => { const at = new Date(i.sched_at!); return { i, day: ymd(at), start: at.getHours() * 60 + at.getMinutes(), len: i.sched_minutes ?? 60 }; })
-      .filter((b) => b.day === day).sort((a, b) => a.start - b.start || b.len - a.len);
-    // Side by side when they overlap.
+  // A day's timed things: scheduled tasks and the weekly schedule, side by side when they overlap.
+  type Slot = { key: string; start: number; len: number; i?: PlanItem; e?: CalEvent };
+  const of = (day: string, date: Date) => {
+    const tasks: Slot[] = blocks.map((i) => { const at = new Date(i.sched_at!); return { key: i.id, i, day: ymd(at), start: at.getHours() * 60 + at.getMinutes(), len: i.sched_minutes ?? 60 }; })
+      .filter((b) => b.day === day);
+    const reps: Slot[] = repeatsOn(date).filter((e) => e.start_min !== null).map((e) => ({ key: `e-${e.id}`, e, start: e.start_min!, len: e.minutes }));
+    const list = [...reps, ...tasks].sort((a, b) => a.start - b.start || b.len - a.len);
     const lanes: number[] = []; const placed = list.map((b) => { let lane = lanes.findIndex((end) => end <= b.start); if (lane < 0) { lane = lanes.length; lanes.push(0); } lanes[lane] = b.start + b.len; return { ...b, lane }; });
     return placed.map((b) => ({ ...b, lanes: Math.max(1, ...placed.filter((o) => o.start < b.start + b.len && b.start < o.start + o.len).map((o) => o.lane + 1)) }));
   };
@@ -540,23 +543,24 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
                 {day === today && now.getHours() >= FIRST && now.getHours() <= LAST && (
                   <div className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-[#ef4444]" style={{ top: ((now.getHours() - FIRST) * 60 + now.getMinutes()) / 60 * HOUR_PX }} />
                 )}
-                {repeatsOn(d).filter((e) => e.start_min !== null).map((e) => {
-                  const top = Math.max(0, (e.start_min! - FIRST * 60) / 60 * HOUR_PX), h = Math.max(14, e.minutes / 60 * HOUR_PX - 2);
-                  const at = new Date(d); at.setHours(0, e.start_min!, 0, 0);
-                  return (
-                    <button key={e.id} type="button" onClick={() => setOpenEv(e)} title={`${timeLabel(at)} · ${e.title}`}
-                      className="absolute inset-x-[1px] z-[15] overflow-hidden rounded-md border border-[#38bdf8]/50 bg-[#10202b] px-1 py-0.5 text-left text-[10px] leading-tight text-[#cfeaff]" style={{ top, height: h }}>
-                      <span className="block text-[9px] text-[#7cc9f0]">{timeLabel(at)}</span><span className="line-clamp-2">{e.title}</span>
-                    </button>
-                  );
-                })}
-                {of(day).map(({ i, start, len, lane, lanes }) => {
+                {of(day, d).map(({ key, i, e, start, len, lane, lanes }) => {
                   const top = Math.max(0, (start - FIRST * 60) / 60 * HOUR_PX), h = Math.max(16, len / 60 * HOUR_PX - 2);
+                  const pos = { top, height: h, left: `calc(${(lane / lanes) * 100}% + 1px)`, width: `calc(${100 / lanes}% - 2px)` };
+                  if (e) { // the weekly schedule: tap to see or change it
+                    const at = new Date(d); at.setHours(0, e.start_min!, 0, 0);
+                    return (
+                      <button key={key} type="button" onClick={() => setOpenEv(e)} title={`${timeLabel(at)} · ${e.title}`}
+                        className="absolute z-[15] overflow-hidden rounded-md border border-[#38bdf8]/50 bg-[#10202b] px-1 py-0.5 text-left text-[10px] leading-tight text-[#cfeaff]" style={pos}>
+                        <span className="block text-[9px] text-[#7cc9f0]">{timeLabel(at)}</span><span className="line-clamp-2">{e.title}</span>
+                      </button>
+                    );
+                  }
+                  if (!i) return null;
                   return (
                     <button key={i.id} type="button" data-grip {...dnd.bind(`cal:${i.id}`, i.text || "Untitled")} onClick={() => setOpen(i.id)}
                       title={`${timeLabel(new Date(i.sched_at!))} · ${i.text}`}
                       className={`absolute z-20 touch-none overflow-hidden rounded-md border border-accent/70 bg-[#2a1f0c] px-1 py-0.5 text-left text-[10.5px] leading-tight text-text ${i.done ? "opacity-50 line-through" : ""}`}
-                      style={{ top, height: h, left: `calc(${(lane / lanes) * 100}% + 1px)`, width: `calc(${100 / lanes}% - 2px)` }}>
+                      style={pos}>
                       <span className="block text-[9px] text-accent">{timeLabel(new Date(i.sched_at!))}</span>
                       <span className="line-clamp-3">{i.text || "Untitled"}</span>
                     </button>
