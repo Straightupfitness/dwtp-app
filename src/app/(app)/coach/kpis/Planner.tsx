@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDnd } from "@/components/useDnd";
 import Section from "@/components/Section";
-import { deleteItems, saveItems, type PlanItem } from "./items";
+import { deleteEvent, deleteItems, saveEvent, saveItems, type CalEvent, type PlanItem } from "./items";
 
 /**
  * November 19 (Michael): his planner on the KPIs tab. November 20: the Eisenhower matrix, where every box is an outline
@@ -137,7 +137,7 @@ const BOXES: { box: Box; title: string; sub: string; color: string }[] = [
 const PROJECTS = { box: null as Box, title: "Projects", sub: "Your big projects. Drag their tasks into the boxes above.", color: "#c084fc" };
 
 /** The whole matrix: four boxes and Projects, each an outline, with drag and drop between them. */
-export function Matrix({ plan }: { plan: Plan }) {
+export function Matrix({ plan, events = [] }: { plan: Plan; events?: CalEvent[] }) {
   const items = useMemo(() => plan.items.filter((i) => i.kind === "outline"), [plan.items]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const kids = useMemo(() => {
@@ -223,7 +223,7 @@ export function Matrix({ plan }: { plan: Plan }) {
 
   return (
     <div data-planner className="space-y-4">
-      <Section title="Calendar" icon="calendar" open><Scheduler plan={plan} items={items} dnd={dnd} /></Section>
+      <Section title="Calendar" icon="calendar" open><Scheduler plan={plan} items={items} dnd={dnd} events={events} /></Section>
       <Section title="Eisenhower matrix" icon="checkins" open>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={plan.undo} disabled={!plan.canUndo} title="Undo (⌘Z)" aria-label="Undo" className="min-h-10 rounded-xl border border-border px-3 text-[13px] disabled:opacity-35">↶ Undo</button>
@@ -473,7 +473,13 @@ const timeLabel = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", 
  * November 20 (Michael): a week (today first) from 5 AM to 9 PM. Drag a task from the matrix onto a day and time; drag a
  * block to move it; tap it to change how long it is, finish it, or take it off. The task stays in its box too.
  */
-function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: ReturnType<typeof useDnd> }) {
+function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]; dnd: ReturnType<typeof useDnd>; events: CalEvent[] }) {
+  const [evs, setEvs] = useState(events);
+  const [seenEvents, setSeenEvents] = useState(events);
+  if (seenEvents !== events) { setSeenEvents(events); setEvs(events); }
+  const [openEv, setOpenEv] = useState<CalEvent | null>(null);
+  // November 20: what comes back on a day: his weekly schedule and the year's birthdays.
+  const repeatsOn = (d: Date) => evs.filter((e) => (e.kind === "weekly" ? e.weekday === d.getDay() : e.month === d.getMonth() + 1 && e.day === d.getDate()));
   const [offset, setOffset] = useState(0); // days from today
   const [open, setOpen] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -508,6 +514,16 @@ function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: R
               {ymd(d) === today ? "Today" : d.toLocaleDateString("en-US", { weekday: "short" })} {d.getDate()}
             </p>
           ))}
+          {/* All-day: check-in replies, birthdays… */}
+          <p className="pt-0.5 text-right text-[9px] uppercase tracking-wide text-dim">all day</p>
+          {days.map((d) => (
+            <div key={`ad-${ymd(d)}`} className="space-y-0.5 border-l border-border px-0.5 pb-1">
+              {repeatsOn(d).filter((e) => e.start_min === null).map((e) => (
+                <button key={e.id} type="button" onClick={() => setOpenEv(e)} title={e.note ?? e.title}
+                  className={`block w-full truncate rounded px-1 text-left text-[10px] leading-4 ${e.kind === "yearly" ? "bg-[#3a1d2e] text-[#ffb3d1]" : "bg-[#13222e] text-[#9bdcff]"}`}>{e.icon ? `${e.icon} ` : ""}{e.title}</button>
+              ))}
+            </div>
+          ))}
           {/* The hours down the side */}
           <div className="relative" style={{ height }}>
             {Array.from({ length: LAST - FIRST + 1 }, (_, k) => <span key={k} className="absolute right-1 -translate-y-1/2 text-[10px] text-dim" style={{ top: k * HOUR_PX + (k ? 0 : 6) }}>{hourLabel(FIRST + k)}</span>)}
@@ -524,6 +540,16 @@ function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: R
                 {day === today && now.getHours() >= FIRST && now.getHours() <= LAST && (
                   <div className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-[#ef4444]" style={{ top: ((now.getHours() - FIRST) * 60 + now.getMinutes()) / 60 * HOUR_PX }} />
                 )}
+                {repeatsOn(d).filter((e) => e.start_min !== null).map((e) => {
+                  const top = Math.max(0, (e.start_min! - FIRST * 60) / 60 * HOUR_PX), h = Math.max(14, e.minutes / 60 * HOUR_PX - 2);
+                  const at = new Date(d); at.setHours(0, e.start_min!, 0, 0);
+                  return (
+                    <button key={e.id} type="button" onClick={() => setOpenEv(e)} title={`${timeLabel(at)} · ${e.title}`}
+                      className="absolute inset-x-[1px] z-[15] overflow-hidden rounded-md border border-[#38bdf8]/50 bg-[#10202b] px-1 py-0.5 text-left text-[10px] leading-tight text-[#cfeaff]" style={{ top, height: h }}>
+                      <span className="block text-[9px] text-[#7cc9f0]">{timeLabel(at)}</span><span className="line-clamp-2">{e.title}</span>
+                    </button>
+                  );
+                })}
                 {of(day).map(({ i, start, len, lane, lanes }) => {
                   const top = Math.max(0, (start - FIRST * 60) / 60 * HOUR_PX), h = Math.max(16, len / 60 * HOUR_PX - 2);
                   return (
@@ -541,6 +567,7 @@ function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: R
           })}
         </div>
       </div>
+      <Repeats evs={evs} setEvs={setEvs} open={openEv} setOpen={setOpenEv} />
       {openItem && openItem.sched_at && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label="Scheduled task">
           <div className="w-full max-w-sm space-y-2.5 rounded-[18px] border border-border bg-[#121212] p-4" onClick={(e) => e.stopPropagation()}>
@@ -561,5 +588,100 @@ function Scheduler({ plan, items, dnd }: { plan: Plan; items: PlanItem[]; dnd: R
         </div>
       )}
     </div>
+  );
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const minLabel = (m: number | null) => { if (m === null) return "All day"; const d = new Date(2000, 0, 1, 0, m); return timeLabel(d); };
+const toTime = (m: number | null) => (m === null ? "" : `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+const fromTime = (t: string) => { const m = t.match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+/**
+ * November 20: his weekly schedule and the year's birthdays, listed under the calendar: add, change or remove them.
+ * Birthdays send him a reminder 2 days before.
+ */
+function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: CalEvent[]) => void; open: CalEvent | null; setOpen: (e: CalEvent | null) => void }) {
+  const [form, setForm] = useState<(Omit<CalEvent, "id"> & { id: string | null }) | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const blank = (kind: "weekly" | "yearly"): Omit<CalEvent, "id"> & { id: string | null } => ({ id: null, title: "", kind, weekday: 1, month: 1, day: 1, start_min: kind === "weekly" ? 540 : null, minutes: 60, icon: kind === "yearly" ? "🎂" : null, note: null });
+  const edit = (e: CalEvent) => { setForm({ ...e }); setErr(""); setOpen(null); };
+  const save = async () => {
+    if (!form) return;
+    setBusy(true); setErr("");
+    const { id, ...rest } = form;
+    const r = await saveEvent(id, rest);
+    setBusy(false);
+    if ("error" in r && r.error) { setErr(r.error); return; }
+    const newId = "id" in r && r.id ? r.id : `new-${evs.length}`;
+    setEvs(id ? evs.map((x) => (x.id === id ? { ...x, ...rest } : x)) : [...evs, { ...rest, id: newId }]);
+    setForm(null);
+  };
+  const remove = async (e: CalEvent) => { const r = await deleteEvent(e.id); if (!("error" in r && r.error)) { setEvs(evs.filter((x) => x.id !== e.id)); setForm(null); setOpen(null); } };
+  const weekly = evs.filter((e) => e.kind === "weekly").sort((a, b) => ((a.weekday ?? 0) + 6) % 7 - ((b.weekday ?? 0) + 6) % 7 || (a.start_min ?? -1) - (b.start_min ?? -1));
+  const yearly = evs.filter((e) => e.kind === "yearly").sort((a, b) => (a.month ?? 0) - (b.month ?? 0) || (a.day ?? 0) - (b.day ?? 0));
+  const box = "min-h-10 rounded-lg border border-border bg-bg px-2 text-[14px] text-text outline-none focus:border-accent";
+  return (
+    <>
+      <details className="mt-2 text-[13px]">
+        <summary className="cursor-pointer text-dim">Weekly schedule &amp; birthdays ({weekly.length} weekly · {yearly.length} yearly) · edit</summary>
+        <div className="mt-2 grid gap-3 md:grid-cols-2">
+          <div>
+            <p className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-accent">Every week <button type="button" onClick={() => setForm(blank("weekly"))} className="normal-case tracking-normal text-accent underline">+ Add</button></p>
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {weekly.map((e) => <li key={e.id}><button type="button" onClick={() => edit(e)} className="flex w-full gap-2 px-2 py-1 text-left hover:bg-[#161616]"><span className="w-9 shrink-0 text-dim">{WEEKDAYS[e.weekday ?? 0]}</span><span className="w-16 shrink-0 text-dim">{minLabel(e.start_min)}</span><span className="truncate">{e.title}</span></button></li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-accent">Every year (reminder 2 days before) <button type="button" onClick={() => setForm(blank("yearly"))} className="normal-case tracking-normal text-accent underline">+ Add</button></p>
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {yearly.map((e) => <li key={e.id}><button type="button" onClick={() => edit(e)} className="flex w-full gap-2 px-2 py-1 text-left hover:bg-[#161616]"><span className="w-14 shrink-0 text-dim">{MONTHS[(e.month ?? 1) - 1]} {e.day}</span><span className="truncate">{e.icon ? `${e.icon} ` : ""}{e.title}{e.note ? <span className="text-dim"> · {e.note}</span> : null}</span></button></li>)}
+            </ul>
+          </div>
+        </div>
+      </details>
+      {open && !form && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label={open.title}>
+          <div className="w-full max-w-sm space-y-2 rounded-[18px] border border-border bg-[#121212] p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[16px] font-semibold">{open.icon ? `${open.icon} ` : ""}{open.title}</p>
+            <p className="text-[13px] text-dim">{open.kind === "weekly" ? `Every ${WEEKDAYS[open.weekday ?? 0]} · ${minLabel(open.start_min)}${open.start_min !== null ? ` · ${open.minutes} min` : ""}` : `Every year on ${MONTHS[(open.month ?? 1) - 1]} ${open.day} · reminder 2 days before`}</p>
+            {open.note && <p className="text-[14px]">{open.note}</p>}
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={() => edit(open)} className="min-h-10 flex-1 rounded-xl border border-border text-[13px] font-semibold">Change</button>
+              <button type="button" onClick={() => setOpen(null)} className="min-h-10 flex-1 rounded-xl bg-accent text-[13px] font-semibold text-black">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {form && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setForm(null)} role="dialog" aria-modal="true" aria-label="Repeating event">
+          <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void save(); }} className="w-full max-w-sm space-y-2.5 rounded-[18px] border border-border bg-[#121212] p-4">
+            <p className="font-[family-name:var(--font-display)] text-lg uppercase">{form.id ? "Change" : "Add"} {form.kind === "weekly" ? "a weekly event" : "a yearly date"}</p>
+            <input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={form.kind === "weekly" ? "Train at HG" : "Name"} className={`${box} w-full`} />
+            {form.kind === "weekly" ? (
+              <div className="flex flex-wrap gap-1">{WEEKDAYS.map((w, k) => <button key={w} type="button" onClick={() => setForm({ ...form, weekday: k })} className={`min-h-9 rounded-lg border px-2.5 text-[13px] ${form.weekday === k ? "border-accent text-accent" : "border-border text-dim"}`}>{w}</button>)}</div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={form.month ?? 1} onChange={(e) => setForm({ ...form, month: Number(e.target.value) })} className={box}>{MONTHS.map((m, k) => <option key={m} value={k + 1}>{m}</option>)}</select>
+                <input type="number" min={1} max={31} value={form.day ?? 1} onChange={(e) => setForm({ ...form, day: Number(e.target.value) })} className={`${box} w-20`} />
+                <input value={form.icon ?? ""} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="🎂" className={`${box} w-16 text-center`} aria-label="Icon" />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-[13px] text-dim"><input type="checkbox" checked={form.start_min === null} onChange={(e) => setForm({ ...form, start_min: e.target.checked ? null : 540 })} className="size-4 accent-[var(--accent)]" />All day</label>
+              {form.start_min !== null && <>
+                <input type="time" value={toTime(form.start_min)} onChange={(e) => setForm({ ...form, start_min: fromTime(e.target.value) })} className={`${box} [color-scheme:dark]`} />
+                <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })} className={box}>{[15, 30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`}</option>)}</select>
+              </>}
+            </div>
+            <input value={form.note ?? ""} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Note (optional)" className={`${box} w-full`} />
+            {err && <p className="text-[13px] text-[var(--red)]">{err}</p>}
+            <button disabled={busy} className="min-h-11 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
+            {form.id && <button type="button" onClick={() => void remove(form as CalEvent)} className="min-h-10 w-full text-[13px] text-[var(--red)]">Delete</button>}
+          </form>
+        </div>
+      )}
+    </>
   );
 }

@@ -21,13 +21,15 @@ export default async function KpisPage() {
   ]);
   const missing = [ex, sl, cl, pa].some((r) => r.error);
   // November 20: before the scheduler SQL (36), read the planner without its scheduling columns.
+  // November 20: his repeating events and birthdays (SQL 37); without the table, the calendar just has none.
+  const ev = await supabase.from("kpi_events").select("id, title, kind, weekday, month, day, start_min, minutes, icon, note").order("start_min", { nullsFirst: true });
   const items = it.error ? await supabase.from("kpi_items").select("id, kind, parent_id, text, note, quadrant, position, done, collapsed").order("position") : it;
   // Today in Los Angeles, so "this month" and "coming up" match his calendar.
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
   const data: Data = {
     expenses: (ex.data ?? []) as Data["expenses"], slots: (sl.data ?? []) as Data["slots"], clients: (cl.data ?? []) as Data["clients"],
     payments: (pa.data ?? []) as Data["payments"], leads: ((le.data ?? []) as { temperature: string | null }[]).map((l) => l.temperature), today,
-    items: (items.data ?? []) as Data["items"], planReady: !items.error,
+    items: (items.data ?? []) as Data["items"], planReady: !items.error, events: (ev.error ? [] : ev.data ?? []) as Data["events"],
   };
   return (
     <section className="mx-auto max-w-6xl space-y-3.5 pb-28">

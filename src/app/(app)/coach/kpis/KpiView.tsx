@@ -3,13 +3,13 @@ import { useMemo, useState, useTransition } from "react";
 import { Grip, useDnd } from "@/components/useDnd";
 import { deleteKpi, saveKpi, type KpiTable } from "./actions";
 import { Matrix, usePlan } from "./Planner";
-import type { PlanItem } from "./items";
+import type { CalEvent, PlanItem } from "./items";
 
 type Expense = { id: string; name: string; category: "business" | "personal"; amount: number; frequency: "weekly" | "biweekly" | "monthly" | "yearly"; canceling: boolean; notes: string | null; position: number; draw_day?: number | null };
 type Slot = { id: string; name: string; rent: number; plan_2027: number | null; plan_note: string | null; position: number };
 type Client = { id: string; slot_id: string | null; name: string; monthly: number; paid_amount: number | null; paid_weeks: number | null; expires_on: string | null; renewal_offer: number | null; notes: string | null; position: number; started_on?: string | null; created_at?: string };
 type Payment = { id: string; client_id: string | null; name: string; amount: number; paid_on: string; notes: string | null };
-export type Data = { expenses: Expense[]; slots: Slot[]; clients: Client[]; payments: Payment[]; leads: (string | null)[]; today: string; items: PlanItem[]; planReady: boolean };
+export type Data = { expenses: Expense[]; slots: Slot[]; clients: Client[]; payments: Payment[]; leads: (string | null)[]; today: string; items: PlanItem[]; planReady: boolean; events: CalEvent[] };
 
 const n = (x: unknown) => Number(x ?? 0) || 0;
 const money = (x: number) => `${x < 0 ? "−" : ""}$${Math.abs(x).toLocaleString("en-US", { maximumFractionDigits: Math.abs(x) % 1 ? 2 : 0, minimumFractionDigits: Math.abs(x) % 1 ? 2 : 0 })}`;
@@ -245,7 +245,7 @@ export default function KpiView({ d }: { d: Data }) {
 
       {/* November 20: Schedule (the calendar, then the Eisenhower matrix). */}
       <BigSection eyebrow="Your week" title="Schedule">
-        {planReady ? <Matrix plan={plan} />
+        {planReady ? <Matrix plan={plan} events={d.events} />
           : <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the 32 KPI planner SQL file in Supabase to turn on the Eisenhower matrix.</p>}
       </BigSection>
 

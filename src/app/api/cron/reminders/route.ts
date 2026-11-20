@@ -24,8 +24,12 @@ export async function GET(req: Request) {
   let birthdays = 0;
   try { birthdays = await sendBirthdays(adminClient()); } catch (e) { console.error("birthdays", e); }
 
+  // November 20: Michael's yearly dates (birthdays…) on his KPIs calendar: a reminder 2 days before.
+  let dates = 0;
+  try { dates = await remindDates(); } catch (e) { console.error("dates", e); }
+
   // Nothing from the app before the launch (moved to Mon Nov 16 on November 6; check-ins until then run in VideoAsk).
-  if (todayIn(DEADLINE_TZ) < LAUNCH_DATE) return NextResponse.json({ ok: true, birthdays, skipped: `before launch (${LAUNCH_DATE})` });
+  if (todayIn(DEADLINE_TZ) < LAUNCH_DATE) return NextResponse.json({ ok: true, birthdays, dates, skipped: `before launch (${LAUNCH_DATE})` });
 
   const db = adminClient();
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: DEADLINE_TZ, weekday: "short" }).format(new Date());
@@ -90,4 +94,24 @@ export async function GET(req: Request) {
     }
   }
   return NextResponse.json({ ok: true, weekday, sent, birthdays });
+}
+
+/** Birthdays and other yearly dates on Michael's calendar that are 2 days away: one reminder each (per year). */
+async function remindDates() {
+  const db = adminClient();
+  const { data, error } = await db.from("kpi_events").select("id, title, month, day, icon, note").eq("kind", "yearly");
+  if (error || !data?.length) return 0;
+  const today = todayIn(DEADLINE_TZ);
+  const soon = new Date(Date.parse(today + "T12:00:00Z") + 2 * 86_400_000);
+  const m = soon.getUTCMonth() + 1, d = soon.getUTCDate();
+  const due = data.filter((e) => e.month === m && e.day === d);
+  if (!due.length) return 0;
+  const { coachIds } = await import("@/lib/notify");
+  const ids = await coachIds();
+  const when = soon.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  for (const e of due) {
+    const what = `${e.icon ? `${e.icon} ` : ""}${e.title}`;
+    await notify(ids, { title: `${what} in 2 days`, body: `${when}${e.note ? ` · ${e.note}` : ""}`, url: "/coach/kpis", dedupeKey: `date:${e.id}:${soon.getUTCFullYear()}` });
+  }
+  return due.length;
 }

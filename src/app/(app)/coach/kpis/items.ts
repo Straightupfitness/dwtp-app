@@ -47,3 +47,34 @@ export async function deleteItems(ids: string[]) {
   const { error } = await db.from("kpi_items").delete().in("id", ok);
   return error ? { error: error.message } : { ok: true };
 }
+
+/** November 20: something on his calendar that comes back every week or every year (a birthday). */
+export type CalEvent = {
+  id: string; title: string; kind: "weekly" | "yearly"; weekday: number | null; month: number | null; day: number | null;
+  start_min: number | null; minutes: number; icon: string | null; note: string | null;
+};
+
+export async function saveEvent(id: string | null, e: Omit<CalEvent, "id">) {
+  const db = await coach();
+  if (!db) return { error: "Coach only" };
+  const int = (v: unknown, lo: number, hi: number) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x >= lo && x <= hi ? x : null; };
+  const row = {
+    title: String(e.title ?? "").trim().slice(0, 200), kind: e.kind === "yearly" ? "yearly" : "weekly",
+    weekday: e.kind === "weekly" ? int(e.weekday, 0, 6) : null, month: e.kind === "yearly" ? int(e.month, 1, 12) : null, day: e.kind === "yearly" ? int(e.day, 1, 31) : null,
+    start_min: e.start_min == null || (e.start_min as unknown) === "" ? null : int(e.start_min, 0, 1439), minutes: int(e.minutes, 5, 720) ?? 60,
+    icon: e.icon ? String(e.icon).slice(0, 8) : null, note: e.note ? String(e.note).trim().slice(0, 500) || null : null,
+  };
+  if (!row.title) return { error: "Give it a name." };
+  if (row.kind === "weekly" && row.weekday === null) return { error: "Pick a day of the week." };
+  if (row.kind === "yearly" && (row.month === null || row.day === null)) return { error: "Pick the date." };
+  const { data, error } = id ? await db.from("kpi_events").update(row).eq("id", id).select("id").single() : await db.from("kpi_events").insert(row).select("id").single();
+  if (error) return { error: /does not exist|schema cache/i.test(error.message) ? "Run the 37 calendar events SQL file in Supabase first." : error.message };
+  return { ok: true, id: (data?.id as string) ?? id };
+}
+
+export async function deleteEvent(id: string) {
+  const db = await coach();
+  if (!db) return { error: "Coach only" };
+  const { error } = await db.from("kpi_events").delete().eq("id", id);
+  return error ? { error: error.message } : { ok: true };
+}
