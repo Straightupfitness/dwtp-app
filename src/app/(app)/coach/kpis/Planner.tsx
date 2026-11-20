@@ -43,24 +43,67 @@ export function usePlan(initial: PlanItem[]) {
     return () => { window.removeEventListener("pagehide", out); out(); };
   }, [flush]);
 
-  const put = useCallback((rows: PlanItem[]) => {
-    setItems((cur) => { const m = new Map(cur.map((i) => [i.id, i])); for (const r of rows) { m.set(r.id, r); dirty.current.set(r.id, r); } return [...m.values()]; });
+  // November 20 (Michael): undo and redo (⌘Z / ⇧⌘Z, or the buttons). Every change saves what came before; a run of
+  // typing in one line counts as one step.
+  const past = useRef<PlanItem[][]>([]);
+  const future = useRef<PlanItem[][]>([]);
+  const lastType = useRef<{ id: string; at: number } | null>(null);
+  const [steps, setSteps] = useState({ undo: 0, redo: 0 });
+  const record = useCallback((typingIn?: string) => {
+    const now = Date.now();
+    if (typingIn && lastType.current?.id === typingIn && now - lastType.current.at < 1500) { lastType.current.at = now; return; }
+    lastType.current = typingIn ? { id: typingIn, at: now } : null;
+    past.current.push(latest.current);
+    if (past.current.length > 100) past.current.shift();
+    future.current = [];
+    setSteps({ undo: past.current.length, redo: 0 });
+  }, []);
+  /** Make the planner look exactly like `target` again, and save the difference. */
+  const apply = useCallback((target: PlanItem[]) => {
+    const cur = new Map(latest.current.map((i) => [i.id, i]));
+    const next = new Map(target.map((i) => [i.id, i]));
+    for (const t of target) { const c = cur.get(t.id); if (!c || JSON.stringify(c) !== JSON.stringify(t)) { dirty.current.set(t.id, t); gone.current.delete(t.id); } }
+    for (const id of cur.keys()) if (!next.has(id)) { gone.current.add(id); dirty.current.delete(id); }
+    latest.current = target;
+    setItems(target);
     later();
   }, [later]);
+  const undo = useCallback(() => {
+    const prev = past.current.pop(); if (!prev) return;
+    future.current.push(latest.current); lastType.current = null;
+    apply(prev); setSteps({ undo: past.current.length, redo: future.current.length });
+  }, [apply]);
+  const redo = useCallback(() => {
+    const next = future.current.pop(); if (!next) return;
+    past.current.push(latest.current); lastType.current = null;
+    apply(next); setSteps({ undo: past.current.length, redo: future.current.length });
+  }, [apply]);
+
+  const put = useCallback((rows: PlanItem[], typingIn?: string) => {
+    record(typingIn);
+    const m = new Map(latest.current.map((i) => [i.id, i]));
+    for (const r of rows) { m.set(r.id, r); dirty.current.set(r.id, r); gone.current.delete(r.id); }
+    latest.current = [...m.values()];
+    setItems(latest.current);
+    later();
+  }, [later, record]);
   const patch = useCallback((id: string, p: Partial<PlanItem>) => {
     const cur = latest.current.find((i) => i.id === id);
-    if (cur) put([{ ...cur, ...p }]);
+    const onlyText = Object.keys(p).length === 1 && "text" in p;
+    if (cur) put([{ ...cur, ...p }], onlyText ? id : undefined);
   }, [put]);
   const remove = useCallback((ids: string[]) => {
+    record();
     // A line's children go with it.
     const all = new Set(ids);
     let grew = true;
     while (grew) { grew = false; for (const i of latest.current) if (i.parent_id && all.has(i.parent_id) && !all.has(i.id)) { all.add(i.id); grew = true; } }
-    setItems((cur) => cur.filter((i) => !all.has(i.id)));
+    latest.current = latest.current.filter((i) => !all.has(i.id));
+    setItems(latest.current);
     for (const id of all) { gone.current.add(id); dirty.current.delete(id); }
     later();
-  }, [later]);
-  return { items, put, patch, remove, status };
+  }, [later, record]);
+  return { items, put, patch, remove, status, undo, redo, canUndo: steps.undo > 0, canRedo: steps.redo > 0 };
 }
 type Plan = ReturnType<typeof usePlan>;
 
@@ -122,12 +165,29 @@ export function Matrix({ plan }: { plan: Plan }) {
     const parent = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
     plan.put([{ ...m, parent_id: parent, quadrant: parent ? m.quadrant : box, position: posAt(parent ? kids.get(parent) ?? [] : roots(box), t.id, id) }]);
   });
+  // ⌘Z / Ctrl+Z undoes the last step here (and ⇧⌘Z / Ctrl+Y redoes it), unless she's typing in some other box on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "z" && k !== "y") return;
+      const el = document.activeElement as HTMLElement | null;
+      const typingElsewhere = el && el.matches("input, textarea, select, [contenteditable=true]") && !el.closest("[data-planner]");
+      if (typingElsewhere) return;
+      e.preventDefault();
+      if (k === "y" || e.shiftKey) plan.redo(); else plan.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [plan]);
   const setAll = (collapsed: boolean) => plan.put(items.filter((i) => (kids.get(i.id)?.length ?? 0) > 0 && i.collapsed !== collapsed).map((i) => ({ ...i, collapsed })));
   const shared = { plan, items, byId, kids, roots, boxOf, dnd, showDone, needle: q.trim().toLowerCase() };
 
   return (
-    <div className="space-y-2">
+    <div data-planner className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={plan.undo} disabled={!plan.canUndo} title="Undo (⌘Z)" aria-label="Undo" className="min-h-10 rounded-xl border border-border px-3 text-[13px] disabled:opacity-35">↶ Undo</button>
+        <button type="button" onClick={plan.redo} disabled={!plan.canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className="min-h-10 rounded-xl border border-border px-3 text-[13px] disabled:opacity-35">↷ Redo</button>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search every box" aria-label="Search the matrix" className="min-h-10 min-w-[10rem] flex-1 rounded-xl border border-border bg-card px-3 text-[14px] outline-none focus:border-accent" />
         <button type="button" onClick={() => setShowDone((x) => !x)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">{showDone ? "Hide completed" : "Show completed"}</button>
         <button type="button" onClick={() => setAll(false)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Expand all</button>
@@ -140,7 +200,7 @@ export function Matrix({ plan }: { plan: Plan }) {
       <OutlineBox {...PROJECTS} {...shared} />
       <details className="text-[12px] text-dim">
         <summary className="cursor-pointer">How it works (keyboard shortcuts)</summary>
-        <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dots into another box, or up and down, and everything under it comes along · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
+        <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dots into another box, or up and down, and everything under it comes along · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · ⌘Z / Ctrl+Z: undo · ⇧⌘Z / Ctrl+Y: redo · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
       </details>
       {dnd.ghost}
     </div>
