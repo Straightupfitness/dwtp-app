@@ -7,6 +7,7 @@ export type Temp = "hot" | "warm" | "cold" | "dead" | "";
 export type LeadInput = {
   first_name: string; last_name: string; email: string; phone: string; city: string; goals: string; notes: string;
   lead_type: LeadType; time_slot: string; lead_source: string; contact_method: string; temperature: Temp;
+  facebook?: string; instagram?: string; // November 20: her usernames (or profile links)
 };
 
 async function coach() {
@@ -16,6 +17,16 @@ async function coach() {
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   return me?.role === "coach" ? supabase : null;
 }
+/** "https://www.facebook.com/jane.doe", "facebook.com/profile.php?id=123", "@jane" → "jane.doe" / "123" / "jane". */
+export const handleOf = async (v: string | null | undefined) => {
+  let t = (v ?? "").trim();
+  if (!t) return null;
+  const id = t.match(/[?&]id=(\d+)/)?.[1];
+  if (id) return id;
+  t = t.replace(/^https?:\/\//i, "").replace(/^(www\.|m\.|web\.)?(facebook\.com|fb\.com|m\.me|instagram\.com|ig\.me\/m)\//i, "").replace(/^@/, "");
+  t = t.split(/[/?#\s]/)[0];
+  return t ? t.slice(0, 100) : null;
+};
 const clean = (l: Partial<LeadInput>) => ({
   first_name: (l.first_name ?? "").trim().slice(0, 80), last_name: (l.last_name ?? "").trim().slice(0, 80),
   email: (l.email ?? "").trim().toLowerCase().slice(0, 200) || null, phone: (l.phone ?? "").trim().slice(0, 40) || null,
@@ -48,7 +59,9 @@ export async function setLeads(ids: string[], patch: { temperature?: Temp; lead_
 export async function saveLead(id: string | null, l: LeadInput) {
   const db = await coach();
   if (!db) return { error: "Coach only" };
-  const row = clean(l);
+  const row: Record<string, unknown> = clean(l);
+  if (l.facebook !== undefined) row.facebook = await handleOf(l.facebook);
+  if (l.instagram !== undefined) row.instagram = await handleOf(l.instagram);
   if (!row.first_name && !row.email && !row.phone) return { error: "Add at least a first name, email or phone." };
   const { error } = id
     ? await db.from("leads").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id)

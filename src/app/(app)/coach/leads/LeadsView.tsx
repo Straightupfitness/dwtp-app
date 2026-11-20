@@ -7,13 +7,15 @@ export type Lead = {
   id: string; first_name: string; last_name: string; email: string | null; phone: string | null; city: string | null; goals: string | null; notes: string | null; source: string; created_at: string;
   lead_type?: "online" | "in_person" | null; time_slot?: string | null; lead_source?: string | null; contact_method?: string | null; temperature?: "hot" | "warm" | "cold" | "dead" | null;
   last_heard_on?: string | null; last_reached_on?: string | null; // November 19: last time she reached out / he did
+  facebook?: string | null; instagram?: string | null; // November 20: her usernames, for Messenger and Instagram DMs
 };
 
-const EMPTY: LeadInput = { first_name: "", last_name: "", email: "", phone: "", city: "", goals: "", notes: "", lead_type: "", time_slot: "", lead_source: "", contact_method: "", temperature: "" };
+const EMPTY: LeadInput = { first_name: "", last_name: "", email: "", phone: "", city: "", goals: "", notes: "", lead_type: "", time_slot: "", lead_source: "", contact_method: "", temperature: "", facebook: "", instagram: "" };
 const FIELDS: [keyof LeadInput, string, string][] = [
   ["first_name", "First name", "text"], ["last_name", "Last name", "text"], ["phone", "Phone", "tel"], ["email", "Email", "email"],
   ["time_slot", "Time slot", "text"], ["city", "City she lives in", "text"], ["lead_source", "Source (where you got her)", "text"],
-  ["contact_method", "Main way you talk (Txt, IG DM…)", "text"], ["notes", "Notes", "area"], ["goals", "Her goals", "area"],
+  ["contact_method", "Main way you talk (Txt, IG DM…)", "text"], ["facebook", "Facebook (username or profile link)", "text"], ["instagram", "Instagram (username)", "text"],
+  ["notes", "Notes", "area"], ["goals", "Her goals", "area"],
 ];
 // November 17: how hot she is, and online or in person.
 const TEMPS: { v: Exclude<Temp, "">; label: string; icon: string; on: string }[] = [
@@ -29,6 +31,7 @@ const TEMP_ORDER: Record<string, number> = { hot: 0, warm: 1, cold: 2, "": 3, de
 const toInput = (l: Lead): LeadInput => ({
   first_name: l.first_name, last_name: l.last_name, email: l.email ?? "", phone: l.phone ?? "", city: l.city ?? "", goals: l.goals ?? "", notes: l.notes ?? "",
   lead_type: l.lead_type ?? "", time_slot: l.time_slot ?? "", lead_source: l.lead_source ?? "", contact_method: l.contact_method ?? "", temperature: l.temperature ?? "",
+  facebook: l.facebook ?? "", instagram: l.instagram ?? "",
 });
 const fmtPhone = (p: string | null) => { const d = (p ?? "").replace(/\D/g, "").slice(-10); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p ?? ""; };
 
@@ -209,7 +212,15 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
                 <td className="p-2 text-[#cfcfcf]"><span className="line-clamp-3" title={l.notes ?? ""}>{l.notes}</span></td>
                 <td className="p-2"><DateCell v={l.last_heard_on ?? null} label="She reached out" onPick={(d) => mark([l.id], { last_heard_on: d })} /></td>
                 <td className="p-2"><DateCell v={l.last_reached_on ?? null} label="I reached out" onPick={(d) => mark([l.id], { last_reached_on: d })} /></td>
-                <td className="p-2"><button type="button" onClick={() => setDetails(l)} className="min-h-7 rounded-full border border-border px-2.5 text-[11px] font-semibold hover:border-accent hover:text-accent">Details</button></td>
+                <td className="p-2">
+                  <button type="button" onClick={() => setDetails(l)} className="min-h-7 rounded-full border border-border px-2.5 text-[11px] font-semibold hover:border-accent hover:text-accent">Details</button>
+                  {(l.facebook || l.instagram) && (
+                    <span className="mt-1 flex gap-1">
+                      {l.facebook && <Link href={`/coach/text?kind=leads&via=messenger&ids=${l.id}`} title={`Messenger: ${l.facebook}`} className="text-[14px]">💬</Link>}
+                      {l.instagram && <Link href={`/coach/text?kind=leads&via=instagram&ids=${l.id}`} title={`Instagram: @${l.instagram}`} className="text-[14px]">📸</Link>}
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -256,6 +267,9 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
               {TEMPS.map((t) => <button key={t.v} type="button" disabled={pending} onClick={() => mark([...picked], { temperature: t.v })} className={act}>{t.icon} {t.label}</button>)}
               {TYPES.map((t) => <button key={t.v} type="button" disabled={pending} onClick={() => mark([...picked], { lead_type: t.v })} className={act}>{t.label}</button>)}
               <Link href={`/coach/text?kind=leads&ids=${[...picked].join(",")}`} className={`${act} border-accent bg-accent text-black`}>📱 Text {one ? one.first_name || "her" : picked.size} from my phone</Link>
+              {/* November 20: or on Facebook Messenger (his Facebook) / Instagram (SUFitness), on a phone or a computer. */}
+              <Link href={`/coach/text?kind=leads&via=messenger&ids=${[...picked].join(",")}`} className={act}>💬 Messenger</Link>
+              <Link href={`/coach/text?kind=leads&via=instagram&ids=${[...picked].join(",")}`} className={act}>📸 Instagram</Link>
               <button type="button" onClick={async () => {
                 const list = pickedRows.map((r) => r.email).filter(Boolean).join(", ");
                 try { await navigator.clipboard.writeText(list); setMsg(`Copied ${pickedRows.filter((r) => r.email).length} email address${pickedRows.length === 1 ? "" : "es"}.`); } catch { setMsg(list); }
@@ -284,12 +298,12 @@ export default function LeadsView({ leads }: { leads: Lead[] }) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {FIELDS.map(([k, label, kind]) => (
-                <label key={k} className={`flex flex-col gap-1 text-[12px] text-dim ${kind === "area" || k === "email" || k === "lead_source" || k === "contact_method" ? "col-span-2" : ""}`}>
+                <label key={k} className={`flex flex-col gap-1 text-[12px] text-dim ${kind === "area" || k === "email" || k === "lead_source" || k === "contact_method" || k === "facebook" || k === "instagram" ? "col-span-2" : ""}`}>
                   {label}
                   {kind === "area"
-                    ? <textarea value={edit.f[k]} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, [k]: e.target.value } })} rows={3} className="rounded-xl border border-border bg-card p-2.5 text-[15px] text-text outline-none focus:border-accent" />
-                    : <input type={kind} value={edit.f[k]} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, [k]: e.target.value } })} autoFocus={k === "first_name"}
-                        autoCapitalize={kind === "email" ? "none" : "words"} className="min-h-11 rounded-xl border border-border bg-card px-3 text-[15px] text-text outline-none focus:border-accent" />}
+                    ? <textarea value={edit.f[k] ?? ""} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, [k]: e.target.value } })} rows={3} className="rounded-xl border border-border bg-card p-2.5 text-[15px] text-text outline-none focus:border-accent" />
+                    : <input type={kind} value={edit.f[k] ?? ""} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, [k]: e.target.value } })} autoFocus={k === "first_name"}
+                        autoCapitalize={kind === "email" || k === "facebook" || k === "instagram" ? "none" : "words"} className="min-h-11 rounded-xl border border-border bg-card px-3 text-[15px] text-text outline-none focus:border-accent" />}
                 </label>
               ))}
             </div>
@@ -405,6 +419,14 @@ function DetailsBox({ l, onClose, onSaved }: { l: Lead; onClose: () => void; onS
         <label className="flex flex-col gap-1 text-[12px] text-dim">City<input value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} className={box} /></label>
         <label className="flex flex-col gap-1 text-[12px] text-dim">Source<input value={f.lead_source} onChange={(e) => setF({ ...f, lead_source: e.target.value })} className={box} /></label>
         <label className="flex flex-col gap-1 text-[12px] text-dim">How you talk (Txt, IG DM…)<input value={f.contact_method} onChange={(e) => setF({ ...f, contact_method: e.target.value })} className={box} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">Facebook (username or profile link)<input value={f.facebook ?? ""} onChange={(e) => setF({ ...f, facebook: e.target.value })} autoCapitalize="none" placeholder="jane.doe" className={box} /></label>
+        <label className="flex flex-col gap-1 text-[12px] text-dim">Instagram (username)<input value={f.instagram ?? ""} onChange={(e) => setF({ ...f, instagram: e.target.value })} autoCapitalize="none" placeholder="@janedoe" className={box} /></label>
+        {(l.facebook || l.instagram) && (
+          <div className="flex gap-2">
+            {l.facebook && <Link href={`/coach/text?kind=leads&via=messenger&ids=${l.id}`} className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border text-[13px] font-semibold">💬 Messenger</Link>}
+            {l.instagram && <Link href={`/coach/text?kind=leads&via=instagram&ids=${l.id}`} className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border text-[13px] font-semibold">📸 Instagram</Link>}
+          </div>
+        )}
         {err && <p className="text-sm text-[var(--red)]">{err}</p>}
         <button disabled={pending} className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">{pending ? "Saving…" : "Save"}</button>
       </form>

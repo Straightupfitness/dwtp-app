@@ -10,7 +10,9 @@ export default async function LeadsPage() {
   if (me?.role !== "coach") redirect("/today");
   const cols = "id, first_name, last_name, email, phone, city, goals, notes, source, created_at, lead_type, time_slot, lead_source, contact_method, temperature";
   // November 19: the contact dates (SQL 33), read with everything else; without that column yet, the rest still loads.
-  const withDates = await supabase.from("leads").select(`${cols}, last_heard_on, last_reached_on`).order("created_at", { ascending: false });
+  // November 20: and her Facebook / Instagram (SQL 34). Each newer column is optional, so the page loads either way.
+  const all = await supabase.from("leads").select(`${cols}, last_heard_on, last_reached_on, facebook, instagram`).order("created_at", { ascending: false });
+  const withDates = all.error ? await supabase.from("leads").select(`${cols}, last_heard_on, last_reached_on`).order("created_at", { ascending: false }) : all;
   const { data, error } = withDates.error ? await supabase.from("leads").select(cols).order("created_at", { ascending: false }) : withDates;
   return (
     <section className="mx-auto max-w-7xl space-y-3.5 pb-28">

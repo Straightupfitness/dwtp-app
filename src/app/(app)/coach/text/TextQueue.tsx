@@ -3,7 +3,7 @@ import { markReachedOut } from "../leads/actions";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; week?: number; weight?: number | null; goal?: number | null; city?: string | null; time?: string | null };
+export type TextRow = { id: string; name: string; first: string; last: string; phone: string | null; handle?: string | null; week?: number; weight?: number | null; goal?: number | null; city?: string | null; time?: string | null };
 
 const CLIENT_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{week}", "Program week"], ["{weight}", "Latest weight"], ["{goal}", "Goal weight"], ["{togo}", "Lbs to goal"]];
 const LEAD_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "Last name"], ["{city}", "City"], ["{time}", "Time slot"]];
@@ -22,6 +22,16 @@ export function fill(t: string, r: TextRow) {
     .replace(/\{\s*goal\s*\}/gi, fmt(r.goal))
     .replace(/\{\s*togo\s*\}/gi, fmt(togo));
 }
+/** November 20: Facebook Messenger (his personal Facebook) and Instagram DMs (SUFitness). They open her chat on a phone
+ * or a computer; the message is copied first, so he pastes it and taps send. */
+export type Via = "sms" | "messenger" | "instagram";
+const VIA = {
+  sms: { verb: "Text", icon: "📱", app: "Messages", none: "No phone number" },
+  messenger: { verb: "Message", icon: "💬", app: "Messenger", none: "No Facebook" },
+  instagram: { verb: "DM", icon: "📸", app: "Instagram", none: "No Instagram" },
+} as const;
+const chatHref = (via: Via, to: string, body: string) => via === "messenger" ? `https://m.me/${encodeURIComponent(to)}`
+  : via === "instagram" ? `https://ig.me/m/${encodeURIComponent(to)}` : smsHref(to, body);
 const smsHref = (phone: string, body: string) => {
   const d = phone.replace(/[^\d+]/g, "");
   return `sms:${/^\d{10}$/.test(d) ? `+1${d}` : d}?&body=${encodeURIComponent(body)}`;
@@ -32,7 +42,10 @@ const smsHref = (phone: string, body: string) => {
  * he taps send, swipes back, and the next one is highlighted. Progress is kept on this phone (the app may reload
  * while he's in Messages).
  */
-export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[]; kind?: "clients" | "leads" }) {
+export default function TextQueue({ rows, kind = "clients", via = "sms" }: { rows: TextRow[]; kind?: "clients" | "leads"; via?: Via }) {
+  const V = VIA[via];
+  const addr = (r: TextRow) => (via === "sms" ? r.phone : r.handle ?? null);
+  const [copied, setCopied] = useState<string | null>(null);
   const FIELDS = kind === "leads" ? LEAD_FIELDS : CLIENT_FIELDS;
   const TPL_KEY = `dwtp-text-template${kind === "leads" ? "-leads" : ""}`;
   const [tpl, setTpl] = useState("Hi {first}, ");
@@ -51,7 +64,7 @@ export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[];
   }, [key, TPL_KEY]);
   const save = (next: Record<string, number>) => { setSent(next); try { localStorage.setItem(SENT_KEY, JSON.stringify({ key, tpl, sent: next })); } catch {} };
 
-  const withPhone = rows.filter((r) => r.phone), noPhone = rows.filter((r) => !r.phone);
+  const withPhone = rows.filter((r) => addr(r)), noPhone = rows.filter((r) => !addr(r));
   const nextId = withPhone.find((r) => !sent[r.id])?.id;
   const done = withPhone.filter((r) => sent[r.id]).length;
 
@@ -69,7 +82,7 @@ export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[];
           <p className="whitespace-pre-line">{fill(tpl, rows[0])}</p>
         </div>
       )}
-      {noPhone.length > 0 && <p className="text-[13px] text-[#e7d3a8]">No phone number for {noPhone.map((r) => r.first).join(", ")}, so they&apos;re skipped. Add one on her {kind === "leads" ? "lead" : "client page"}.</p>}
+      {noPhone.length > 0 && <p className="text-[13px] text-[#e7d3a8]">{V.none} for {noPhone.map((r) => r.first).join(", ")}, so they&apos;re skipped. Add it on her {kind === "leads" ? "lead (Details)" : "client page"}.</p>}
       <button type="button" disabled={!tpl.trim() || !withPhone.length} onClick={() => { try { localStorage.setItem(TPL_KEY, tpl); } catch {} save({}); setStep("send"); }}
         className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">Next: send to {withPhone.length} →</button>
     </div>
@@ -82,7 +95,8 @@ export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[];
         <button type="button" onClick={() => setStep("write")} className="min-h-10 px-2 text-[13px] text-accent underline">Edit message</button>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-[#222]"><div className="h-full bg-accent transition-all" style={{ width: `${(done / Math.max(1, withPhone.length)) * 100}%` }} /></div>
-      <p className="text-[13px] text-dim">Tap a name: Messages opens with her text ready. Tap send, swipe back here, and tap the next one.</p>
+      <p className="text-[13px] text-dim">{via === "sms" ? "Tap a name: Messages opens with her text ready. Tap send, swipe back here, and tap the next one."
+        : `Tap a name: your message is copied and her ${V.app} chat opens (on your phone or computer). Paste, tap send, come back here, and tap the next one.${via === "instagram" ? " Make sure you're on the SUFitness account in Instagram." : ""}`}</p>
       <ul className="space-y-2">
         {withPhone.map((r) => {
           const body = fill(tpl, r), isNext = r.id === nextId, isSent = !!sent[r.id];
@@ -90,19 +104,23 @@ export default function TextQueue({ rows, kind = "clients" }: { rows: TextRow[];
             <li key={r.id} className={`rounded-2xl border p-3 ${isNext ? "border-accent bg-[#161310]" : "border-border bg-card"} ${isSent ? "opacity-60" : ""}`}>
               <div className="flex items-center gap-2">
                 <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-semibold">{isSent ? "✓ " : ""}{r.name}</span>
-                  <span className="block truncate text-[12px] text-dim">{body.replace(/\s+/g, " ").slice(0, 90)}</span></span>
-                <a href={smsHref(r.phone!, body)} onClick={() => { save({ ...sent, [r.id]: Date.now() }); if (kind === "leads") void markReachedOut(r.id).catch(() => {}); }}
+                  <span className="block truncate text-[12px] text-dim">{copied === r.id ? "Copied. Paste it in the chat." : body.replace(/\s+/g, " ").slice(0, 90)}</span></span>
+                <a href={chatHref(via, addr(r)!, body)} target={via === "sms" ? undefined : "_blank"} rel="noopener noreferrer"
+                  onClick={() => {
+                    if (via !== "sms") { void navigator.clipboard?.writeText(body).then(() => setCopied(r.id)).catch(() => {}); }
+                    save({ ...sent, [r.id]: Date.now() }); if (kind === "leads") void markReachedOut(r.id).catch(() => {});
+                  }}
                   className={`flex min-h-11 shrink-0 items-center rounded-xl px-3.5 text-[14px] font-semibold ${isNext ? "bg-accent text-black" : "border border-border"}`}>
-                  {isSent ? "Again" : `📱 Text ${r.first}`}
+                  {isSent ? "Again" : `${V.icon} ${V.verb} ${r.first}`}
                 </a>
               </div>
             </li>
           );
         })}
       </ul>
-      {done === withPhone.length && <p className="rounded-xl border border-[#2f5d3a] p-3 text-center text-[14px] text-[#7ddc8f]">All {done} texted 🎉</p>}
+      {done === withPhone.length && <p className="rounded-xl border border-[#2f5d3a] p-3 text-center text-[14px] text-[#7ddc8f]">All {done} {via === "sms" ? "texted" : "messaged"} 🎉</p>}
       {noPhone.length > 0 && (
-        <p className="text-[13px] text-dim">No phone number: {noPhone.map((r, i) => <span key={r.id}>{i ? ", " : ""}{kind === "leads" ? r.first : <Link href={`/coach/clients/${r.id}`} className="underline">{r.first}</Link>}</span>)}</p>
+        <p className="text-[13px] text-dim">{V.none}: {noPhone.map((r, i) => <span key={r.id}>{i ? ", " : ""}{kind === "leads" ? r.first : <Link href={`/coach/clients/${r.id}`} className="underline">{r.first}</Link>}</span>)}</p>
       )}
     </div>
   );
