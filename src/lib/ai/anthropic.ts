@@ -42,8 +42,24 @@ export async function askClaude(opts: {
 
 /** Pull the first JSON object out of a model reply. */
 export function parseJson<T>(text: string): T {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end < start) throw new Error("No JSON in AI reply");
-  return JSON.parse(text.slice(start, end + 1)) as T;
+  // November 20: the first complete {...} in the reply (a note or a second object after it no longer breaks it), with
+  // small slips forgiven (trailing commas, fractions like 1/2 as numbers).
+  const objects: string[] = [];
+  for (let i = text.indexOf("{"); i >= 0 && objects.length < 5; i = text.indexOf("{", i + 1)) {
+    let depth = 0, inStr = false, esc = false;
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j];
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) { objects.push(text.slice(i, j + 1)); i = j; break; }
+    }
+  }
+  if (!objects.length) throw new Error("No JSON in AI reply");
+  const fix = (s: string) => s.replace(/,\s*([}\]])/g, "$1").replace(/:\s*(\d+)\/(\d+)\s*([,}])/g, (_m, a, b, c) => `: ${(Number(a) / Number(b)).toFixed(2)}${c}`);
+  for (const o of objects) {
+    try { return JSON.parse(o) as T; } catch {}
+    try { return JSON.parse(fix(o)) as T; } catch {}
+  }
+  throw new Error("No JSON in AI reply");
 }

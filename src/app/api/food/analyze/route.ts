@@ -47,8 +47,13 @@ export async function POST(req: Request) {
   content.push({ type: "text", text: text?.trim() ? `Her description: ${text.trim()}` : "Estimate this meal." });
 
   try {
-    const reply = await askClaude({ system: SYSTEM, content });
-    const estimate = parseJson<FoodEstimate>(reply);
+    let estimate: FoodEstimate;
+    try { estimate = parseJson<FoodEstimate>(await askClaude({ system: SYSTEM, content })); }
+    catch (e) {
+      // November 20: a reply that wasn't clean JSON gets one more try before she sees an error.
+      if (!/No JSON|JSON|Unexpected token/i.test(String((e as Error).message))) throw e;
+      estimate = parseJson<FoodEstimate>(await askClaude({ system: SYSTEM, content: [...content, { type: "text", text: "Reply with the JSON object only: no words before or after it." }] }));
+    }
     // Belt and braces: the same food with the same amount listed twice in a row is a dictation repeat.
     estimate.items = (estimate.items ?? []).filter((it, i, a) => !a.slice(0, i).some((x) => x.name.trim().toLowerCase() === it.name.trim().toLowerCase() && x.amount.trim().toLowerCase() === it.amount.trim().toLowerCase())).slice(0, 20);
     return NextResponse.json(estimate);
