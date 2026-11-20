@@ -22,7 +22,7 @@ export async function saveItems(rows: PlanItem[]) {
   if (!db) return { error: "Coach only" };
   const clean = rows.filter((r) => UUID.test(r.id) && ["action", "matrix", "outline"].includes(r.kind)).map((r) => ({
     id: r.id, kind: r.kind, parent_id: r.parent_id && UUID.test(r.parent_id) ? r.parent_id : null, text: String(r.text ?? "").slice(0, 5000),
-    note: r.note ? String(r.note).slice(0, 10000) : null, quadrant: r.kind === "matrix" ? Math.min(4, Math.max(1, Math.round(Number(r.quadrant) || 1))) : null,
+    note: r.note ? String(r.note).slice(0, 10000) : null, quadrant: r.quadrant == null || r.kind === "action" ? (r.kind === "matrix" ? 1 : null) : Math.min(4, Math.max(1, Math.round(Number(r.quadrant) || 1))), // November 20: outline lines carry their box too
     position: Number.isFinite(Number(r.position)) ? Number(r.position) : 0, done: !!r.done, collapsed: !!r.collapsed, updated_at: new Date().toISOString(),
   }));
   if (!clean.length) return { ok: true };

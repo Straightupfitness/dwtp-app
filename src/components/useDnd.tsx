@@ -26,8 +26,10 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
       const s = start.current;
       if (!s) return;
       if (!s.live && Math.hypot(e.clientX - s.x, e.clientY - s.y) < 6) return;
+      if (!s.live) { document.body.style.userSelect = "none"; document.body.style.webkitUserSelect = "none"; } // no text highlighting while dragging
       s.live = true;
       e.preventDefault();
+      window.getSelection()?.removeAllRanges();
       setDrag({ id: s.id, label: s.label, x: e.clientX, y: e.clientY });
       const t = target(e.clientX, e.clientY);
       setOver(t.zone); setOverBefore(t.before);
@@ -36,6 +38,8 @@ export function useDnd(onDrop: (id: string, target: string, before: string | nul
       const s = start.current;
       start.current = null;
       if (!s?.live) return;
+      document.body.style.userSelect = ""; document.body.style.webkitUserSelect = "";
+      window.getSelection()?.removeAllRanges();
       justDragged.current = true;
       setTimeout(() => { justDragged.current = false; }, 50);
       const t = target(e.clientX, e.clientY);

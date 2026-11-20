@@ -3,7 +3,7 @@ import { useMemo, useState, useTransition } from "react";
 import Section from "@/components/Section";
 import { Grip, useDnd } from "@/components/useDnd";
 import { deleteKpi, saveKpi, type KpiTable } from "./actions";
-import { Matrix, Outline, usePlan } from "./Planner";
+import { Matrix, usePlan } from "./Planner";
 import type { PlanItem } from "./items";
 
 type Expense = { id: string; name: string; category: "business" | "personal"; amount: number; frequency: "weekly" | "biweekly" | "monthly" | "yearly"; canceling: boolean; notes: string | null; position: number; draw_day?: number | null };
@@ -236,9 +236,8 @@ export default function KpiView({ d }: { d: Data }) {
 
       {/* 6–8. The planner */}
       {planReady ? <>
-        <Section title="Workflowy" icon="progress" open><Outline plan={plan} /></Section>
         <Section title="Eisenhower matrix" icon="checkins" open><Matrix plan={plan} /></Section>
-      </> : <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the 32 KPI planner SQL file in Supabase to turn on Workflowy and the Eisenhower matrix.</p>}
+      </> : <p className="rounded-xl border border-[#3a2f12] bg-[#1a150a] p-3 text-[14px] text-[#e7d3a8]">Run the 32 KPI planner SQL file in Supabase to turn on the Eisenhower matrix.</p>}
 
       {edit && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={edit.title}>

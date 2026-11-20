@@ -4,8 +4,10 @@ import { Grip, useDnd } from "@/components/useDnd";
 import { deleteItems, saveItems, type PlanItem } from "./items";
 
 /**
- * November 19 (Michael): his planner on the KPIs tab: the action plan, the Eisenhower matrix and an outline that
- * works like Workflowy. Changes show right away and save a moment later.
+ * November 19 (Michael): his planner on the KPIs tab. November 20: the Eisenhower matrix, where every box is an outline
+ * that works like Workflowy, and a Projects box underneath. Drag bullets (with everything under them) from a project
+ * into a box, or between boxes. Changes show right away and save a moment later.
+ * Data: outline lines (kind "outline"); a top-level line's quadrant says which box it's in (1–4, or none = Projects).
  */
 
 const uid = () => crypto.randomUUID();
@@ -13,9 +15,10 @@ const byPos = (a: PlanItem, b: PlanItem) => a.position - b.position;
 
 /** All planner lines in one place, saved in the background. */
 export function usePlan(initial: PlanItem[]) {
-  const [items, setItems] = useState<PlanItem[]>(initial);
+  // November 20: the Eisenhower matrix boxes became outlines too, so older matrix tasks become bullets in their box.
+  const [items, setItems] = useState<PlanItem[]>(() => initial.map((i) => (i.kind === "matrix" ? { ...i, kind: "outline" as const, parent_id: null } : i)));
   const [status, setStatus] = useState<"" | "saving" | "saved" | string>("");
-  const dirty = useRef(new Map<string, PlanItem>());
+  const dirty = useRef(new Map<string, PlanItem>(initial.filter((i) => i.kind === "matrix").map((i) => [i.id, { ...i, kind: "outline" as const, parent_id: null }])));
   const gone = useRef(new Set<string>());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(items);
@@ -33,6 +36,7 @@ export function usePlan(initial: PlanItem[]) {
     setStatus(err ? String(err) : "saved");
   }, []);
   const later = useCallback(() => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => { void flush(); }, 700); }, [flush]);
+  useEffect(() => { if (dirty.current.size) later(); }, [later]); // save the converted matrix tasks once
   useEffect(() => {
     const out = () => { if (dirty.current.size || gone.current.size) void flush(); };
     window.addEventListener("pagehide", out);
@@ -71,112 +75,6 @@ function posAt(list: PlanItem[], before: string | null, moving?: string) {
   return i === 0 ? l[0].position - 1 : (l[i - 1].position + l[i].position) / 2;
 }
 
-/** A line of text she can tap to change. */
-function InlineText({ value, onSave, className = "", done = false, placeholder }: { value: string; onSave: (v: string) => void; className?: string; done?: boolean; placeholder?: string }) {
-  const [edit, setEdit] = useState(false);
-  const [v, setV] = useState(value);
-  if (!edit) return <button type="button" onClick={() => { setV(value); setEdit(true); }} className={`min-w-0 flex-1 text-left ${done ? "text-dim line-through" : ""} ${className}`}>{value || <span className="text-dim">{placeholder ?? "Tap to write"}</span>}</button>;
-  return (
-    <input autoFocus value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { setEdit(false); if (v !== value) onSave(v); }}
-      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setV(value); setEdit(false); } }}
-      className={`min-h-8 min-w-0 flex-1 rounded-md border border-accent bg-bg px-2 outline-none ${className}`} />
-  );
-}
-
-// ── Action plan ─────────────────────────────────────────────
-
-export function ActionPlan({ plan }: { plan: Plan }) {
-  const list = plan.items.filter((i) => i.kind === "action").sort(byPos);
-  const [text, setText] = useState("");
-  const [showDone, setShowDone] = useState(true);
-  const dnd = useDnd((id, _t, before) => plan.patch(id, { position: posAt(list, before, id) }));
-  const add = () => { const t = text.trim(); if (!t) return; plan.put([{ id: uid(), kind: "action", parent_id: null, text: t, note: null, quadrant: null, position: posAt(list, null), done: false, collapsed: false }]); setText(""); };
-  const shown = list.filter((i) => showDone || !i.done);
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-[12px] text-dim">
-        <span>{list.filter((i) => i.done).length} of {list.length} done · drag to reorder</span>
-        <span className="flex items-center gap-3"><Saved s={plan.status} /><button type="button" onClick={() => setShowDone((x) => !x)} className="underline">{showDone ? "Hide done" : "Show done"}</button></span>
-      </div>
-      <ol data-drop="action" className="divide-y divide-border rounded-xl border border-border">
-        {shown.map((i, n) => (
-          <li key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text)} className="flex min-h-11 items-center gap-2 px-2 py-1.5">
-            <Grip />
-            <span className="w-6 shrink-0 text-right text-[12px] tabular-nums text-dim">{n + 1}.</span>
-            <input type="checkbox" checked={i.done} onChange={(e) => plan.patch(i.id, { done: e.target.checked })} className="size-[18px] shrink-0 accent-[var(--accent)]" aria-label={`Done: ${i.text}`} />
-            <InlineText value={i.text} done={i.done} onSave={(v) => plan.patch(i.id, { text: v })} className="text-[14px]" />
-            <button type="button" onClick={() => plan.remove([i.id])} className="min-h-8 shrink-0 px-1.5 text-dim hover:text-[var(--red)]" aria-label={`Delete ${i.text}`}>✕</button>
-          </li>
-        ))}
-        {!shown.length && <li className="p-3 text-[13px] text-dim">Nothing here yet. Add your first step below.</li>}
-      </ol>
-      <form onSubmit={(e) => { e.preventDefault(); add(); }} className="flex gap-2">
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a step to your action plan" className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-[14px] outline-none focus:border-accent" />
-        <button className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-[14px] font-semibold text-black">Add</button>
-      </form>
-      {dnd.ghost}
-    </div>
-  );
-}
-
-// ── Eisenhower matrix ───────────────────────────────────────
-
-const QUADS = [
-  { q: 1, title: "Urgent & important", sub: "Do now", color: "#ef4444" },
-  { q: 2, title: "Not urgent & important", sub: "Schedule", color: "#f5a623" },
-  { q: 3, title: "Urgent, not important", sub: "Delegate", color: "#38bdf8" },
-  { q: 4, title: "Not urgent, not important", sub: "Delete", color: "#6b6b6b" },
-];
-
-export function Matrix({ plan }: { plan: Plan }) {
-  const all = plan.items.filter((i) => i.kind === "matrix");
-  const [showDone, setShowDone] = useState(false);
-  const dnd = useDnd((id, target, before) => {
-    const q = Number(target.replace("q", ""));
-    plan.patch(id, { quadrant: q, position: posAt(all.filter((i) => i.quadrant === q), before, id) });
-  });
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-[12px] text-dim">
-        <span>Drag a task to another box. Tap one to change it.</span>
-        <span className="flex items-center gap-3"><Saved s={plan.status} /><button type="button" onClick={() => setShowDone((x) => !x)} className="underline">{showDone ? "Hide done" : `Show done (${all.filter((i) => i.done).length})`}</button></span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {QUADS.map(({ q, title, sub, color }) => <Quadrant key={q} q={q} title={title} sub={sub} color={color} plan={plan} dnd={dnd} showDone={showDone}
-          list={all.filter((i) => i.quadrant === q && (showDone || !i.done)).sort(byPos)} />)}
-      </div>
-      {dnd.ghost}
-    </div>
-  );
-}
-
-function Quadrant({ q, title, sub, color, list, plan, dnd, showDone }: { q: number; title: string; sub: string; color: string; list: PlanItem[]; plan: Plan; dnd: ReturnType<typeof useDnd>; showDone: boolean }) {
-  const [text, setText] = useState("");
-  const add = () => { const t = text.trim(); if (!t) return; plan.put([{ id: uid(), kind: "matrix", parent_id: null, text: t, note: null, quadrant: q, position: posAt(list, null), done: false, collapsed: false }]); setText(""); };
-  return (
-    <div data-drop={`q${q}`} className={`flex min-h-44 flex-col rounded-xl border bg-card p-2.5 transition ${dnd.over === `q${q}` ? "ring-2" : ""}`} style={{ borderColor: `${color}88`, ...(dnd.over === `q${q}` ? { boxShadow: `0 0 0 2px ${color}` } : {}) }}>
-      <p className="text-[13px] font-semibold" style={{ color }}>{title}</p>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-dim">{sub}</p>
-      <ul className="mt-1.5 flex-1 space-y-1">
-        {list.map((i) => (
-          <li key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text)} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-bg px-1.5 py-1">
-            <Grip />
-            <input type="checkbox" checked={i.done} onChange={(e) => plan.patch(i.id, { done: e.target.checked })} className="size-4 shrink-0 accent-[var(--accent)]" aria-label={`Done: ${i.text}`} />
-            <InlineText value={i.text} done={i.done} onSave={(v) => plan.patch(i.id, { text: v })} className="text-[13px]" />
-            <button type="button" onClick={() => plan.remove([i.id])} className="min-h-7 shrink-0 px-1 text-[12px] text-dim hover:text-[var(--red)]" aria-label={`Delete ${i.text}`}>✕</button>
-          </li>
-        ))}
-        {!list.length && <li className="py-2 text-[12px] text-dim">{showDone ? "Nothing here." : "Nothing here. Add one or drag one in."}</li>}
-      </ul>
-      <form onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-1.5 flex gap-1.5">
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="+ Add a task" aria-label={`Add a task to ${title}`} className="min-h-9 min-w-0 flex-1 rounded-lg border border-border bg-bg px-2.5 text-[13px] outline-none focus:border-accent" />
-      </form>
-    </div>
-  );
-}
-
-// ── Outline (like Workflowy) ────────────────────────────────
-
 /** Indented text (tabs, spaces, "- " or "• " bullets) → lines with their depth. Workflowy's plain-text export works too. */
 function parseOutline(text: string) {
   const lines = text.replace(/\r/g, "").split("\n").filter((l) => l.trim());
@@ -189,39 +87,94 @@ function parseOutline(text: string) {
   });
 }
 
-export function Outline({ plan }: { plan: Plan }) {
+type Box = 1 | 2 | 3 | 4 | null; // null = Projects
+const BOXES: { box: Box; title: string; sub: string; color: string }[] = [
+  { box: 1, title: "Urgent & important", sub: "Do now", color: "#ef4444" },
+  { box: 2, title: "Not urgent & important", sub: "Schedule", color: "#f5a623" },
+  { box: 3, title: "Urgent, not important", sub: "Delegate", color: "#38bdf8" },
+  { box: 4, title: "Not urgent, not important", sub: "Delete", color: "#8a8a8a" },
+];
+const PROJECTS = { box: null as Box, title: "Projects", sub: "Your big projects. Drag their tasks into the boxes above.", color: "#c084fc" };
+
+/** The whole matrix: four boxes and Projects, each an outline, with drag and drop between them. */
+export function Matrix({ plan }: { plan: Plan }) {
   const items = useMemo(() => plan.items.filter((i) => i.kind === "outline"), [plan.items]);
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const kids = useMemo(() => {
-    const m = new Map<string | null, PlanItem[]>();
-    for (const i of items) { const k = i.parent_id && items.some((x) => x.id === i.parent_id) ? i.parent_id : null; (m.get(k) ?? m.set(k, []).get(k)!).push(i); }
+    const m = new Map<string, PlanItem[]>();
+    for (const i of items) if (i.parent_id && byId.has(i.parent_id)) (m.get(i.parent_id) ?? m.set(i.parent_id, []).get(i.parent_id)!).push(i);
     for (const l of m.values()) l.sort(byPos);
     return m;
-  }, [items]);
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const [zoom, setZoom] = useState<string | null>(null);
-  const [showDone, setShowDone] = useState(true);
+  }, [items, byId]);
+  const roots = useCallback((box: Box) => items.filter((i) => !(i.parent_id && byId.has(i.parent_id)) && (i.quadrant ?? null) === box).sort(byPos), [items, byId]);
+  /** Which box a line is in (its top-level line's box). */
+  const boxOf = useCallback((i: PlanItem): Box => { let c = i; for (let n = 0; c.parent_id && byId.has(c.parent_id) && n < 60; n++) c = byId.get(c.parent_id)!; return (c.quadrant ?? null) as Box; }, [byId]);
+  const [showDone, setShowDone] = useState(false);
   const [q, setQ] = useState("");
+
+  // Drag a bullet (and everything under it) within a box or into another one.
+  const dnd = useDnd((id, zone, before) => {
+    const m = byId.get(id); if (!m) return;
+    const box = (zone === "box-p" ? null : Number(zone.replace("box-", ""))) as Box;
+    if (!before) { plan.put([{ ...m, parent_id: null, quadrant: box, position: posAt(roots(box), null, id) }]); return; }
+    const t = byId.get(before); if (!t || t.id === id) return;
+    for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === id) return; // not into itself
+    const parent = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
+    plan.put([{ ...m, parent_id: parent, quadrant: parent ? m.quadrant : box, position: posAt(parent ? kids.get(parent) ?? [] : roots(box), t.id, id) }]);
+  });
+  const setAll = (collapsed: boolean) => plan.put(items.filter((i) => (kids.get(i.id)?.length ?? 0) > 0 && i.collapsed !== collapsed).map((i) => ({ ...i, collapsed })));
+  const shared = { plan, items, byId, kids, roots, boxOf, dnd, showDone, needle: q.trim().toLowerCase() };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search every box" aria-label="Search the matrix" className="min-h-10 min-w-[10rem] flex-1 rounded-xl border border-border bg-card px-3 text-[14px] outline-none focus:border-accent" />
+        <button type="button" onClick={() => setShowDone((x) => !x)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">{showDone ? "Hide completed" : "Show completed"}</button>
+        <button type="button" onClick={() => setAll(false)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Expand all</button>
+        <button type="button" onClick={() => setAll(true)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Collapse all</button>
+        <Saved s={plan.status} />
+      </div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {BOXES.map((b) => <OutlineBox key={b.box} {...b} {...shared} />)}
+      </div>
+      <OutlineBox {...PROJECTS} {...shared} />
+      <details className="text-[12px] text-dim">
+        <summary className="cursor-pointer">How it works (keyboard shortcuts)</summary>
+        <p className="mt-1 leading-relaxed">Each box works like Workflowy. Drag a bullet by its dots into another box, or up and down, and everything under it comes along · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
+      </details>
+      {dnd.ghost}
+    </div>
+  );
+}
+
+type Shared = {
+  plan: Plan; items: PlanItem[]; byId: Map<string, PlanItem>; kids: Map<string, PlanItem[]>; roots: (b: Box) => PlanItem[]; boxOf: (i: PlanItem) => Box;
+  dnd: ReturnType<typeof useDnd>; showDone: boolean; needle: string;
+};
+
+/** One box of the matrix (or Projects): an outline that works like Workflowy. */
+function OutlineBox({ box, title, sub, color, plan, byId, kids, roots, boxOf, dnd, showDone, needle }: { box: Box; title: string; sub: string; color: string } & Shared) {
+  const [zoom, setZoom] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ id: string; at?: number } | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLTextAreaElement>());
-  const root = zoom && byId.has(zoom) ? zoom : null;
+  const zoomItem = zoom ? byId.get(zoom) : undefined;
+  const root = zoomItem && boxOf(zoomItem) === box ? zoom : null; // a line dragged to another box leaves this box's zoom
+  const childrenOf = useCallback((pid: string | null) => (pid ? kids.get(pid) ?? [] : roots(box)), [kids, roots, box]);
 
-  // Search: show what matches and the lines above it.
-  const needle = q.trim().toLowerCase();
+  // Search: what matches and the lines above it.
   const keep = useMemo(() => {
     if (!needle) return null;
     const s = new Set<string>();
-    for (const i of items) if (i.text.toLowerCase().includes(needle) || (i.note ?? "").toLowerCase().includes(needle)) {
+    for (const i of byId.values()) if (boxOf(i) === box && (i.text.toLowerCase().includes(needle) || (i.note ?? "").toLowerCase().includes(needle))) {
       let c: PlanItem | undefined = i; while (c && !s.has(c.id)) { s.add(c.id); c = c.parent_id ? byId.get(c.parent_id) : undefined; }
     }
     return s;
-  }, [needle, items, byId]);
-
-  // What's on screen, in order, with depth.
+  }, [needle, byId, boxOf, box]);
   const rows = useMemo(() => {
     const out: { i: PlanItem; depth: number }[] = [];
     const walk = (pid: string | null, depth: number) => {
-      for (const i of kids.get(pid) ?? []) {
+      for (const i of childrenOf(pid)) {
         if (!showDone && i.done && !keep) continue;
         if (keep && !keep.has(i.id)) continue;
         out.push({ i, depth });
@@ -230,7 +183,7 @@ export function Outline({ plan }: { plan: Plan }) {
     };
     walk(root, 0);
     return out;
-  }, [kids, root, showDone, keep]);
+  }, [childrenOf, kids, root, showDone, keep]);
 
   useEffect(() => {
     if (!focus) return;
@@ -238,8 +191,9 @@ export function Outline({ plan }: { plan: Plan }) {
     if (el) { el.focus(); const at = focus.at ?? el.value.length; el.setSelectionRange(at, at); setFocus(null); }
   }, [focus, rows]);
 
-  const siblings = (i: PlanItem) => kids.get(i.parent_id && byId.has(i.parent_id) ? i.parent_id : null) ?? [];
-  const newLine = (parent: string | null, position: number, text = ""): PlanItem => ({ id: uid(), kind: "outline", parent_id: parent, text, note: null, quadrant: null, position, done: false, collapsed: false });
+  const parentOf = (i: PlanItem) => (i.parent_id && byId.has(i.parent_id) ? i.parent_id : null);
+  const siblings = (i: PlanItem) => childrenOf(parentOf(i));
+  const newLine = (parent: string | null, position: number, text = ""): PlanItem => ({ id: uid(), kind: "outline", parent_id: parent, text, note: null, quadrant: parent ? null : box, position, done: false, collapsed: false });
   const after = (i: PlanItem) => { const s = siblings(i); const k = s.findIndex((x) => x.id === i.id); return s[k + 1] ? (i.position + s[k + 1].position) / 2 : i.position + 1; };
 
   function enter(i: PlanItem, el: HTMLTextAreaElement) {
@@ -248,10 +202,10 @@ export function Outline({ plan }: { plan: Plan }) {
     const open = (kids.get(i.id)?.length ?? 0) > 0 && !i.collapsed;
     if (a === 0 && i.text) { // at the very start: a new empty line above
       const s = siblings(i); const k = s.findIndex((x) => x.id === i.id);
-      const n = newLine(i.parent_id, k > 0 ? (s[k - 1].position + i.position) / 2 : i.position - 1);
+      const n = newLine(parentOf(i), k > 0 ? (s[k - 1].position + i.position) / 2 : i.position - 1);
       plan.put([n]); setFocus({ id: n.id }); return;
     }
-    const n = open ? newLine(i.id, ((kids.get(i.id) ?? [])[0]?.position ?? 1) - 1, rest) : newLine(i.parent_id, after(i), rest);
+    const n = open ? newLine(i.id, ((kids.get(i.id) ?? [])[0]?.position ?? 1) - 1, rest) : newLine(parentOf(i), after(i), rest);
     plan.put([{ ...i, text: before }, n]); setFocus({ id: n.id, at: 0 });
   }
   function indent(i: PlanItem) {
@@ -261,9 +215,11 @@ export function Outline({ plan }: { plan: Plan }) {
     plan.put([{ ...p, collapsed: false }, { ...i, parent_id: p.id, position: (last?.position ?? 0) + 1 }]); setFocus({ id: i.id });
   }
   function outdent(i: PlanItem) {
-    if (!i.parent_id || i.parent_id === root) return;
-    const p = byId.get(i.parent_id); if (!p) return;
-    plan.put([{ ...i, parent_id: p.parent_id, position: after(p) }]); setFocus({ id: i.id });
+    const pid = parentOf(i);
+    if (!pid || pid === root) return;
+    const p = byId.get(pid)!;
+    const gp = parentOf(p);
+    plan.put([{ ...i, parent_id: gp, quadrant: gp ? i.quadrant : box, position: after(p) }]); setFocus({ id: i.id });
   }
   function move(i: PlanItem, dir: -1 | 1) {
     const s = siblings(i); const k = s.findIndex((x) => x.id === i.id); const o = s[k + dir];
@@ -281,13 +237,12 @@ export function Outline({ plan }: { plan: Plan }) {
     e.preventDefault();
     const lines = parseOutline(text);
     if (!lines.length) return;
-    const out: PlanItem[] = []; const stack: { depth: number; id: string | null; last: number }[] = [];
+    const out: PlanItem[] = []; const stack: { depth: number; id: string; last: number }[] = [];
     let pos = i.text ? after(i) : i.position;
-    const parentBase = i.parent_id;
     let first = true;
     for (const l of lines) {
       while (stack.length && stack.at(-1)!.depth >= l.depth) stack.pop();
-      const parent = stack.length ? stack.at(-1)!.id : parentBase;
+      const parent = stack.length ? stack.at(-1)!.id : parentOf(i);
       const p = stack.length ? ++stack.at(-1)!.last : pos++;
       const row = first && !i.text ? { ...i, text: l.text, done: l.done } : { ...newLine(parent, p, l.text), done: l.done };
       first = false;
@@ -316,75 +271,52 @@ export function Outline({ plan }: { plan: Plan }) {
   }
   const crumbs: PlanItem[] = [];
   for (let c = root ? byId.get(root) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) crumbs.unshift(c);
-  const addFirst = () => { const n = newLine(root, ((kids.get(root) ?? []).at(-1)?.position ?? 0) + 1); plan.put([n]); setFocus({ id: n.id }); };
-  const setAll = (collapsed: boolean) => plan.put(items.filter((i) => (kids.get(i.id)?.length ?? 0) > 0 && i.collapsed !== collapsed).map((i) => ({ ...i, collapsed })));
-  // November 19 (Michael): drag a bullet up or down by its dots; everything under it comes along. It lands just above
-  // the bullet you drop it on (at that bullet's level), or at the end.
-  const dnd = useDnd((id, _t, before) => {
-    const m = byId.get(id); if (!m) return;
-    if (!before) { plan.put([{ ...m, parent_id: root, position: ((kids.get(root) ?? []).filter((x) => x.id !== id).at(-1)?.position ?? 0) + 1 }]); return; }
-    const t = byId.get(before); if (!t || t.id === id) return;
-    for (let c: PlanItem | undefined = t; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (c.id === id) return; // not into itself
-    const parent = t.parent_id && byId.has(t.parent_id) ? t.parent_id : null;
-    plan.put([{ ...m, parent_id: parent, position: posAt(kids.get(parent) ?? [], t.id, id) }]);
-  });
+  const addLine = () => { const n = newLine(root, (childrenOf(root).at(-1)?.position ?? 0) + 1); plan.put([n]); setFocus({ id: n.id }); };
   const act = active ? byId.get(active) : undefined;
   const actIdx = act ? rows.findIndex((r) => r.i.id === act.id) : -1;
+  const zone = box === null ? "box-p" : `box-${box}`;
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your outline" aria-label="Search the outline" className="min-h-10 min-w-[10rem] flex-1 rounded-xl border border-border bg-card px-3 text-[14px] outline-none focus:border-accent" />
-        <button type="button" onClick={() => setShowDone((x) => !x)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">{showDone ? "Hide completed" : "Show completed"}</button>
-        <button type="button" onClick={() => setAll(false)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Expand all</button>
-        <button type="button" onClick={() => setAll(true)} className="min-h-10 rounded-xl border border-border px-3 text-[12px] text-dim">Collapse all</button>
-        <Saved s={plan.status} />
-      </div>
-      {/* Where she is: Home › Project › … (tap a bullet to zoom in). */}
-      <p className="flex flex-wrap items-center gap-1 text-[13px]">
-        <button type="button" onClick={() => setZoom(null)} className={root ? "text-accent underline" : "font-semibold"}>Home</button>
-        {crumbs.map((c, k) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">›</span>
-          <button type="button" onClick={() => setZoom(c.id)} className={k === crumbs.length - 1 ? "max-w-[14rem] truncate font-semibold" : "max-w-[10rem] truncate text-accent underline"}>{c.text || "Untitled"}</button></span>)}
-      </p>
-      {root && byId.get(root) && (
-        <textarea value={byId.get(root)!.text} onChange={(e) => plan.patch(root, { text: e.target.value })} rows={1} aria-label="Title"
-          className="w-full resize-none bg-transparent font-[family-name:var(--font-display)] text-2xl uppercase outline-none" />
+    <div data-drop={zone} className="flex min-h-40 flex-col rounded-xl border bg-card p-2.5 transition"
+      style={{ borderColor: `${color}88`, ...(dnd.over === zone ? { boxShadow: `0 0 0 2px ${color}` } : {}) }}>
+      <p className="text-[13px] font-semibold" style={{ color }}>{title}</p>
+      <p className="text-[11px] uppercase tracking-[0.14em] text-dim">{sub}</p>
+      {root && (
+        <p className="mt-1 flex flex-wrap items-center gap-1 text-[12px]">
+          <button type="button" onClick={() => setZoom(null)} className="text-accent underline">{title}</button>
+          {crumbs.map((c, k) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">›</span>
+            <button type="button" onClick={() => setZoom(c.id)} className={k === crumbs.length - 1 ? "max-w-[12rem] truncate font-semibold" : "max-w-[8rem] truncate text-accent underline"}>{c.text || "Untitled"}</button></span>)}
+        </p>
       )}
-      <div data-drop="outline" className="rounded-xl border border-border bg-card px-1 py-1.5">
+      <div className="mt-1 flex-1">
         {rows.map(({ i, depth }, idx) => {
           const has = (kids.get(i.id)?.length ?? 0) > 0;
           return (
-            <div key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text || "Untitled")} className={`group flex items-start ${dnd.overBefore === i.id && dnd.dragging !== i.id ? "shadow-[inset_0_2px_0_var(--accent)]" : ""}`} style={{ paddingLeft: depth * 22, ...dnd.bind(i.id, "").style }}>
+            <div key={i.id} data-before={i.id} {...dnd.bind(i.id, i.text || "Untitled")}
+              className={`group flex items-start ${dnd.overBefore === i.id && dnd.dragging !== i.id ? "shadow-[inset_0_2px_0_var(--accent)]" : ""}`}
+              style={{ paddingLeft: depth * 20, ...dnd.bind(i.id, "").style }}>
               <span className="flex h-7 items-center opacity-100 md:opacity-0 md:group-hover:opacity-100"><Grip /></span>
               <button type="button" onClick={() => has && plan.patch(i.id, { collapsed: !i.collapsed })} aria-label={has ? (i.collapsed ? "Expand" : "Collapse") : undefined} tabIndex={-1}
-                className={`grid h-7 w-5 shrink-0 place-items-center text-[10px] text-dim ${has ? "opacity-60 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" : "invisible"}`}>{i.collapsed ? "▶" : "▼"}</button>
-              <button type="button" onClick={() => setZoom(i.id)} aria-label={`Zoom into ${i.text || "this line"}`} tabIndex={-1}
-                className="grid h-7 w-5 shrink-0 place-items-center">
+                className={`grid h-7 w-4 shrink-0 place-items-center text-[9px] text-dim ${has ? "opacity-60 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" : "invisible"}`}>{i.collapsed ? "▶" : "▼"}</button>
+              <button type="button" onClick={() => setZoom(i.id)} aria-label={`Zoom into ${i.text || "this line"}`} tabIndex={-1} className="grid h-7 w-5 shrink-0 place-items-center">
                 <span className={`block size-[7px] rounded-full ${i.done ? "bg-[#5a5a5a]" : "bg-[#d0d0d0]"} ${has && i.collapsed ? "outline outline-[5px] outline-[#3a3a3a]" : ""}`} />
               </button>
               <textarea ref={(el) => { if (el) { refs.current.set(i.id, el); el.style.height = "0px"; el.style.height = `${el.scrollHeight}px`; } else refs.current.delete(i.id); }}
                 value={i.text} rows={1} onChange={(e) => plan.patch(i.id, { text: e.target.value.replace(/\n/g, " ") })}
                 onKeyDown={(e) => key(e, i, idx)} onPaste={(e) => paste(i, e)} onFocus={() => setActive(i.id)}
-                className={`min-h-7 flex-1 resize-none overflow-hidden bg-transparent py-[3px] pr-2 text-[15px] leading-[22px] outline-none ${i.done ? "text-dim line-through" : ""}`} />
+                className={`min-h-7 flex-1 resize-none overflow-hidden bg-transparent py-[3px] pr-1 text-[14px] leading-[22px] outline-none ${i.done ? "text-dim line-through" : ""}`} />
             </div>
           );
         })}
-        {!rows.length && (
-          <button type="button" onClick={addFirst} className="w-full px-3 py-3 text-left text-[14px] text-dim">{needle ? "Nothing matches." : "Tap here to start. Or paste a list (indented lines become nested bullets)."}</button>
-        )}
-        {rows.length > 0 && !needle && <button type="button" onClick={addFirst} className="ml-10 min-h-8 text-[13px] text-dim hover:text-accent">+ Add</button>}
+        {!rows.length && <p className="py-1 text-[12px] text-dim">{needle ? "Nothing matches." : box === null ? "Add a project, or paste one in (indented lines become its tasks)." : "Nothing here. Add one, or drag one in."}</p>}
       </div>
-      <details className="text-[12px] text-dim">
-        <summary className="cursor-pointer">Keyboard shortcuts</summary>
-        <p className="mt-1 leading-relaxed">Drag a bullet by its dots to move it up or down (everything under it comes along) · Enter: new bullet · Tab / Shift+Tab: indent / outdent · ↑ ↓: move between bullets · Ctrl/⌘+Enter: complete · Ctrl/⌘+↑ / ↓: collapse / expand · Ctrl/⌘+Shift+↑ / ↓: move a bullet up / down · Backspace on an empty bullet: delete it · Ctrl/⌘+Shift+Backspace: delete a bullet with everything under it · Click a bullet dot to zoom in. Paste an indented list (like a Workflowy export) to bring it all in at once.</p>
-      </details>
-      {dnd.ghost}
+      {!needle && <button type="button" onClick={addLine} className="mt-1 min-h-8 self-start rounded-lg px-2 text-[13px] text-dim hover:text-accent">+ Add</button>}
       {/* On a phone (no Tab key): the tools for the bullet she's on. */}
       {act && actIdx >= 0 && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+64px)] z-20 flex justify-center gap-1 rounded-xl border border-border bg-[#141414]/95 p-1 backdrop-blur md:hidden">
-          {[["⇤", "Outdent", () => outdent(act)], ["⇥", "Indent", () => indent(act)], ["↑", "Move up", () => move(act, -1)], ["↓", "Move down", () => move(act, 1)],
-            ["✓", act.done ? "Not done" : "Complete", () => plan.patch(act.id, { done: !act.done })], ["🗑", "Delete", () => del(act, actIdx)]].map(([icon, label, fn]) => (
-            <button key={label as string} type="button" onMouseDown={(e) => e.preventDefault()} onClick={fn as () => void} aria-label={label as string} className="min-h-10 min-w-10 rounded-lg px-2 text-[15px] text-[#d0d0d0] active:bg-[#262626]">{icon as string}</button>
+        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+64px)] z-20 mt-1 flex justify-center gap-1 rounded-xl border border-border bg-[#141414]/95 p-1 backdrop-blur md:hidden">
+          {([["⇤", "Outdent", () => outdent(act)], ["⇥", "Indent", () => indent(act)], ["↑", "Move up", () => move(act, -1)], ["↓", "Move down", () => move(act, 1)],
+            ["✓", act.done ? "Not done" : "Complete", () => plan.patch(act.id, { done: !act.done })], ["🗑", "Delete", () => del(act, actIdx)]] as [string, string, () => void][]).map(([icon, label, fn]) => (
+            <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={fn} aria-label={label} className="min-h-10 min-w-10 rounded-lg px-2 text-[15px] text-[#d0d0d0] active:bg-[#262626]">{icon}</button>
           ))}
         </div>
       )}
