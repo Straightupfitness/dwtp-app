@@ -15,6 +15,9 @@ export const VIDEO_SETS: { title: string; prefix: string; codes: string[] }[] = 
   { title: "Driven Woman Blueprint", prefix: "7X", codes: Array.from({ length: 19 }, (_, i) => `7X-${String(i + 1).padStart(2, "0")}`) },
   { title: "Check-ins", prefix: "CHK", codes: Array.from({ length: 28 }, (_, i) => `CHK-${String(i + 1).padStart(2, "0")}`).filter((c) => c !== "CHK-27") },
   { title: "Medals", prefix: "MED", codes: Array.from({ length: 50 }, (_, i) => `MED-${String(i + 1).padStart(2, "0")}`) },
+  // November 21: Batch 3, the fix-it circles (MED-51 … 85) and the later and elite medals (MED-86 … 134).
+  { title: "Medals: fix-its (Batch 3)", prefix: "MED", codes: Array.from({ length: 35 }, (_, i) => `MED-${i + 51}`) },
+  { title: "Medals: later & elite (Batch 3)", prefix: "MED", codes: Array.from({ length: 49 }, (_, i) => `MED-${i + 86}`) },
   { title: "Habits & Homework", prefix: "HH", codes: Array.from({ length: 26 }, (_, i) => `HH-${String(i + 1).padStart(2, "0")}`) },
   { title: "Strong Body Wednesday (by week)", prefix: "SBW", codes: Array.from({ length: 26 }, (_, i) => `SBW-${String(i + 1).padStart(2, "0")}`) },
 ];
