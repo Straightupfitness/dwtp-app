@@ -35,6 +35,12 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
   const [done, setDone] = useState("");
   const [big, setBig] = useState(false);
   const [left, setLeft] = useState(false);
+  // November 20 (Michael): the camera bubble in "Screen + me" is 35% bigger (176 → 238 px) and he drags it anywhere.
+  // Its spot is remembered for next time. null = the default bottom-right corner.
+  const BUBBLE = 238;
+  const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const clamp = (x: number, y: number) => ({ x: Math.min(Math.max(8, x), window.innerWidth - BUBBLE - 8), y: Math.min(Math.max(8, y), window.innerHeight - BUBBLE - 8) });
   const [ctx, setCtx] = useState<ReturnType<typeof pageContext>>({ checkin: false, client: null });
   const [note, setNote] = useState("");
   const live = useRef<HTMLVideoElement>(null);
@@ -105,6 +111,7 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
         streams.current.push(me); camStream.current = me;
         const mixed = new MediaStream([...screen.getVideoTracks(), ...me.getAudioTracks()]);
         screen.getVideoTracks()[0].addEventListener("ended", () => { if (rec.current?.state === "recording") rec.current.stop(); });
+        try { const saved = JSON.parse(localStorage.getItem("dwtp-bubble") ?? "null"); setSpot(saved ? clamp(saved.x, saved.y) : null); } catch { setSpot(null); }
         record(mixed, 900_000);
       }
     } catch {
@@ -205,8 +212,16 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
           <span className="font-semibold text-[#ff6b6b]">● {mmss(secs)}</span><span className="text-white/60">max {mmss(MAX_SECONDS)}</span>
           <button type="button" onClick={() => rec.current?.stop()} className="rounded-full bg-[#b3261e] px-3 py-1 font-semibold">Stop</button>
         </div>
-        <video ref={live} muted playsInline onClick={() => setLeft((x) => !x)} title="Tap to move to the other corner"
-          className={`fixed bottom-6 ${corner} z-[70] size-44 cursor-pointer rounded-full border-4 border-accent bg-black object-cover shadow-2xl`} style={{ transform: "scaleX(-1)" }} />
+        <video ref={live} muted playsInline title="Drag me anywhere"
+          onPointerDown={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => { if (drag.current) setSpot(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy)); }}
+          onPointerUp={() => { drag.current = null; try { if (spot) localStorage.setItem("dwtp-bubble", JSON.stringify(spot)); } catch {} }}
+          className={`fixed z-[70] cursor-grab touch-none select-none rounded-full border-4 border-accent bg-black object-cover shadow-2xl active:cursor-grabbing ${spot ? "" : "bottom-6 right-4"}`}
+          style={{ width: BUBBLE, height: BUBBLE, transform: "scaleX(-1)", ...(spot ? { left: spot.x, top: spot.y } : {}) }} />
       </>}
 
       {(mode === "review" || mode === "uploading") && url && (
