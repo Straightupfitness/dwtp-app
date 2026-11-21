@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { syncCaptions } from "@/lib/captions";
 import Link from "next/link";
 import { FieldInput } from "../checkin/CheckinFlow";
 import { BLUEPRINT, UNLOCK } from "@/lib/blueprint";
@@ -37,6 +38,8 @@ export default function OnboardingFlow({ first, userId, videos, saved, preview =
   const [hh, setHh] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
+  // November 21: captions on the welcome video too (its src is set in the markup).
+  useEffect(() => { const v = video.current; if (v?.currentSrc || v?.src) syncCaptions(v, v.currentSrc || v.src); }, []);
   // Shuffle each question's options once, so the right answer isn't always first.
   const shuffled = useMemo(() => UNLOCK.map((u, k) => [...u.options].sort((x, y) => ((x.length * 7 + k) % 5) - ((y.length * 7 + k) % 5))), []);
   const unlocked = picks.every((p, k) => p === UNLOCK[k].options[0]);
@@ -47,7 +50,7 @@ export default function OnboardingFlow({ first, userId, videos, saved, preview =
     if (!v) return;
     const url = code ? videos[code] : null;
     if (!url) { v.pause(); v.removeAttribute("src"); v.load(); setPlaying(false); return; }
-    if (v.src !== url) v.src = url;
+    if (v.src !== url) { v.src = url; syncCaptions(v, url); }
     v.currentTime = 0; v.muted = false;
     v.play().then(() => setPlaying(true), () => setPlaying(false));
   }

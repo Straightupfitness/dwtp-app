@@ -1,5 +1,6 @@
 "use client";
 import BadWeekBox from "@/components/BadWeekBox";
+import { syncCaptions } from "@/lib/captions";
 import { useEffect, useRef, useState } from "react";
 import SleepBlock from "./SleepBlock";
 import { celebrate, markSeen } from "@/lib/celebrate";
@@ -40,7 +41,7 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
   const video = useRef<HTMLVideoElement>(null);
   const set = (k: string, v: unknown) => { setError(""); setA((x) => ({ ...x, [k]: v })); };
   // Load the welcome video (CHK-01) right away; it plays when she taps ▶.
-  useEffect(() => { const v = video.current; if (v && !v.src && videos["CHK-01"]) v.src = videos["CHK-01"]; }, [videos]);
+  useEffect(() => { const v = video.current; if (v && !v.src && videos["CHK-01"]) { v.src = videos["CHK-01"]; syncCaptions(v, videos["CHK-01"]); } }, [videos]);
 
   const bad = badWeek.already || a.bad_week === true;
   const flow: (Screen | "welcome" | "review")[] = ["welcome", ...(bad ? [BAD_WEEK_SCREEN] : []), ...screens.filter((s) => !s.habits || habits.length), "review"];
@@ -54,7 +55,7 @@ export default function CheckinFlow({ week, userId, screens, videos, habits, clo
     if (!v) return;
     const url = code ? videos[code] : null;
     if (!url) { v.pause(); v.removeAttribute("src"); v.load(); setPlaying(false); return; }
-    if (v.src !== url) v.src = url;
+    if (v.src !== url) { v.src = url; syncCaptions(v, url); }
     v.currentTime = 0; v.muted = muted;
     v.play().then(() => setPlaying(true), () => setPlaying(false));
   }

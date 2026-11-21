@@ -53,3 +53,12 @@ body {
 }
 @keyframes shine-text { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
 @media (prefers-reduced-motion: reduce) { .shine-text { animation: none; } }
+
+/* November 21: captions on Michael's videos: big, readable, on a dark band. */
+video::cue {
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
+  font-size: 1.05em;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+}

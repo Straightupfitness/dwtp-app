@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { captionSrc } from "@/lib/captions";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { embedUrl, KIND_LABEL, loadLessons, weekMedals } from "@/lib/lessons";
@@ -44,7 +45,9 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
 
       {own ? (
         <video src={own.url} controls playsInline preload="metadata" title={l.title}
-          className={own.portrait ? "mx-auto block max-h-[75dvh] w-auto max-w-full rounded-2xl border border-border bg-black" : "aspect-video w-full rounded-2xl border border-border bg-black"} />
+          className={own.portrait ? "mx-auto block max-h-[75dvh] w-auto max-w-full rounded-2xl border border-border bg-black" : "aspect-video w-full rounded-2xl border border-border bg-black"}>
+          {captionSrc(own.url) && <track kind="captions" srcLang="en" label="English" default src={captionSrc(own.url)!} />}
+        </video>
       ) : embed ? (
         <div className="aspect-video overflow-hidden rounded-2xl border border-border bg-black">
           <iframe src={embed} title={l.title} className="size-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />

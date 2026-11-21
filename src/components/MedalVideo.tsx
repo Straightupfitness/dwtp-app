@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { captionSrc } from "@/lib/captions";
 
 const len = (s: number | null) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
 
@@ -35,7 +36,9 @@ export default function MedalVideo({ url, seconds, color, name, compact = false 
       {open && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label={`Video: ${name}`}>
           <video src={url} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} onEnded={() => setOpen(false)}
-            className="max-h-[82dvh] w-auto max-w-full rounded-2xl bg-black" />
+            className="max-h-[82dvh] w-auto max-w-full rounded-2xl bg-black">
+            {captionSrc(url) && <track kind="captions" srcLang="en" label="English" default src={captionSrc(url)!} />}
+          </video>
           <button type="button" onClick={() => setOpen(false)} className="min-h-11 px-4 text-sm text-[#cfcfcf]">Close ✕</button>
         </div>
       )}
