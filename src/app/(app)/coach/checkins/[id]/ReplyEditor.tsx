@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PrompterRecorder, { groupsFromText } from "@/components/PrompterRecorder";
-import { saveReply } from "./actions";
+import { markReplied, saveReply } from "./actions";
 
 type Summary = { win?: string; obstacle?: string; questions?: string; flags?: string[]; report?: { label: string; text: string }[] } | null;
 
@@ -37,15 +37,22 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
   const [text, setText] = useState(initialText);
   const [points, setPoints] = useState(initialDraft);
   const [summary, setSummary] = useState<Summary>(initialSummary);
-  const [video, setVideo] = useState<string | null>(null);
-  // November 20 (Michael): the app-wide "Record myself" hands its video here when he taps "Use as her check-in reply".
+  const [busy, setBusy] = useState<"" | "draft" | "save" | "send">("");
+  const [msg, setMsg] = useState("");
+  const [video, setVideoState] = useState<string | null>(null);
+  const textNow = useRef(text);
+  useEffect(() => { textNow.current = text; }, [text]);
+  // November 20 (Michael): a new reply video is saved to her draft right away, so leaving the page never loses it.
+  const setVideo = (path: string | null) => {
+    setVideoState(path);
+    if (path) saveReply(checkinId, textNow.current, path, false).then((r) => setMsg(r?.error ? `Couldn't save the video to the draft: ${r.error}` : "Video saved to your draft. Tap Send to her when you're ready."));
+  };
+  // The app-wide "Record myself" hands its video here when he taps "Use as her check-in reply".
   useEffect(() => {
     const on = (e: Event) => setVideo((e as CustomEvent<string>).detail);
     window.addEventListener("dwtp-reply-video", on);
     return () => window.removeEventListener("dwtp-reply-video", on);
-  }, []);
-  const [busy, setBusy] = useState<"" | "draft" | "save" | "send">("");
-  const [msg, setMsg] = useState("");
+  });
   const [sent, setSent] = useState(sentAt);
 
   async function draft() {
@@ -62,7 +69,14 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
     const r = await saveReply(checkinId, text, video, send);
     setBusy("");
     if (r?.error) setMsg(r.error);
-    else { setMsg(send ? "Sent. She'll see it on her Check-in tab." : "Saved."); if (send) setSent(new Date().toISOString()); }
+    else { setMsg(send ? "Sent. She'll see it on her Check-in tab and in her chat." : "Saved."); if (send) setSent(new Date().toISOString()); }
+  }
+  // November 20 (Michael): he already answered her another way (a chat video, a call): mark it replied, nothing is sent.
+  async function already() {
+    setBusy("save"); setMsg("");
+    const r = await markReplied(checkinId);
+    setBusy("");
+    if (r?.error) setMsg(r.error); else { setSent(new Date().toISOString()); setMsg("Marked as replied. Nothing was sent to her."); }
   }
 
   return (
@@ -111,6 +125,7 @@ export default function ReplyEditor({ checkinId, clientId, initialText, initialD
           {busy === "send" ? "Sending…" : sent ? "Update sent reply" : "Send to her"}
         </button>
       </div>
+      {!sent && <button type="button" onClick={already} disabled={busy !== ""} className="text-[13px] text-dim underline">✓ I already replied another way (mark as replied, sends nothing)</button>}
       {msg && <p className="text-sm">{msg}</p>}
       {sent && <p className="text-xs text-dim">Sent {new Date(sent).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} Pacific</p>}
     </div>

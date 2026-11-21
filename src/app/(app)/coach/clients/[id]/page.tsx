@@ -34,6 +34,7 @@ import { progressFor } from "@/lib/badges-server";
 import { BadgeRow } from "@/components/BadgeIcon";
 import { questionLabels } from "@/lib/checkin";
 import DeleteCheckin from "@/app/(app)/coach/checkins/[id]/DeleteCheckin";
+import MarkReplied from "@/app/(app)/coach/checkins/[id]/MarkReplied";
 import { adminClient } from "@/lib/supabase/admin";
 import { loadSeen } from "@/lib/seen";
 import { loadFoodWeek } from "@/lib/food-week";
@@ -160,6 +161,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
                 </span>
                 <span className="text-2xl font-bold" aria-hidden="true">›</span>
               </Link>
+              <MarkReplied id={k.id} />
               <DeleteCheckin id={k.id} label={`her ${weekName(k.week_number)} check-in`} compact />
             </div>
           ))}

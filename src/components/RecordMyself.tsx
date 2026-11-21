@@ -46,6 +46,14 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
   // eslint-disable-next-line react-hooks/set-state-in-effect -- checking what this browser can do, once
   useEffect(() => { setScreenOk(!!navigator.mediaDevices && "getDisplayMedia" in navigator.mediaDevices && !/iPhone|iPad|Android/i.test(navigator.userAgent)); }, []);
   useEffect(() => () => streams.current.forEach((s) => s.getTracks().forEach((t) => t.stop())), []);
+  // November 20 (Michael): a recording he hasn't used, sent or downloaded yet only lives in this tab. Warn before a
+  // refresh or closing the tab would throw it away. (Moving between pages inside the app keeps it.)
+  useEffect(() => {
+    if (!["recording", "review", "uploading"].includes(mode)) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [mode]);
   useEffect(() => {
     if (mode !== "recording") return;
     const t = setInterval(() => setSecs((s) => { if (s + 1 >= MAX_SECONDS) rec.current?.stop(); return s + 1; }), 1000);

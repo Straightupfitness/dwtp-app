@@ -8,8 +8,8 @@ export async function saveReply(checkinId: string, text: string, videoPath: stri
   const { data: { user } } = await supabase.auth.getUser();
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user?.id ?? "").single();
   if (me?.role !== "coach") return { error: "Coach only" };
-  if (send && !text.trim() && !videoPath) return { error: "Write a reply or add a video first." };
   const { data: before } = await supabase.from("checkin_replies").select("sent_at, video_path").eq("checkin_id", checkinId).maybeSingle();
+  if (send && !text.trim() && !videoPath && !before?.video_path) return { error: "Write a reply or add a video first." };
   const { error } = await supabase.from("checkin_replies").upsert({
     checkin_id: checkinId, final_text: text, ...(videoPath ? { video_path: videoPath } : {}),
     updated_at: new Date().toISOString(), ...(send ? { sent_at: new Date().toISOString() } : {}),
@@ -73,4 +73,17 @@ export async function deleteCheckin(checkinId: string) {
   if (!count) return { error: "It couldn't be deleted (already gone?)." };
   revalidatePath("/coach", "layout");
   return { ok: true, clientId: (c?.client_id as string | undefined) ?? null };
+}
+
+/** November 20 (Michael): he already replied another way (a chat video, a call). Marks it replied; nothing goes to her. */
+export async function markReplied(checkinId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: me } = await supabase.from("profiles").select("role").eq("id", user?.id ?? "").single();
+  if (me?.role !== "coach") return { error: "Coach only" };
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("checkin_replies").upsert({ checkin_id: checkinId, sent_at: now, updated_at: now }, { onConflict: "checkin_id" });
+  if (error) return { error: error.message };
+  revalidatePath("/coach", "layout");
+  return { ok: true };
 }
