@@ -8,6 +8,7 @@ import { parseQty, totals, type FoodItem } from "@/lib/food";
 import { saveMeal, updateMeal, deleteGoTo, updateGoTo, uploadFoodPhoto, saveGoTo } from "./actions";
 import { EDIT_EVENT, type MealToEdit } from "./EditMeal";
 import FoodSearch from "./FoodSearch";
+import NumberField from "@/components/NumberField";
 import BarcodeScanner from "./BarcodeScanner";
 
 type Slot = "meal_1" | "meal_2" | "meal_3" | "other";
@@ -364,7 +365,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
                 <div className="grid grid-cols-4 gap-2">
                   {([["calories", "kcal"], ["protein_g", "protein g"], ["fiber_g", "fiber g"], ["potassium_mg", "K mg"]] as const).map(([k, l]) => (
                     <label key={k} className="text-[11px] text-dim">{l}
-                      <input type="number" inputMode="decimal" value={it[k]} onChange={(e) => edit(i, k, e.target.value)} className={`${input} mt-1 px-2 text-sm`} />
+                      <NumberField value={Number(it[k]) || 0} onChange={(n) => edit(i, k, String(n))} className={`${input} mt-1 px-2 text-sm`} />
                     </label>
                   ))}
                 </div>
