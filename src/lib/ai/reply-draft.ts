@@ -4,6 +4,7 @@ import { askClaude, type ContentBlock } from "./anthropic";
 import { weekData } from "../coach-data";
 import { questionLabels } from "../checkin";
 import { PROGRAM_RULES } from "./voice";
+import { todayIn } from "../program";
 
 // November 1: Michael wants talking points, not a script. He replies in his own words; the AI finds what to talk about.
 const SYSTEM = `You prepare Michael Duivis's talking points for his weekly check-in reply to a client in his Driven Woman Transformation Program (DWTP),
@@ -33,7 +34,7 @@ FIVE SECTIONS, in this order:
 
 ${PROGRAM_RULES}
 
-HARD RULES: never invent data. If there are no weigh-ins or food logs, say so in that section ("No food logged this week") and make
+HARD RULES: judge only the whole days you're given: never call today or a day that hasn't happened yet "nothing logged". never invent data. If there are no weigh-ins or food logs, say so in that section ("No food logged this week") and make
 logging the lowest-hanging fruit. Use her numbers and the real dates from the data. No greetings, no sign-off, no script.
 
 SPECIAL WEEKS (add a bullet to section 1 only when the context says so): Week 1 welcome and "Log Your Numbers"; Week 4 sleep checkpoint
@@ -64,6 +65,11 @@ export async function generateDraft(supabase: SupabaseClient, checkinId: string)
   const { data: c } = await supabase.from("checkins").select("*").eq("id", checkinId).single();
   if (!c) throw new Error("Check-in not found");
   const d = await weekData(supabase, c.client_id, c.week_number);
+  // November 20 (Michael): only whole days count. Today is still in progress (she may not have logged dinner yet) and
+  // later days haven't happened, so the talking points look at the days of her check-in week up to yesterday.
+  const today = todayIn((d.profile?.timezone as string | undefined) ?? "America/Los_Angeles");
+  const whole = d.days.filter((x) => x.date < today);
+  const wholeNote = whole.length < d.days.length ? ` (whole days only: ${whole.length ? `${dayLabel(d.start)} to ${dayLabel(whole[whole.length - 1].date)}` : "none yet"}; today and later days are left out on purpose)` : "";
   const labels = questionLabels();
   const answers = Object.entries(c.answers ?? {}).filter(([k]) => !["habits", "sleep_photos", "videos"].includes(k))
     .map(([k, v]) => `- ${labels[k] ?? k}: ${Array.isArray(v) ? v.join("; ") : v}`).join("\n");
@@ -92,12 +98,12 @@ HABITS (current streak, of 14 days):
 ${d.habits.map((h) => `- ${h.circle}: ${h.title}: ${h.complete ? "complete" : `${h.streak} days`}`).join("\n") || "(none)"}
 
 WEIGHT (last 3 weeks): ${d.weights.map((w) => `${dayLabel(w.log_date)}: ${w.weight_lbs}`).join(", ") || "NO WEIGHTS LOGGED"}
-Weigh-ins this week (${dayLabel(d.start)} to ${dayLabel(d.end)}): ${d.weekWeights.length} of 7. Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
+Weigh-ins this week (${dayLabel(d.start)} to ${dayLabel(d.end)}): ${d.weekWeights.length} of ${Math.min(7, whole.length + 1)} days so far (today counts if she weighed in this morning). Last weight: ${d.lastWeight ? `${d.lastWeight.weight_lbs} lbs on ${d.lastWeight.log_date}` : "none"}
 
-STEPS (she logs them in the app) AND SLEEP (per day): ${d.days.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
+STEPS (she logs them in the app) AND SLEEP (per day)${wholeNote}: ${whole.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
 
-FOOD THIS WEEK (${d.start} to ${d.end}):
-${d.days.map((x) => `${dayLabel(x.date)}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m) => `  ${m.slot} (${m.time}): ${m.calories} kcal, ${m.protein} g protein, ${m.fiber} g fiber: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
+FOOD THIS WEEK${wholeNote}:
+${whole.map((x) => `${dayLabel(x.date)}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m) => `  ${m.slot} (${m.time}): ${m.calories} kcal, ${m.protein} g protein, ${m.fiber} g fiber: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
 
 MICHAEL'S LAST REPLIES (to stay consistent with what he asked her to do):
 ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin_replies[0] : p.checkin_replies; return r?.final_text ? `Week ${p.week_number}: ${r.final_text.slice(0, 900)}` : null; }).filter(Boolean).join("\n---\n") || "none"}`;
