@@ -9,14 +9,11 @@ export default function BadWeekBox({ already, left, checked, onChange }: { alrea
     <label className={`${box} flex items-start gap-3`}>
       <input type="checkbox" checked={checked} disabled={!left} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[#7c5cff]" />
       <span className="text-[14px] leading-snug">
-        <b className="block text-[15px]">Was this a bad week?</b>
+        <b className="block text-[15px]">Click here if this was a bad week</b>
         {left ? (
           <span className="mt-1 block text-[13px] text-[#cfcfcf]">
-            If life got in the way, tick this:
-            <span className="mt-1 block">✓ This week still counts as done for your 15 Pound Guarantee, even with missed habits.</span>
-            <span className="block">✓ Nothing gets postponed. Next week&apos;s Habits &amp; Homework opens as usual.</span>
-            <span className="block">✓ Your check-in gets shorter: just tell me what happened.</span>
-            <span className="mt-1 block text-[12px] text-[#b9a6ff]">{left} of 3 bad weeks left</span>
+            This will make your check-in shorter. All you have to do is tell me what happened. Nothing gets postponed: you&apos;ll still get next week&apos;s Habits &amp; Homework as usual.
+            <span className="mt-1 block text-[12px] text-[#b9a6ff]">You have {left} of 3 bad weeks left.</span>
           </span>
         ) : <span className="mt-1 block text-[13px] text-[#cfcfcf]">You&apos;ve used all 3 bad weeks. Message me and I&apos;ll help you through this one.</span>}
       </span>
