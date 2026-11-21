@@ -43,7 +43,9 @@ async function toChat(supabase: Awaited<ReturnType<typeof createClient>>, coachI
         if (file && !(await supabase.storage.from("media").upload(to, file, { contentType: file.type || "video/mp4" })).error) path = to;
       }
     }
-    const body = [`Your Week ${week} check-in reply 👇`, text.trim()].filter(Boolean).join("\n\n");
+    const { data: her } = await supabase.from("profiles").select("full_name").eq("id", clientId).maybeSingle();
+    const first = (her?.full_name ?? "").trim().split(/\s+/)[0];
+    const body = [`Hi${first ? ` ${first}` : ""}, here is your week ${week} check-in reply ⬆️`, text.trim()].filter(Boolean).join("\n\n");
     const { error } = await supabase.from("messages").insert({ client_id: clientId, sender_id: coachId, body, attachment_path: path, attachment_kind: path ? "video" : null });
     if (error) console.error("check-in reply to chat failed", error.message);
   } catch (e) { console.error("check-in reply to chat failed", e); }
