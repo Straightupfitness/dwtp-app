@@ -12,7 +12,7 @@ import BarcodeScanner from "./BarcodeScanner";
 
 type Slot = "meal_1" | "meal_2" | "meal_3" | "other";
 const SLOTS: { v: Slot; label: string }[] = [{ v: "meal_1", label: "Meal 1" }, { v: "meal_2", label: "Meal 2" }, { v: "meal_3", label: "Meal 3" }, { v: "other", label: "Other" }];
-export type GoTo = { id: string; name: string; items: FoodItem[] };
+export type GoTo = { id: string; name: string; items: FoodItem[]; photo?: string | null };
 
 const toDataUrl = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsDataURL(b); });
 const Cam = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>;
@@ -47,6 +47,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   const [busy, setBusy] = useState<"" | "estimating" | "adding" | "saving">("");
   const [error, setError] = useState("");
   const [manage, setManage] = useState(false);
+  const [favOpen, setFavOpen] = useState(false); // November 20: the ★ Favorites drop-down
   const [editId, setEditId] = useState<string | null>(null); // set when she's changing a meal she already saved
   const [favEdit, setFavEdit] = useState<GoTo | null>(null); // November 7: changing a favorite's foods
   const voice = useRef(false);
@@ -224,16 +225,43 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
             <span className="text-[11px] leading-tight text-[#a8a8a8]">Your usual foods, or search, one by one.</span>
           </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-          {goTos.length > 0 && <span className="flex shrink-0 items-center text-[12px] font-semibold uppercase tracking-[0.1em] text-accent">★ Favorites</span>}
-          {goTos.map((g) => (
-            <button key={g.id} type="button" onClick={() => { setItems(g.items); setSavedId(g.id); setText(g.name); setNotes(""); setMode("review"); }}
-              className="min-h-10 shrink-0 rounded-full border border-[#2a2a2a] px-3.5 text-[13px]">+ {g.name}</button>
-          ))}
-          {goTos.length > 0
-            ? <button type="button" onClick={() => setManage(!manage)} className="min-h-10 shrink-0 rounded-full px-2 text-[13px] text-dim">{manage ? "Done" : "Edit"}</button>
-            : <span className="py-2 text-xs text-dim">★ Save a meal as a favorite (like your daily breakfast) to log it again with one tap.</span>}
-        </div>
+        {/* November 20 (Michael): ★ Favorites opens a drop-down with all of them, one under the other, with their picture. */}
+        {goTos.length > 0 ? (
+          <div className="overflow-hidden rounded-2xl border border-[#2a2a2a] bg-card">
+            <div className="flex items-center">
+              <button type="button" onClick={() => { setFavOpen(!favOpen); if (favOpen) setManage(false); }} aria-expanded={favOpen}
+                className="flex min-h-12 flex-1 items-center gap-2 px-3.5 text-left">
+                <span className="text-[14px] font-semibold text-accent">★ Favorites</span>
+                <span className="text-[12px] text-dim">{goTos.length}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a8a8a8" strokeWidth="2" aria-hidden="true" className={`ml-auto transition-transform ${favOpen ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+              {favOpen && <button type="button" onClick={() => setManage(!manage)} className="min-h-12 px-3.5 text-[13px] text-dim">{manage ? "Done" : "Edit"}</button>}
+            </div>
+            {favOpen && !manage && (
+              <ul className="max-h-[60dvh] divide-y divide-border overflow-y-auto border-t border-border">
+                {goTos.map((g) => {
+                  const t = totals(g.items);
+                  return (
+                    <li key={g.id}>
+                      <button type="button" onClick={() => { setItems(g.items); setSavedId(g.id); setText(g.name); setNotes(""); setFavOpen(false); setMode("review"); }}
+                        className="flex min-h-16 w-full items-center gap-3 px-3 py-2 text-left active:bg-white/5">
+                        {g.photo
+                          // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL
+                          ? <img src={g.photo} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                          : <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#1f1708] text-lg text-accent" aria-hidden="true">★</span>}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold">{g.name}</span>
+                          <span className="block truncate text-[12px] text-dim">{Math.round(t.calories)} kcal · {Math.round(t.protein_g)} g protein · {g.items.map((i) => i.name).join(", ")}</span>
+                        </span>
+                        <span className="shrink-0 text-xl text-accent" aria-hidden="true">+</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : <p className="py-1 text-xs text-dim">★ Save a meal as a favorite (like your daily breakfast) to log it again with one tap.</p>}
         {manage && (
           <div className="space-y-1.5">
             <ul className="divide-y divide-border rounded-xl border border-border">

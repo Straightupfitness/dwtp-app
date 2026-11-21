@@ -39,14 +39,16 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
   const isToday = day === today;
   const prev = addDays(day, -1);
 
-  const [{ data: rows }, { data: target }, { data: saved }, myFoods, foodRules] = await Promise.all([
+  const [{ data: rows }, { data: target }, { data: saved }, myFoods, foodRules, { data: pics }] = await Promise.all([
     // The day before through the day after (UTC), then her own time zone picks the day.
     supabase.from("food_logs").select("id, eaten_at, meal_slot, source, items, calories, protein_g, fiber_g, potassium_mg, photo_path, note")
       .eq("client_id", user!.id).gte("eaten_at", addDays(day, -2) + "T00:00:00Z").lt("eaten_at", addDays(day, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
-    supabase.from("saved_meals").select("id, name, items, last_used_at").eq("client_id", user!.id).order("last_used_at", { ascending: false, nullsFirst: false }).limit(20),
+    supabase.from("saved_meals").select("id, name, items, last_used_at").eq("client_id", user!.id).order("last_used_at", { ascending: false, nullsFirst: false }).limit(150),
     loadMyFoods(supabase, user!.id),
     loadFoodRules(supabase, user!.id),
+    // November 20: her meals with a picture, so each favorite can show the photo from the last time she logged it.
+    supabase.from("food_logs").select("items, photo_path").eq("client_id", user!.id).not("photo_path", "is", null).order("eaten_at", { ascending: false }).limit(400),
   ]);
   const meals = (rows ?? []).filter((r) => todayIn(tz, new Date(r.eaten_at)) === day);
   const dayName = isToday ? "Today" : day === addDays(today, -1) ? "Yesterday"
@@ -58,7 +60,12 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
   }), { calories: 0, protein: 0, fiber: 0, potassium: 0 });
 
   const photoUrls = new Map<string, string>();
-  const paths = meals.map((m) => m.photo_path).filter(Boolean) as string[];
+  // A favorite's picture: the latest meal with a photo that has the same foods (same names, in any amount).
+  const foodsKey = (items: unknown) => ((items as FoodItem[] | null) ?? []).map((i) => i.name.trim().toLowerCase()).sort().join("|");
+  const picByFoods = new Map<string, string>();
+  for (const p of pics ?? []) { const key = foodsKey(p.items); if (key && !picByFoods.has(key)) picByFoods.set(key, p.photo_path as string); }
+  const favPic = new Map((saved ?? []).map((g) => [g.id, picByFoods.get(foodsKey(g.items)) ?? null]));
+  const paths = [...new Set([...meals.map((m) => m.photo_path), ...favPic.values()].filter(Boolean) as string[])];
   if (paths.length) {
     const { data: signed } = await supabase.storage.from("food-photos").createSignedUrls(paths, 3600);
     signed?.forEach((s) => s.path && s.signedUrl && photoUrls.set(s.path, s.signedUrl));
@@ -101,7 +108,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} myFoods={myFoods} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[] })) as GoTo[]} />
+      <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} myFoods={myFoods} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[], photo: favPic.get(g.id) ? photoUrls.get(favPic.get(g.id)!) ?? null : null })) as GoTo[]} />
       <FoodRules initial={foodRules} />
 
       {/* Recipes (October 29): Michael's and the library, to cook and log in a tap. */}
