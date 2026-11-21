@@ -19,7 +19,7 @@ export default async function ClientFood({ params, searchParams }: { params: Pro
   const today = todayIn(tz);
   const day = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today ? asked : today;
   const [{ data: rows }, { data: t }] = await Promise.all([
-    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, description, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
+    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, description, note, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
       .eq("client_id", id).gte("eaten_at", addDays(day, -2) + "T00:00:00Z").lt("eaten_at", addDays(day, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", id).maybeSingle(),
   ]);
@@ -65,6 +65,7 @@ export default async function ClientFood({ params, searchParams }: { params: Pro
           {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
           {m.photo_path && photos.get(m.photo_path) && <img src={photos.get(m.photo_path)} alt="" className="max-h-64 w-full rounded-xl object-cover" />}
           {m.description && <p className="text-[13px] italic text-[#a8a8a8]">&ldquo;{m.description}&rdquo;</p>}
+          {m.note && <p className="whitespace-pre-line rounded-lg border border-accent/40 bg-[#1a1408] px-2 py-1 text-[13px] text-[#f5d9a8]">💬 Her comment: {m.note}</p>}
           <ul className="divide-y divide-border text-[14px]">
             {(m.items as FoodItem[]).map((it, i) => (
               <li key={i} className="flex justify-between gap-3 py-1.5"><span>{it.name} <span className="text-dim">· {it.amount}</span></span><span className="shrink-0 text-dim">{Math.round(it.calories)} kcal · {it.protein_g} g</span></li>

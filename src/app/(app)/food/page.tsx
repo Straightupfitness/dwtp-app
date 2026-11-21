@@ -41,7 +41,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
 
   const [{ data: rows }, { data: target }, { data: saved }, myFoods, foodRules] = await Promise.all([
     // The day before through the day after (UTC), then her own time zone picks the day.
-    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
+    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, items, calories, protein_g, fiber_g, potassium_mg, photo_path, note")
       .eq("client_id", user!.id).gte("eaten_at", addDays(day, -2) + "T00:00:00Z").lt("eaten_at", addDays(day, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     supabase.from("saved_meals").select("id, name, items, last_used_at").eq("client_id", user!.id).order("last_used_at", { ascending: false, nullsFirst: false }).limit(20),
@@ -130,13 +130,14 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
                 <p className="shrink-0 text-[13px] font-semibold">{m.calories} kcal</p>
               </div>
               <p className="mt-1 text-sm leading-snug">{foods(m)}</p>
+              {m.note && <p className="mt-1 whitespace-pre-line rounded-lg bg-bg/60 px-2 py-1 text-[13px] italic leading-snug text-[#cfcfcf]">💬 {m.note}</p>}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-[#a8a8a8]">{Math.round(Number(m.protein_g))} g protein · {Math.round(Number(m.fiber_g))} g fiber</p>
                 <span className="flex flex-wrap items-center justify-end gap-x-2">
                   {!isToday && <CopyMeal id={m.id} toDay={today} />}
                   <CopyMealTo id={m.id} today={today} from={day} />
                   <FavoriteMeal id={m.id} suggest={(m.items as FoodItem[])[0]?.name.slice(0, 40) ?? ""} />
-                  <EditMeal meal={{ id: m.id, items: m.items as FoodItem[], slot: (m.meal_slot ?? "other") as "meal_1" | "meal_2" | "meal_3" | "other", eatenAt: m.eaten_at, photoUrl: m.photo_path ? photoUrls.get(m.photo_path) ?? null : null }} />
+                  <EditMeal meal={{ id: m.id, items: m.items as FoodItem[], slot: (m.meal_slot ?? "other") as "meal_1" | "meal_2" | "meal_3" | "other", eatenAt: m.eaten_at, photoUrl: m.photo_path ? photoUrls.get(m.photo_path) ?? null : null, note: m.note ?? null }} />
                   <DeleteMeal id={m.id} />
                 </span>
               </div>

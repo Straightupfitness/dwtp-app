@@ -103,7 +103,7 @@ Weigh-ins this week (${dayLabel(d.start)} to ${dayLabel(d.end)}): ${d.weekWeight
 STEPS (she logs them in the app) AND SLEEP (per day)${wholeNote}: ${whole.map((x) => `${x.date}: ${x.steps ?? "-"} steps, ${x.sleepMin != null ? (x.sleepMin / 60).toFixed(1) + " h sleep" : "- sleep"}`).join(" | ")}
 
 FOOD THIS WEEK${wholeNote}:
-${whole.map((x) => `${dayLabel(x.date)}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m) => `  ${m.slot} (${m.time}): ${m.calories} kcal, ${m.protein} g protein, ${m.fiber} g fiber: ${m.items.slice(0, 15).join("; ")}`).join("\n")}` : "nothing logged"}`).join("\n")}
+${whole.map((x) => `${dayLabel(x.date)}: ${x.meals ? `${x.meals} meals, ${x.calories} kcal, ${x.protein} g protein, ${x.fiber} g fiber\n${x.list.map((m) => `  ${m.slot} (${m.time}): ${m.calories} kcal, ${m.protein} g protein, ${m.fiber} g fiber: ${m.items.slice(0, 15).join("; ")}${m.note ? ` · HER COMMENT: "${m.note}"` : ""}`).join("\n")}` : "nothing logged"}`).join("\n")}
 
 MICHAEL'S LAST REPLIES (to stay consistent with what he asked her to do):
 ${d.previous.map((p) => { const r = Array.isArray(p.checkin_replies) ? p.checkin_replies[0] : p.checkin_replies; return r?.final_text ? `Week ${p.week_number}: ${r.final_text.slice(0, 900)}` : null; }).filter(Boolean).join("\n---\n") || "none"}`;

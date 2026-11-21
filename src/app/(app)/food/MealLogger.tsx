@@ -37,6 +37,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   const [slot, setSlot] = useState<Slot>(defaultSlot);
   const [items, setItems] = useState<FoodItem[]>([]);
   const [notes, setNotes] = useState("");
+  const [comment, setComment] = useState<string | null>(null); // November 20: her own comment on the meal (null = closed)
   const [savedId, setSavedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [adder, setAdder] = useState<"type" | "search" | "scan" | "own">("type");
@@ -57,7 +58,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   useEffect(() => {
     const open = (e: Event) => {
       const m = (e as CustomEvent<MealToEdit>).detail;
-      setEditId(m.id); setItems(m.items); setSlot(m.slot); setWhen(new Date(m.eatenAt)); setPreview(m.photoUrl); setPhoto(null); setPhotoGone(false);
+      setEditId(m.id); setItems(m.items); setSlot(m.slot); setWhen(new Date(m.eatenAt)); setPreview(m.photoUrl); setPhoto(null); setPhotoGone(false); setComment(m.note ?? null);
       setSavedId(null); setText(""); setNotes(""); setSaveAs(null); setEditing(null); setExtra(""); setError(""); setAdder("type"); setMode("review");
     };
     window.addEventListener(EDIT_EVENT, open);
@@ -65,7 +66,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   }, []);
 
   function reset() {
-    setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setPhotoGone(false); setText(""); setItems([]); setNotes(""); setSavedId(null);
+    setMode("home"); setAdder("type"); setWhen(defaultWhen()); setPhoto(null); setPreview(null); setPhotoGone(false); setText(""); setItems([]); setNotes(""); setComment(null); setSavedId(null);
     setEditing(null); setExtra(""); setSaveAs(null); setError(""); voice.current = false; setSlot(defaultSlot); setEditId(null); setFavEdit(null); setBatch(null);
   }
   async function estimate(image: Blob | null, description: string) {
@@ -98,6 +99,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   const dictation = useDictation((t) => { voice.current = true; setText(t); });
   const listening = dictation.listening;
   function toggleVoice() { dictation.toggle(text); }
+  const noteDictation = useDictation((t) => setComment(t));
   async function addTyped() {
     if (!extra.trim()) return;
     setBusy("adding"); setError("");
@@ -160,7 +162,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
     }
     if (editId) {
       const newPath = photo ? await uploadPhoto(photo) : null;
-      const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs,
+      const r = await updateMeal(editId, { items, mealSlot: slot, eatenAt: when ? when.toISOString() : null, saveAs, note: comment ?? "",
         ...(newPath ? { photoPath: newPath } : photoGone ? { photoPath: null } : {}) });
       setBusy("");
       if (r?.error) { setError(r.error); return; }
@@ -171,7 +173,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
     const photoPath = photo ? await uploadPhoto(photo) : null;
     const logItems = batch ? [potItem(batch.ate / potServings, `${servingsText(batch.ate)} (the pot makes ${potServings})`)] : items;
     const r = await saveMeal({ items: logItems, mealSlot: slot, eatenAt: when ? when.toISOString() : null, source: savedId ? "saved_meal" : photo ? "photo" : voice.current ? "voice" : "text",
-      description: batch ? `${batch.name.trim()}: ${items.map((i) => `${i.amount} ${i.name}`).join(", ")}` : text, photoPath, savedMealId: savedId, saveAs: batch ? null : saveAs });
+      description: batch ? `${batch.name.trim()}: ${items.map((i) => `${i.amount} ${i.name}`).join(", ")}` : text, photoPath, savedMealId: savedId, saveAs: batch ? null : saveAs, note: comment });
     setBusy("");
     if (r?.error) { setError(r.error); return; }
     if (batch) await saveBatchFavorite();
@@ -404,6 +406,27 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
             )}
           </div>
         )}
+
+        {/* November 20: her own comment on the meal, however she logged it (photo, voice or typed). Speak it or type it. */}
+        {!favEdit && items.length > 0 && (comment === null ? (
+          <button type="button" onClick={() => setComment("")} className="flex items-center gap-2 text-left text-sm text-[#cfcfcf]">
+            <span aria-hidden="true">💬</span><span>Add a comment <span className="text-[12px] text-dim">(how it went, where you were, how you felt)</span></span>
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><span className="text-sm font-semibold">💬 Your comment</span>
+              {!comment.trim() && <button type="button" onClick={() => setComment(null)} className="text-[12px] text-dim">Cancel</button>}</div>
+            <div className="relative">
+              <textarea value={comment} onChange={(e) => setComment(e.target.value)} autoFocus rows={2} maxLength={1000}
+                placeholder="e.g. Ate this at my mom's · So bloated after · Starving by 3 pm"
+                className="w-full rounded-xl border border-[#2a2a2a] bg-bg p-3 pr-12 text-[16px] leading-snug outline-none focus:border-accent" />
+              {noteDictation.supported() && (
+                <button type="button" onClick={() => noteDictation.toggle(comment)} aria-label={noteDictation.listening ? "Stop" : "Speak your comment"}
+                  className={`absolute right-2 top-2 grid size-9 place-items-center rounded-full ${noteDictation.listening ? "bg-[#ef4444] text-white" : "text-[#a8a8a8]"}`}><Mic /></button>
+              )}
+            </div>
+          </div>
+        ))}
 
         {items.length > 0 && !savedId && !favEdit && !batch && (
           <label className="flex items-center gap-2.5 text-sm">

@@ -1,7 +1,7 @@
 "use client";
 import type { FoodItem } from "@/lib/food";
 
-export type MealToEdit = { id: string; items: FoodItem[]; slot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt: string; photoUrl: string | null };
+export type MealToEdit = { id: string; items: FoodItem[]; slot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt: string; photoUrl: string | null; note?: string | null };
 export const EDIT_EVENT = "dwtp:edit-meal";
 
 /** Opens a saved meal in the meal checker (MealLogger listens for this), so she can fix the foods, the meal or the time. */

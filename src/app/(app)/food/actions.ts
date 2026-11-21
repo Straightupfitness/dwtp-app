@@ -17,6 +17,7 @@ export async function saveMeal(input: {
   savedMealId?: string | null;
   saveAs?: string | null;  // also save this meal as a go-to meal with this name
   eatenAt?: string | null; // when she ate it, if not now (last 62 days)
+  note?: string | null;    // November 20: her comment on the meal
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +26,7 @@ export async function saveMeal(input: {
   const t = totals(items);
   const at = input.eatenAt ? new Date(input.eatenAt) : null;
   const eatenAt = at && !isNaN(at.getTime()) && at.getTime() <= Date.now() + 60_000 && Date.now() - at.getTime() <= MAX_BACK_MS ? at.toISOString() : undefined;
-  const { error } = await supabase.from("food_logs").insert({
+  const row = {
     client_id: user.id,
     ...(eatenAt ? { eaten_at: eatenAt } : {}),
     meal_slot: input.mealSlot,
@@ -38,7 +39,10 @@ export async function saveMeal(input: {
     fiber_g: Math.round(t.fiber_g * 10) / 10,
     potassium_mg: Math.round(t.potassium_mg),
     confirmed: true,
-  });
+  };
+  const note = input.note?.trim().slice(0, 1000) || null;
+  let { error } = await supabase.from("food_logs").insert({ ...row, ...(note ? { note } : {}) });
+  if (error && note && /note/.test(error.message)) ({ error } = await supabase.from("food_logs").insert(row)); // before SQL 38
   if (error) return { error: error.message };
   if (input.savedMealId) await supabase.from("saved_meals").update({ last_used_at: new Date().toISOString() }).eq("id", input.savedMealId).eq("client_id", user.id);
   if (input.saveAs?.trim()) await saveGoTo(input.saveAs, items);
@@ -54,7 +58,7 @@ export async function saveMeal(input: {
  * Change a meal she already saved: its foods, which meal it was, and when she ate it. The photo stays, unless she
  * adds, changes or removes it (November 19: photoPath a new picture, null to remove, left out to keep).
  */
-export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt?: string | null; saveAs?: string | null; photoPath?: string | null }) {
+export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlot: "meal_1" | "meal_2" | "meal_3" | "other"; eatenAt?: string | null; saveAs?: string | null; photoPath?: string | null; note?: string | null }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in" };
@@ -78,6 +82,7 @@ export async function updateMeal(id: string, input: { items: FoodItem[]; mealSlo
     protein_g: Math.round(t.protein_g * 10) / 10,
     fiber_g: Math.round(t.fiber_g * 10) / 10,
     potassium_mg: Math.round(t.potassium_mg),
+    ...(input.note !== undefined ? { note: input.note?.trim().slice(0, 1000) || null } : {}),
   }).eq("id", id).eq("client_id", user.id);
   if (error) return { error: error.message };
   if (oldPhoto && oldPhoto !== input.photoPath) await supabase.storage.from("food-photos").remove([oldPhoto]);

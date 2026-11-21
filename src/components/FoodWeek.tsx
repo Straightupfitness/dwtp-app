@@ -52,7 +52,7 @@ export default function FoodWeek({ data, title = "Food · last 7 days", compact 
                 {d.meals.map((m) => (
                   <span key={m.id} className="block text-[11px] leading-snug">
                     <span className="text-dim">{m.slot} · </span>{m.kcal} kcal · {m.protein} g P
-                    <span className="block truncate text-[#8a8a8a]">{m.items.map((x) => x.name).join(", ") || m.description}</span>
+                    <span className="block truncate text-[#8a8a8a]">{m.note ? "💬 " : ""}{m.items.map((x) => x.name).join(", ") || m.description}</span>
                   </span>
                 ))}
               </span>
@@ -140,6 +140,7 @@ export function DayPopup({ data, index, setIndex, coachClientId }: { data: FoodW
                 {m.photo && <a href={m.photo} target="_blank" rel="noreferrer" className="shrink-0"><img src={m.photo} alt="" className="size-28 rounded-xl object-cover md:size-36" /></a>}
                 <div className="min-w-0 flex-1">
                   {m.description && <p className="text-[13px] italic text-[#a8a8a8]">&ldquo;{m.description}&rdquo;</p>}
+                  {m.note && <p className="mb-1 whitespace-pre-line rounded-lg border border-accent/40 bg-[#1a1408] px-2 py-1 text-[13px] text-[#f5d9a8]">💬 Her comment: {m.note}</p>}
                   <ul className="divide-y divide-border text-[14px]">
                     {m.items.map((it, i) => (
                       <li key={i} className="flex justify-between gap-3 py-1.5"><span>{it.name} <span className="text-dim">· {it.amount}</span></span><span className="shrink-0 text-dim">{Math.round(it.calories)} kcal · {Math.round(it.protein_g)} g</span></li>

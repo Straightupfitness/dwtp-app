@@ -5,7 +5,7 @@ import { addDays } from "./daily";
 import { DAILY_TARGETS, type FoodItem } from "./food";
 
 export type WeekMeal = {
-  id: string; time: string; slot: string; source: string | null; description: string | null; items: FoodItem[];
+  id: string; time: string; slot: string; source: string | null; description: string | null; note: string | null; items: FoodItem[];
   kcal: number; protein: number; fiber: number; potassium: number; photo: string | null;
 };
 export type FoodDay = { date: string; meals: WeekMeal[]; kcal: number; protein: number; fiber: number; potassium: number };
@@ -28,7 +28,7 @@ export async function loadFoodWeek(supabase: SupabaseClient, clientId: string, o
   const end = opts.end && opts.end < today ? opts.end : today;
   const first = addDays(end, -(count - 1));
   const [{ data: rows }, { data: t }] = await Promise.all([
-    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, description, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
+    supabase.from("food_logs").select("id, eaten_at, meal_slot, source, description, note, items, calories, protein_g, fiber_g, potassium_mg, photo_path")
       .eq("client_id", clientId).gte("eaten_at", addDays(first, -1) + "T00:00:00Z").lt("eaten_at", addDays(end, 2) + "T00:00:00Z").order("eaten_at"),
     supabase.from("nutrition_targets").select("calorie_target, protein_g, fiber_g, potassium_mg").eq("client_id", clientId).maybeSingle(),
   ]);
@@ -45,7 +45,7 @@ export async function loadFoodWeek(supabase: SupabaseClient, clientId: string, o
     const d = byDate.get(todayIn(tz, new Date(r.eaten_at)));
     if (!d) continue;
     const m: WeekMeal = {
-      id: r.id, time: time(r.eaten_at), slot: SLOT[r.meal_slot ?? "other"] ?? "Other", source: r.source, description: r.description,
+      id: r.id, time: time(r.eaten_at), slot: SLOT[r.meal_slot ?? "other"] ?? "Other", source: r.source, description: r.description, note: (r.note as string | null) ?? null,
       items: (r.items as FoodItem[] | null) ?? [], kcal: Math.round(r.calories ?? 0), protein: Math.round(Number(r.protein_g ?? 0)),
       fiber: Math.round(Number(r.fiber_g ?? 0)), potassium: Math.round(r.potassium_mg ?? 0), photo: r.photo_path ? photos.get(r.photo_path) ?? null : null,
     };
