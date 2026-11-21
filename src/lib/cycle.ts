@@ -13,7 +13,10 @@ export type Cycle = { day: number; length: number; periodLength: number; phase: 
 
 export const SYMPTOMS: [string, string][] = [
   ["cramps", "Cramps"], ["bloating", "Bloating"], ["headache", "Headache"], ["poor-sleep", "Slept badly"],
-  ["low-mood", "Low mood"], ["hot-flashes", "Hot flashes"], ["sore", "Very sore"], ["great", "Feeling great"],
+  ["low-mood", "Low mood"], ["hot-flashes", "Hot flashes"],
+  // November 20 (Michael, for Heather): the menopause symptoms from the Blueprint question, so she can tap exactly what she had.
+  ["night-sweats", "Night sweats"], ["brain-fog", "Brain fog"], ["mood-swings", "Mood swings"],
+  ["sore", "Very sore"], ["great", "Feeling great"],
 ];
 export const PHASE_INFO: Record<Phase, { label: string; color: string; note: string }> = {
   period: { label: "Period", color: "#ef4444", note: "Energy can be lower. A lighter day is fine; moving still helps cramps." },
@@ -48,7 +51,7 @@ export function cycleOf(periods: Period[], today: string): Cycle | null {
 /** What the app suggests today. Low energy or a rough symptom → lighter; strong part of the cycle and good energy → heavy. */
 export function suggest(mode: Mode, c: Cycle | null, log: DayLog | null): { pick: Intensity; why: string } {
   const e = log?.energy ?? null, s = log?.symptoms ?? [];
-  const rough = s.some((x) => ["cramps", "headache", "poor-sleep", "sore", "hot-flashes"].includes(x));
+  const rough = s.some((x) => ["cramps", "headache", "poor-sleep", "sore", "hot-flashes", "night-sweats"].includes(x));
   if (e !== null && e <= 2) return { pick: "lighter", why: "Your energy is low today." };
   if (rough && !(e !== null && e >= 4)) return { pick: "lighter", why: "You noted symptoms today." };
   if (s.includes("great") || (e !== null && e >= 4)) {
