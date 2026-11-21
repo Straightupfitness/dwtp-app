@@ -25,7 +25,7 @@ export default function SleepBlock({ userId, week, hours, photos, onHours, onPho
       for (const f of Array.from(files).slice(0, 3 - photos.length)) {
         const small = await shrinkImage(f, 1400, 0.85);
         const path = `${userId}/sleep-w${week}-${crypto.randomUUID()}.jpg`;
-        const { error: e } = await createClient().storage.from("checkin-videos").upload(path, small, { contentType: "image/jpeg" });
+        const { error: e } = await createClient().storage.from("checkin-videos").upload(path, small, { contentType: small.type || "image/jpeg" });
         if (e) throw e;
         added.push(path);
         setPreviews((p) => ({ ...p, [path]: URL.createObjectURL(small) }));

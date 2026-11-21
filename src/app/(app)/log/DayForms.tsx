@@ -41,7 +41,7 @@ export function SleepDay({ date, value }: { date: string; value: number | null }
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   return (
-    <form onSubmit={(e) => { e.preventDefault(); start(async () => { const n = Number(v.replace(",", ".")); const r = await sleepOn(date, v.trim() ? n : null); setMsg(r?.error ?? "Saved."); }); }} className="space-y-1.5">
+    <form onSubmit={(e) => { e.preventDefault(); start(async () => { const n = Number(v.replace(",", ".").replace(/[^\d.]/g, "")); try { const r = await sleepOn(date, v.trim() ? n : null); setMsg(r?.error ?? "Saved."); } catch { setMsg("It didn't save. Close the app, open it again and try once more."); } }); }} className="space-y-1.5">
       <div className="flex gap-2">
         <input value={v} onChange={(e) => setV(e.target.value)} type="text" inputMode="decimal" placeholder="Hours, like 7.5" aria-label="Hours of sleep the night before" className={input} />
         <button disabled={pending} className={btn}>{pending ? "…" : "Save"}</button>
@@ -76,7 +76,7 @@ export function HabitDay({ id, date, title, done, color, auto }: { id: string; d
       <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border-2" style={on ? { background: color, borderColor: color } : { borderColor: "#3a3a3a" }}>
         {on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
       </span>
-      <span className="flex-1"><span className="block text-[15px]">{title}</span>{auto && <span className="block text-xs text-dim">{auto}</span>}</span>
+      <span className="flex-1"><span className="block text-[15px]">{title}</span>{auto && <span className="block text-xs text-dim">⚡ {auto} that day.</span>}</span>
     </button>
   );
 }

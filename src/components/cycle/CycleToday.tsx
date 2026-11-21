@@ -42,6 +42,8 @@ export default function CycleToday({ mode, cycle, log, hasPeriods, preview = fal
           {cycle?.phase !== "period" && (
             <button type="button" disabled={pending || preview} onClick={() => start(async () => { const r = await periodStarted(); setMsg(r?.error ?? "Saved ✓"); })} className="min-h-10 rounded-xl border border-[#ef4444]/60 px-3 text-[13px] font-semibold text-[#ff8a8a]">🩸 My period started today</button>
           )}
+          {/* November 21: a client couldn't find where to log an earlier period. */}
+          {hasPeriods && <Link href="/cycle#past-period" className="inline-flex min-h-10 items-center rounded-xl border border-border px-3 text-[13px] font-semibold text-[#cfcfcf]">📅 Log a past period</Link>}
         </div>
       )}
 

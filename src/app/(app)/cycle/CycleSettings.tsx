@@ -31,15 +31,16 @@ export default function CycleSettings({ mode, periods, today }: { mode: Mode; pe
 
       {mode === "period" && (
         <>
-          <div className="space-y-2 rounded-2xl border border-border bg-card p-3.5">
-            <p className="text-[14px] font-semibold">Add a past period</p>
-            <p className="text-[12px] text-dim">Your last 2 or 3 help the app learn your cycle length right away.</p>
+          <div id="past-period" className="scroll-mt-20 space-y-2 rounded-2xl border border-border bg-card p-3.5">
+            <p className="text-[14px] font-semibold">Log a past period</p>
+            <p className="text-[12px] text-dim">Pick the day it started, and the day it ended if it&apos;s over. Your last 2 or 3 help the app learn your cycle length right away. Logging the same start day again updates it.</p>
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1 text-[12px] text-dim">Started<input type="date" max={today} value={s} onChange={(x) => setS(x.target.value)} className="min-h-11 rounded-xl border border-border bg-bg px-2 text-[15px] text-text [color-scheme:dark]" /></label>
               <label className="flex flex-col gap-1 text-[12px] text-dim">Ended (optional)<input type="date" max={today} value={e} onChange={(x) => setE(x.target.value)} className="min-h-11 rounded-xl border border-border bg-bg px-2 text-[15px] text-text [color-scheme:dark]" /></label>
             </div>
             <button type="button" disabled={pending || !s} onClick={() => run(async () => { const r = await addPastPeriod(s, e || null); if (!("error" in r && r.error)) { setS(""); setE(""); } return r; })}
-              className="min-h-11 w-full rounded-xl bg-accent text-[14px] font-semibold text-black disabled:opacity-40">Add</button>
+              className="min-h-11 w-full rounded-xl bg-accent text-[14px] font-semibold text-black disabled:opacity-40">{pending ? "Saving…" : "Save this period"}</button>
+            {msg && <p className={`text-[13px] ${msg.startsWith("Saved") ? "text-[#7ddc8f]" : "text-[var(--red)]"}`}>{msg}</p>}
           </div>
           <div className="space-y-1.5">
             <p className="text-[12px] uppercase tracking-[0.14em] text-dim">Your periods</p>
@@ -56,7 +57,7 @@ export default function CycleSettings({ mode, periods, today }: { mode: Mode; pe
           </div>
         </>
       )}
-      {msg && <p className="text-[13px] text-dim">{msg}</p>}
+      {msg && mode !== "period" && <p className="text-[13px] text-dim">{msg}</p>}
       <p className="text-[12px] leading-relaxed text-dim">Only you and Michael can see this. It&apos;s a guide for training, not a way to predict or prevent pregnancy.</p>
     </div>
   );

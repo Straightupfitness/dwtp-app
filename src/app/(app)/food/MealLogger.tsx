@@ -85,12 +85,18 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
   }
   async function onPhoto(f?: File) {
     if (!f) return;
-    // A photo from her library: log it at the time she took it (if it's from the last week).
-    const taken = await photoTakenAt(f);
-    setWhen(taken && Date.now() - taken.getTime() > 10 * 60_000 && Date.now() - taken.getTime() < 7 * 86_400_000 ? taken : defaultWhen());
-    const small = await shrinkImage(f, 1024, 0.8);
-    setPhoto(small); setPreview(URL.createObjectURL(small));
-    estimate(small, "");
+    // Show the "reading your meal" screen right away, so she knows the photo arrived.
+    setError(""); setMode("review"); setBusy("estimating");
+    try {
+      // A photo from her library: log it at the time she took it (if it's from the last week).
+      const taken = await photoTakenAt(f).catch(() => null);
+      setWhen(taken && Date.now() - taken.getTime() > 10 * 60_000 && Date.now() - taken.getTime() < 7 * 86_400_000 ? taken : defaultWhen());
+      const small = await shrinkImage(f, 1024, 0.8);
+      setPhoto(small); setPreview(URL.createObjectURL(small));
+      estimate(small, "");
+    } catch {
+      setBusy(""); setError("That photo couldn't be opened. Try again, or pick it from your photos.");
+    }
   }
   /** November 19: a picture for a meal she typed (or is editing). It's only attached: the foods she entered stay as they are. */
   async function attachPhoto(f?: File) {
@@ -214,7 +220,7 @@ export default function MealLogger({ userId, defaultSlot, goTos, day, isToday, m
           <label className="flex min-h-[118px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-accent px-2 text-center text-black">
             <Cam /><span className="text-base font-semibold">Snap it</span>
             <span className="text-[11px] leading-tight text-black/70">Take a picture, or pick one from your photos.</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
           <button type="button" onClick={() => setMode("describe")} className="flex min-h-[118px] flex-col items-center justify-center gap-1 rounded-2xl border border-accent bg-card px-2 text-center">
             <span className="text-accent"><Mic /></span><span className="text-base font-semibold">Say it</span>

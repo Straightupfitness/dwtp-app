@@ -14,10 +14,19 @@ export default function SleepCard({ date, minutes, preview = false }: { date: st
   const [, start] = useTransition();
   const [other, setOther] = useState("");
   const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+  // November 21: an Android client said sleep wasn't saving. Now a failed save always says so (and tries once more),
+  // and a good one says "Saved", so she's never left guessing.
   const save = (h: number | null) => {
     if (preview) return;
-    setErr("");
-    start(async () => { set(h); const r = await sleepOn(date, h); if (r?.error) setErr(r.error); });
+    setErr(""); setOk(false);
+    start(async () => {
+      set(h);
+      let r: { error?: string; ok?: boolean } | undefined;
+      try { r = await sleepOn(date, h); }
+      catch { try { r = await sleepOn(date, h); } catch { r = { error: "It didn't save. Close the app, open it again and try once more." }; } }
+      if (r?.error) setErr(r.error); else setOk(true);
+    });
   };
   return (
     <div id="sleep" className="space-y-2.5 rounded-2xl border border-border bg-card p-3">
@@ -37,12 +46,13 @@ export default function SleepCard({ date, minutes, preview = false }: { date: st
             className={`min-h-10 min-w-[3.25rem] flex-1 rounded-lg border text-[14px] font-semibold ${shown === h ? "border-[#818cf8] bg-[#818cf8] text-black" : "border-[#2e2f55] bg-[#13142a] text-[#c7c9ff]"}`}>{h}</button>
         ))}
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); const n = Number(other.replace(",", ".")); if (n) { save(n); setOther(""); } }} className="flex gap-2">
+      <form onSubmit={(e) => { e.preventDefault(); const n = Number(other.replace(",", ".").replace(/[^\d.]/g, "")); if (n) { save(n); setOther(""); } else setErr("Type your hours as a number, like 6.5."); }} className="flex gap-2">
         <input value={other} onChange={(e) => setOther(e.target.value)} inputMode="decimal" placeholder="Other, like 5.5" aria-label="Hours of sleep"
           className="min-h-10 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-[15px] outline-none focus:border-[#818cf8]" />
         <button className="min-h-10 shrink-0 rounded-lg border border-[#2e2f55] px-3 text-[13px] font-semibold text-[#c7c9ff]">Save</button>
       </form>
       {err && <p className="text-xs text-[var(--red)]">{err}</p>}
+      {ok && !err && <p className="text-xs text-[#7ddc8f]">✓ Saved</p>}
     </div>
   );
 }

@@ -21,6 +21,12 @@ Rules:
 - When unsure of portion size, assume a typical home portion and say so in "notes" (one short sentence).
 - Whole numbers for calories and potassium; one decimal for protein and fiber.
 - If her food rules or usual foods are given, they win over what a photo seems to show (a sausage she logs as turkey sausage IS turkey sausage).
+- PACKAGED FOOD (November 21, Elizabeth): if a photo shows a package, a jar or a Nutrition Facts label, read the label. Use the label's
+  numbers exactly (calories, protein, fiber, potassium per serving) and its full serving size as the amount, word for word
+  (e.g. "2 scoops (50 g)", not "1 scoop"). One labeled serving is the default. Only change the amount when her description
+  says how much she used ("1 scoop", "half a serving", "2 servings"), and then scale every number from the label.
+  Name it by brand and product (e.g. "Orgain Organic Protein, Creamy Chocolate Fudge"). If one photo shows the front and another
+  the label, they're the same product: list it once. A label missing a number (often potassium): estimate that one only.
 - If it isn't food, return {"items":[],"notes":"I couldn't see any food in this."}`;
 
 export async function POST(req: Request) {

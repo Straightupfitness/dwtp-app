@@ -21,8 +21,13 @@ import { loadVideos } from "./videos";
 export const DEFAULT_FOCUS = ["circadian-reset", "food-philosophy", "cardio"];
 /** Habits the app checks off by itself, and what it says instead of a checkbox. */
 export const AUTO_HABITS: Record<string, string> = {
-  "weigh-in": "Checks itself off when you log your weight",
-  "log-food": "Checks itself off when you log a meal",
+  "weigh-in": "Automatic: checks off by itself when you log your weight",
+  "log-food": "Automatic: checks off by itself when you log a meal",
+};
+/** November 21 (Michael): where she goes to do the thing that checks an automatic habit off. */
+export const AUTO_HABIT_LINKS: Record<string, [label: string, href: string]> = {
+  "Automatic: checks off by itself when you log your weight": ["Log my weight", "/today#weight"],
+  "Automatic: checks off by itself when you log a meal": ["Log a meal", "/food"],
 };
 
 /**
