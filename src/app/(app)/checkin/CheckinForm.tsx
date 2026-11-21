@@ -1,4 +1,5 @@
 "use client";
+import BadWeekBox from "@/components/BadWeekBox";
 import { useState } from "react";
 import SleepBlock from "./SleepBlock";
 import { celebrate, markSeen } from "@/lib/celebrate";
@@ -98,14 +99,7 @@ export default function CheckinForm({ week, userId, questions, isVideo, habits, 
       </div>
 
       {/* November 6: the Bad Week Plan. One tap, no explanation needed. */}
-      {name === "How you felt" && (badWeek.already
-        ? <p className="rounded-[14px] border border-[#7c5cff]/60 bg-[#151024] p-3 text-[14px]">This week is a <b>bad week</b> (Bad Week Plan). It still counts. Just tell me how it went.</p>
-        : <label className="flex items-start gap-3 rounded-[14px] border border-[#7c5cff]/60 bg-[#151024] p-3">
-            <input type="checkbox" checked={a.bad_week === true} disabled={!badWeek.left} onChange={(e) => set("bad_week", e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[#7c5cff]" />
-            <span className="text-[14px] leading-snug"><b>This was a bad week</b><span className="block text-[12px] text-[#a8a8a8]">{badWeek.left
-              ? `No explanation needed. It still counts toward your 80%. ${badWeek.left} of 3 left.`
-              : "You've used all 3 bad weeks. Michael will reach out to you."}</span></span>
-          </label>)}
+      {name === "How you felt" && <BadWeekBox already={badWeek.already} left={badWeek.left} checked={a.bad_week === true} onChange={(v) => set("bad_week", v)} />}
       {name === "How you felt" && <>
         {scales.map((q) => <Scale key={q.id} q={q} value={a[q.id]} last={last?.[q.id]} onPick={(v) => set(q.id, v)} />)}
         <SleepBlock userId={userId} week={week} hours={a.sleep_hours as string | undefined} photos={(a.sleep_photos as string[] | undefined) ?? []}
