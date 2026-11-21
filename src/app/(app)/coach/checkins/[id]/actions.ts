@@ -60,3 +60,17 @@ export async function transcribeNow(checkinId: string) {
   await transcribeCheckin(supabase, checkinId);
   revalidatePath(`/coach/checkins/${checkinId}`);
 }
+
+/** November 20 (Michael): delete a check-in he doesn't need to answer (e.g. pre-launch ones). Its reply goes with it. */
+export async function deleteCheckin(checkinId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: me } = await supabase.from("profiles").select("role").eq("id", user?.id ?? "").single();
+  if (me?.role !== "coach") return { error: "Coach only" };
+  const { data: c } = await supabase.from("checkins").select("client_id").eq("id", checkinId).maybeSingle();
+  const { error, count } = await supabase.from("checkins").delete({ count: "exact" }).eq("id", checkinId);
+  if (error) return { error: error.message };
+  if (!count) return { error: "It couldn't be deleted (already gone?)." };
+  revalidatePath("/coach", "layout");
+  return { ok: true, clientId: (c?.client_id as string | undefined) ?? null };
+}

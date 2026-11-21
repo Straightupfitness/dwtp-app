@@ -12,6 +12,7 @@ import FoodWeek from "@/components/FoodWeek";
 import DailyCombo from "@/components/DailyCombo";
 import { BAD_WEEK_SCREEN, screensFor } from "@/lib/checkin-screens";
 import TranscribeButton from "./TranscribeButton";
+import DeleteCheckin from "./DeleteCheckin";
 
 export const maxDuration = 120;
 
@@ -77,7 +78,10 @@ export default async function CheckinReview({ params, searchParams }: { params: 
         <h1 className="font-[family-name:var(--font-display)] text-3xl uppercase">
           <Link href={`/coach/clients/${c.client_id}`}>{d.profile?.full_name ?? "Client"}</Link>
         </h1>
-        <p className="text-xs text-dim">Sent {new Date(c.submitted_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", hour: "numeric", minute: "2-digit" })}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-dim">Sent {new Date(c.submitted_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+          <DeleteCheckin id={c.id} label="this check-in" goTo={`/coach/clients/${c.client_id}`} />
+        </div>
       </header>
       {!!(c.flags as string[])?.length && (
         <div className="flex flex-wrap gap-1.5">{(c.flags as string[]).map((f) => <span key={f} className="rounded bg-[#2a1a10] px-2 py-0.5 text-xs text-gold">{f}</span>)}</div>

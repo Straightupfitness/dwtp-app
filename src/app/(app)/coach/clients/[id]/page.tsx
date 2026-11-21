@@ -33,6 +33,7 @@ import { ProfileForm, FocusPicker, OpenRingButton, SignOffButton, PurchaseForm, 
 import { progressFor } from "@/lib/badges-server";
 import { BadgeRow } from "@/components/BadgeIcon";
 import { questionLabels } from "@/lib/checkin";
+import DeleteCheckin from "@/app/(app)/coach/checkins/[id]/DeleteCheckin";
 import { adminClient } from "@/lib/supabase/admin";
 import { loadSeen } from "@/lib/seen";
 import { loadFoodWeek } from "@/lib/food-week";
@@ -119,10 +120,8 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   // November 15: Action items, what needs his attention for her right now.
   const actions: { icon: string; text: string; href: string }[] = [];
   const daysAgo = (d: string) => Math.round((Date.parse(prog.data.today) - Date.parse(d)) / 86_400_000);
-  for (const k of checkins ?? []) {
-    const sent = Array.isArray(k.checkin_replies) ? k.checkin_replies[0]?.sent_at : (k.checkin_replies as { sent_at?: string } | null)?.sent_at;
-    if (k.submitted_at && !sent) actions.push({ icon: "📝", text: `Reply to her ${weekName(k.week_number)} check-in`, href: `/coach/checkins/${k.id}` });
-  }
+  // November 20 (Michael): check-ins waiting for his reply get their own highlighted bar at the very top of the page.
+  const toReply = (checkins ?? []).filter((k) => k.submitted_at && !(Array.isArray(k.checkin_replies) ? k.checkin_replies[0]?.sent_at : (k.checkin_replies as { sent_at?: string } | null)?.sent_at));
   const bpIn = blueprintDone(assessment?.submitted_at as string | null);
   if (!bpIn && p.status !== "cancelled") actions.push({ icon: "🧭", text: "Her Driven Woman Blueprint isn't done yet", href: `/coach/followups?tab=${Object.keys((assessment?.answers as object) ?? {}).length ? "started" : "not-started"}` });
   if (bpIn && !bpReply?.done_at) actions.push({ icon: "🎥", text: "Send her your Blueprint reply", href: "#assessment" });
@@ -149,6 +148,23 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
   return (
     <section className="space-y-[17px]">
       <Link href="/coach" className="inline-flex min-h-11 items-center text-sm text-dim">← Clients</Link>
+      {toReply.length > 0 && (
+        <div className="space-y-2">
+          {toReply.map((k) => (
+            <div key={k.id} className="flex items-center gap-2 rounded-[18px] bg-accent p-1.5 pr-2 text-black shadow-[0_0_0_3px_rgba(245,166,35,0.25)]">
+              <Link href={`/coach/checkins/${k.id}`} className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-2.5">
+                <span className="text-2xl" aria-hidden="true">📝</span>
+                <span className="min-w-0 flex-1">
+                  <b className="block font-[family-name:var(--font-display)] text-lg uppercase leading-tight">Do this first: reply to her {weekName(k.week_number)} check-in</b>
+                  <span className="text-[13px]">Sent {new Date(k.submitted_at as string).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · tap to open it and reply</span>
+                </span>
+                <span className="text-2xl font-bold" aria-hidden="true">›</span>
+              </Link>
+              <DeleteCheckin id={k.id} label={`her ${weekName(k.week_number)} check-in`} compact />
+            </div>
+          ))}
+        </div>
+      )}
       <header>
         <p className="text-xs uppercase tracking-[0.15em] text-accent">{state.week ? `Week ${state.week}` : p.program_start ? `Starts ${new Date(p.program_start + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}` : "Not started"} · {p.status}</p>
         <div className="flex items-center gap-2">
@@ -351,7 +367,7 @@ export default async function CoachClient({ params, searchParams }: { params: Pr
             <Link key={k.id} href={`/coach/checkins/${k.id}`} className="block space-y-1 rounded-xl border border-border bg-card p-3 text-sm">
               <span className="flex items-center justify-between gap-2">
                 <span><b>{weekName(k.week_number)}</b>{k.submitted_at && <span className="text-dim"> · {new Date(k.submitted_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}<br className="sm:hidden" /><span className="hidden sm:inline"> · </span>sleep {k.sleep ?? "–"} · energy {k.energy ?? "–"} · stress {k.stress ?? "–"} · hunger {k.hunger ?? "–"}</span>
-                <span className={`shrink-0 ${sent ? "text-[var(--green)]" : "text-accent"}`}>{sent ? "Replied" : "Reply"}</span>
+                <span className="flex shrink-0 items-center gap-2"><span className={sent ? "text-[var(--green)]" : "text-accent"}>{sent ? "Replied" : "Reply"}</span><DeleteCheckin id={k.id} label={`her ${weekName(k.week_number)} check-in`} compact /></span>
               </span>
               {((k.flags as string[] | null) ?? []).length > 0 && <span className="flex flex-wrap gap-1">{(k.flags as string[]).map((f) => <span key={f} className="rounded-full bg-[#2a1218] px-2 py-0.5 text-[11px] text-[#fb7185]">{f}</span>)}</span>}
               {(k.answers as Record<string, unknown> | null)?.win ? <span className="block text-xs text-[#a8a8a8]">Win: {String((k.answers as Record<string, unknown>).win).slice(0, 140)}</span> : null}
