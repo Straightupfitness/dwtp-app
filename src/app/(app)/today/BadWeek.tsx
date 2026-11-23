@@ -39,10 +39,12 @@ export function BadWeekOffer({ left }: { left: number }) {
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   return (
-    <section className="rounded-2xl border border-border bg-card p-3.5">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left">
-        <span><span className="block text-[15px] font-semibold">Having a bad week?</span><span className="block text-[12px] text-[#a8a8a8]">Ease off without falling off</span></span>
-        <span className="text-dim">{open ? "⌃" : "⌄"}</span>
+    // November 23 (Michael): the last thing on Today, laid out like "Book a call with Michael", with a red border.
+    <section className="rounded-2xl border border-[#ef4444] bg-card p-3.5">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 text-left">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#2a1010] text-[20px]" aria-hidden="true">😮‍💨</span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Having a bad week?</span><span className="block text-[12px] text-[#a8a8a8]">Ease off without falling off</span></span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" aria-hidden="true" className={`shrink-0 transition ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       {open && (
         <div className="mt-3 space-y-2.5 text-[14px] leading-snug text-[#cfcfcf]">

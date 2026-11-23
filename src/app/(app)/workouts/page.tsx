@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { IconDumbbell } from "@/components/Icons";
-import { cardioType, KIND_LABEL, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
+import { cardioType, KIND_NOTE, loadWorkoutWeek, phaseLabel, stageOf, type WorkoutCard } from "@/lib/workouts";
 import BackButton from "@/components/BackButton";
 import PhaseCard from "./PhaseCard";
 import WorkoutPicker from "./WorkoutPicker";
@@ -92,7 +92,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
         </div>
       ) : (
         <>
-          <PhaseCard stage={stage} kindLabel={KIND_LABEL[phase.kind]} kindNote={KIND_NOTE[phase.kind]} name={phaseLabel(phase.name, phase.stage)}
+          <PhaseCard stage={stage} kindNote={KIND_NOTE[phase.kind]} name={phaseLabel(phase.name, phase.stage)}
             weeks={phase.weeks} weekOfPhase={data.weekOfPhase} perWeek={perWeek} doneByWeek={doneByWeek} next={nextIdx >= 0 ? nextIdx : null}
             intro={preview && data.start ? <p className="mb-2 text-[13px] text-[#d9c9a8]">Your program starts {fmtDate(data.start)}. Here&apos;s a look at Week 1.</p> : null} />
 

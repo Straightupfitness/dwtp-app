@@ -16,7 +16,7 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
  * Her first and newest photo of the same pose sit side by side, with every day underneath.
  * `readOnly`: Michael's view of them on her page.
  */
-export default function ProgressPhotos({ photos, userId, today, readOnly = false }: { photos: ProgressPhoto[]; userId?: string; today: string; readOnly?: boolean }) {
+export default function ProgressPhotos({ photos, userId, today, readOnly = false, noTitle = false }: { photos: ProgressPhoto[]; userId?: string; today: string; readOnly?: boolean; noTitle?: boolean }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [file, setFile] = useState<Blob | null>(null);
@@ -70,10 +70,10 @@ export default function ProgressPhotos({ photos, userId, today, readOnly = false
   return (
     <div id="photos" className="scroll-mt-20 space-y-3 rounded-[18px] border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <div>
+        {noTitle ? <p className="text-[13px] text-dim">Before &amp; after, side by side</p> : <div>
           <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Before &amp; after</p>
           <p className="font-[family-name:var(--font-display)] text-[22px] uppercase leading-tight">Progress photos</p>
-        </div>
+        </div>}
         {!readOnly && !adding && <button type="button" onClick={() => setAdding(true)} className="min-h-11 rounded-xl bg-accent px-3.5 text-[14px] font-semibold text-black">+ Add photo</button>}
       </div>
 

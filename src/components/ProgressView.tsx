@@ -146,14 +146,14 @@ export function WeightCard({ data, coach = false }: { data: Daily; coach?: boole
 }
 
 /** Her badges: earned ones in color, the rest with how far along she is. */
-export function BadgesCard({ badges, coach = false }: { badges: BadgeStatus[]; coach?: boolean }) {
+export function BadgesCard({ badges, coach = false, noTitle = false }: { badges: BadgeStatus[]; coach?: boolean; noTitle?: boolean }) {
   const she = coach ? "She" : "You";
   const Wrap = coach ? "details" : "section"; // November 15: collapsible on Michael's view, like "Every day, in numbers"
   return (
       <Wrap className={`${card} group space-y-3`} {...(coach ? { "data-drawer": "" } : {})}>
         {coach
           ? <summary className={`${display} flex cursor-pointer list-none items-center justify-between gap-2 text-lg`}><span className="flex items-center gap-2"><SectionIcon name="badges" /><span>Badges <span className="inline-block text-dim transition group-open:rotate-180">⌄</span></span></span><span className="font-sans text-[12px] normal-case text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span></summary>
-          : <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>}
+          : noTitle ? null : <H right={<span className="text-[12px] text-dim">{badges.filter((b) => b.earned).length} of {badges.length} earned</span>}>Badges</H>}
         <ul className="grid grid-cols-1 gap-2">
           {badges.map((b) => (
             <li key={b.def.key} className="flex items-center gap-3 rounded-[14px] border border-border bg-[#141414] p-2.5">

@@ -16,7 +16,6 @@ import ItemCheck from "../circles/ItemCheck";
 import QuickStats from "./QuickStats";
 import WaterCard from "./WaterCard";
 import SleepCard from "./SleepCard";
-import CirclesGlance from "@/components/CirclesGlance";
 import BookCall from "@/components/BookCall";
 import { BadWeekActive, BadWeekOffer } from "./BadWeek";
 import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
@@ -24,7 +23,9 @@ import { loadCycle } from "@/lib/cycle";
 import CycleToday from "@/components/cycle/CycleToday";
 import DailyCombo from "@/components/DailyCombo";
 import { Suspense } from "react";
-import TodayProgress from "./TodayProgress";
+import TodayProgress, { TodayWeight } from "./TodayProgress";
+import Fold from "@/components/Fold";
+import SectionIcon from "@/components/SectionIcon";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -37,11 +38,6 @@ function timeLeft(until: Date) {
   const mins = Math.max(0, Math.round((until.getTime() - Date.now()) / 60_000));
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
   return d ? `${d} day${d > 1 ? "s" : ""} ${h} hrs left` : h ? `${h} hrs left` : `${mins} min left`;
-}
-
-function SectionTitle({ icon, children, as = "p" }: { icon: React.ReactNode; children: React.ReactNode; as?: "p" | "h2" }) {
-  const Tag = as;
-  return <Tag className={`${display} flex items-center gap-1.5 text-lg font-medium`}><span className="text-accent">{icon}</span>{children}</Tag>;
 }
 
 export default async function TodayPage() {
@@ -81,7 +77,7 @@ export default async function TodayPage() {
             ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
             : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
         </p>
-        <a href="#progress" className="block" aria-label="See your progress">
+        <a href="#progress" className="block" aria-label="See your Capacity Circles">
           <p className="mb-1.5 text-right text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
             {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
           </p>
@@ -172,7 +168,7 @@ export default async function TodayPage() {
       if (r.video && r.opensOn && r.opensOn >= weekAgo) cg.videos.push({ name: r.name, ...r.video });
     }
   }
-  const all = circleGroups.flatMap((g) => g.items);
+  const all = circleGroups.filter((g) => g.kind !== "other").flatMap((g) => g.items);
   const doneCount = all.filter((i) => i.doneNow).length;
 
   return (
@@ -199,30 +195,28 @@ export default async function TodayPage() {
 
       {startNote}
       {badNow && <BadWeekActive left={badLeft} />}
+      {/* November 23 (Michael): her numbers under one folded title, in the "Today's habits" style. */}
+      <Fold id="numbers" title="Track your numbers" icon={<SectionIcon name="numbers" />} defaultOpen>
       <QuickStats today={today} yesterday={yesterday}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
         steps={stepsYesterday} stepGoal={stepGoal} stepsWeek={stepsWeek} stepsMore={stepsMore}
-        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
+        kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek}
+        weightMore={<Suspense fallback={null}><TodayWeight userId={user!.id} /></Suspense>} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
       <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
         <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, sleep, food, water and habits</span></span><span className="text-accent">›</span>
       </Link>
-      {!notStarted && <CirclesGlance state={state} />}
+      </Fold>
 
       {all.length > 0 && (
-        <>
-          <div className="flex items-center justify-between pt-1">
-            <SectionTitle icon={<IconHabits />} as="h2">{badNow ? "Your other habits (optional this week)" : "Today\u2019s habits"}</SectionTitle>
-            <p className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</p>
-          </div>
-          <div className="-mt-1.5 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>
-        </>
-      )}
-
+        <Fold id="habits" title={badNow ? "Your other habits (optional this week)" : "Today\u2019s habits"} icon={<IconHabits />} defaultOpen
+          right={<span className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</span>}
+          under={<div className="mt-1 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>}>
       {/* November 15 (Michael): her habits grouped under Focus circles, then Fix-its, then anything else open. */}
-      {([["focus", "Focus circles"], ["fixit", "Fix-its"], ["other", "Also working on"]] as const).map(([kind, label]) => {
+      {/* November 23 (Michael): "Also working on" is gone from Today; those habits live on their circle pages. */}
+      {([["focus", "Focus circles"], ["fixit", "Fix-its"]] as const).map(([kind, label]) => {
         const list = circleGroups.filter((g) => g.kind === kind);
         if (!list.length) return null;
         return (
@@ -257,13 +251,15 @@ export default async function TodayPage() {
           </div>
         );
       })}
+        </Fold>
+      )}
       {!circleGroups.length && !notStarted && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
-      {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
-      <BookCall />
-      {/* November 23 (Michael): the Progress tab folded into Today, near the bottom. */}
-      <Suspense fallback={<div id="progress" className="h-16 animate-pulse rounded-[18px] border border-border bg-card" />}>
-        <TodayProgress userId={user!.id} state={state} today={today} />
+      {/* November 23 (Michael): circles, photos and badges folded near the bottom, then the call, then a bad week. */}
+      <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-card" />}>
+        <TodayProgress userId={user!.id} state={state} today={today} started={!notStarted} />
       </Suspense>
+      <BookCall />
+      {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
 
     </section>
   );

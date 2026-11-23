@@ -3,12 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { loadDaily } from "@/lib/daily";
 import DailyCombo from "@/components/DailyCombo";
 import OpenOnHash from "@/components/OpenOnHash";
+import Fold from "@/components/Fold";
 
-const display = "font-[family-name:var(--font-display)] uppercase";
 export const RANGES = [7, 14, 30, 90] as const;
 
 /**
- * November 23 (Michael): what used to be "Food, day by day" on the Progress tab, folded at the bottom of Food.
+ * November 23 (Michael): "Your previous logs", what used to be "Food, day by day" on the Progress tab, folded at the bottom of Food.
  * One graph per number (calories, protein, fiber, potassium, alcohol, water), each with her target on it.
  */
 export default async function FoodHistory({ userId, range, day, open }: { userId: string; range: number; day: string | null; open: boolean }) {
@@ -16,15 +16,7 @@ export default async function FoodHistory({ userId, range, day, open }: { userId
   const data = await loadDaily(supabase, userId, range);
   const href = (r: number) => `/food?${day ? `d=${day}&` : ""}r=${r}#history`;
   return (
-    <details id="history" open={open} className="group scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">
-      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4">
-        <span className="flex-1">
-          <span className={`${display} block text-lg leading-tight`}>What you&apos;ve been eating &amp; drinking</span>
-          <span className="block text-[12px] text-dim">Calories, protein, fiber, potassium, alcohol and water, day by day</span>
-        </span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
-      </summary>
-      <div className="space-y-3 px-4 pb-4">
+    <Fold id="history" variant="card" forceOpen={open} title="Your previous logs" sub="Calories, protein, fiber, potassium, alcohol and water, day by day">
         <nav className="flex gap-1.5" aria-label="How many days">
           {RANGES.map((r) => (
             <Link key={r} href={href(r)} scroll={false} aria-current={r === range ? "true" : undefined}
@@ -33,8 +25,7 @@ export default async function FoodHistory({ userId, range, day, open }: { userId
         </nav>
         <DailyCombo days={data.days} goals={data.goals} only={["cal", "pro", "fib", "pot", "alc", "wat"]} />
         <p className="text-[11px] text-dim">Solid bar = on target · faded = under it · red = over your calories. Dashed line = your target. Alcohol counts the calories of every drink you log.</p>
-      </div>
       <OpenOnHash ids={["history"]} />
-    </details>
+    </Fold>
   );
 }

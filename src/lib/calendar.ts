@@ -26,8 +26,50 @@ export function defaultWorkoutDays(perWeek: number | null): number[] {
     : perWeek && perWeek >= 6 ? [1, 2, 3, 4, 5, 6] : [1, 3, 5];
 }
 
-export async function loadWeek(supabase: SupabaseClient, clientId: string, offset = 0) {
-  const { data: p } = await supabase.from("profiles").select("program_start, timezone, workout_days, strength_days_per_week").eq("id", clientId).single();
+type Profile = { program_start: string | null; timezone: string | null; workout_days: number[] | null; strength_days_per_week: number | null } | null;
+type Shared = {
+  p: Profile;
+  settings: { key: string; value: string | null }[] | null;
+  calls: { call_date: string; title: string | null; replay_url: string | null; passcode: string | null; cancelled: boolean | null }[] | null;
+  tws: { week_number: number; is_diet_break: boolean | null; checkin_is_video: boolean | null }[] | null;
+  lessons: Awaited<ReturnType<typeof loadLessons>>;
+  program: Awaited<ReturnType<typeof loadProgram>>;
+};
+const loadProfile = async (supabase: SupabaseClient, clientId: string) =>
+  (await supabase.from("profiles").select("program_start, timezone, workout_days, strength_days_per_week").eq("id", clientId).single()).data as Profile;
+
+/**
+ * November 23 (Michael): the calendar is one long list of days she scrolls, so it loads every week of her program
+ * at once. What every week shares (her profile, calls, lessons, circles) is fetched once here.
+ */
+export async function loadCalendar(supabase: SupabaseClient, clientId: string) {
+  const p = await loadProfile(supabase, clientId);
+  const tz = p?.timezone ?? "America/Los_Angeles";
+  const today = todayIn(tz);
+  const thisMonday = addDays(today, -((weekday(today) + 6) % 7));
+  const start = p?.program_start ?? null;
+  const startMonday = start ? addDays(start, -((weekday(start) + 6) % 7)) : thisMonday;
+  // From the week she starts to the end of week 26 (or this week, if she's past it); 4 weeks ahead with no start date.
+  const lastMonday = start ? addDays(startMonday, 25 * 7) : addDays(thisMonday, 3 * 7);
+  const from = startMonday < thisMonday ? startMonday : thisMonday;
+  const to = lastMonday > thisMonday ? lastMonday : thisMonday;
+  const offsets: number[] = [];
+  for (let m = from, i = 0; m <= to && i < 60; m = addDays(m, 7), i++) offsets.push(Math.round((Date.parse(m) - Date.parse(thisMonday)) / (7 * 86_400_000)));
+  const [{ data: settings }, { data: calls }, { data: tws }, lessons, program] = await Promise.all([
+    supabase.from("program_settings").select("key, value").in("key", ["rtt_zoom_url", "trainerize_url"]),
+    supabase.from("calls").select("call_date, title, replay_url, passcode, cancelled").gte("call_date", from).lte("call_date", addDays(to, 6)),
+    supabase.from("trajectory_weeks").select("week_number, is_diet_break, checkin_is_video"),
+    loadLessons(supabase, clientId),
+    loadProgram(supabase, clientId),
+  ]);
+  const shared: Shared = { p, settings, calls, tws, lessons, program };
+  const weeks = await Promise.all(offsets.map((o) => loadWeek(supabase, clientId, o, shared)));
+  const cur = weeks.find((w) => w.monday === thisMonday) ?? weeks[0];
+  return { today, start, weeks, workoutDays: cur.workoutDays, perWeek: cur.perWeek };
+}
+
+export async function loadWeek(supabase: SupabaseClient, clientId: string, offset = 0, shared?: Shared) {
+  const p = shared ? shared.p : await loadProfile(supabase, clientId);
   const tz = p?.timezone ?? "America/Los_Angeles";
   const today = todayIn(tz);
   // Weeks run Monday to Sunday, like the program.
@@ -38,7 +80,9 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   const chosen: number[] = p?.workout_days?.length ? p.workout_days : [];
   let workoutDays: number[] = chosen.length ? chosen : defaultWorkoutDays(p?.strength_days_per_week ?? null);
 
-  const [{ data: settings }, { data: calls }, { data: tw }, lessons, program] = await Promise.all([
+  const [{ data: settings }, { data: calls }, { data: tw }, lessons, program] = shared ? [
+    { data: shared.settings }, { data: shared.calls }, { data: shared.tws?.find((t) => t.week_number === Math.min(week, 52)) ?? null }, shared.lessons, shared.program,
+  ] as const : await Promise.all([
     supabase.from("program_settings").select("key, value").in("key", ["rtt_zoom_url", "trainerize_url"]),
     supabase.from("calls").select("call_date, title, replay_url, passcode, cancelled").gte("call_date", days[0]).lte("call_date", days[6]),
     week ? supabase.from("trajectory_weeks").select("is_diet_break, checkin_is_video").eq("week_number", Math.min(week, 52)).maybeSingle() : Promise.resolve({ data: null }),

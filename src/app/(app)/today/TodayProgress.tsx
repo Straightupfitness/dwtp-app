@@ -1,39 +1,52 @@
 import { createClient } from "@/lib/supabase/server";
 import { progressFor } from "@/lib/badges-server";
+import { loadDaily } from "@/lib/daily";
 import { BadgesCard, WeightCard } from "@/components/ProgressView";
 import CirclesSection from "@/components/CirclesSection";
 import ProgressPhotos from "@/components/ProgressPhotos";
 import OpenOnHash from "@/components/OpenOnHash";
+import Fold from "@/components/Fold";
+import SectionIcon from "@/components/SectionIcon";
 import { loadProgressPhotos } from "@/lib/progress-photos";
 import type { ProgramState } from "@/lib/circles";
 
-const display = "font-[family-name:var(--font-display)] uppercase";
-
 /**
- * November 23 (Michael): what used to be the Progress tab, folded into Today near the bottom: her circles, her weight
- * with her goal weight, her progress photos and her badges. Food and water day by day moved to the Food tab, steps
- * under her steps card. Opening Today also awards any badge she has just earned (so it shows in Community).
+ * November 23 (Michael), second pass: near the bottom of Today, three folded sections in the "Today's habits" style:
+ * Your Capacity Circles, Progress photos, Badges. Each remembers whether she left it open. Opening Today also awards
+ * any badge she has just earned (so it shows in Community).
  */
-export default async function TodayProgress({ userId, state, today }: { userId: string; state: ProgramState; today: string }) {
+export default async function TodayProgress({ userId, state, today, started }: { userId: string; state: ProgramState; today: string; started: boolean }) {
   const supabase = await createClient();
-  const [{ data, status }, photos] = await Promise.all([progressFor(supabase, userId), loadProgressPhotos(supabase, userId)]);
+  const [{ status }, photos] = await Promise.all([progressFor(supabase, userId), loadProgressPhotos(supabase, userId)]);
   const earned = status.filter((b) => b.earned).length;
+  const count = (t: string) => <span className="text-[13px] text-[#a8a8a8]">{t}</span>;
   return (
-    <details id="progress" className="group scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">
-      <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4">
-        <span className="flex-1">
-          <span className={`${display} block text-lg leading-tight`}>Your progress</span>
-          <span className="block text-[12px] text-dim">Circles, weight, photos and badges ({earned} of {status.length} earned)</span>
-        </span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
-      </summary>
-      <div className="space-y-4 px-3 pb-3">
-        <CirclesSection state={state} />
-        <WeightCard data={data} />
-        <ProgressPhotos photos={photos} userId={userId} today={today} />
-        <div id="badges" className="scroll-mt-20"><BadgesCard badges={status} /></div>
-      </div>
-      <OpenOnHash ids={["progress", "circles", "photos", "badges", "weight-graph"]} />
+    <>
+      {started && (
+        <Fold id="progress" title="Your Capacity Circles" icon={<SectionIcon name="circles" />}>
+          <CirclesSection state={state} noTitle />
+        </Fold>
+      )}
+      <Fold id="progress-photos" title="Progress photos" icon={<SectionIcon name="photos" />} right={photos.length ? count(`${photos.length}`) : null}>
+        <ProgressPhotos photos={photos} userId={userId} today={today} noTitle />
+      </Fold>
+      <Fold id="badges" title="Badges" icon={<SectionIcon name="badges" />} right={count(`${earned} of ${status.length} earned`)}>
+        <BadgesCard badges={status} noTitle />
+      </Fold>
+      <OpenOnHash ids={["progress", "circles", "photos", "progress-photos", "badges", "weight-graph"]} />
+    </>
+  );
+}
+
+/** Her weight graph with her goal-weight line, folded under the weigh-in card. */
+export async function TodayWeight({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const data = await loadDaily(supabase, userId);
+  if (!data.weights.length) return null;
+  return (
+    <details className="group border-t border-border pt-2">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[13px] font-semibold text-accent">See my weight graph <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
+      <div className="pt-2"><WeightCard data={data} /></div>
     </details>
   );
 }

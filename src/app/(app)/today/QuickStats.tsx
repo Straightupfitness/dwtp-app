@@ -10,7 +10,7 @@ const letter = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-
 const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 
 function Title({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <p className={`${display} flex items-center gap-1.5 text-[15px] font-medium leading-none text-[#cfcfcf]`}><span className="text-accent">{icon}</span>{children}</p>;
+  return <p className={`${display} flex items-center gap-1.5 text-[15px] font-medium leading-tight text-[#cfcfcf]`}><span className="shrink-0 text-accent">{icon}</span>{children}</p>;
 }
 function Steps() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3c1.7 0 3 2 3 4.5S10 12 8.5 12 6 10 6 7.5 6.3 3 8 3zM7 15h3v2.5A1.5 1.5 0 0 1 8.5 19 1.5 1.5 0 0 1 7 17.5zM16 6c1.7 0 2 2.5 2 5s-1 4.5-2.5 4.5S13 13.5 13 11s1.3-5 3-5zM14 18.5h3V21a1.5 1.5 0 0 1-3 0z" /></svg>;
@@ -91,11 +91,14 @@ export default function QuickStats(p: {
   kcal: number; kcalTarget: number | null; protein: number; proteinTarget: number; kcalWeek: DayVal[]; proteinWeek: DayVal[];
   /** November 23: her steps day by day (folded), right under the steps card's own week. */
   stepsMore?: React.ReactNode;
+  /** November 23: her weight graph with the goal line (folded), under the weigh-in. */
+  weightMore?: React.ReactNode;
 }) {
   return (
     <>
       <div className={`${card} space-y-3`}>
-        <Title icon={<IconScale />}>Morning weigh-in</Title>
+        {/* November 23 (Michael): the question is the title. */}
+        <Title icon={<IconScale />}>What was your weight this morning?</Title>
         {p.weight !== null ? (
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-[16px] leading-snug">You weighed <b className={`${display} text-[24px]`}>{p.weight.toFixed(1)}</b> lbs this morning</p>
@@ -103,7 +106,7 @@ export default function QuickStats(p: {
           </div>
         ) : (
           <form action={logWeight} className="space-y-2">
-            <label htmlFor="weight" className="block text-[16px] font-semibold">What was your weight this morning?</label>
+            <label htmlFor="weight" className="sr-only">Your weight this morning, in pounds</label>
             <div className="flex gap-2">
               <input type="hidden" name="date" value={p.today} />
               <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder="lbs" required className={input} />
@@ -116,10 +119,11 @@ export default function QuickStats(p: {
         <Link href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`} className="block text-[13px] text-accent">
           {p.weightWeek[5]?.value == null ? "Forgot yesterday? Add yesterday's weight ›" : "Add or fix another day's weight ›"}
         </Link>
+        {p.weightMore}
       </div>
 
       <div className={`${card} space-y-3`}>
-        <Title icon={<Steps />}>Steps</Title>
+        <Title icon={<Steps />}>How many steps did you get yesterday?</Title>
         {p.steps !== null ? (
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-[16px] leading-snug">You got <b className={`${display} text-[24px]`}>{p.steps.toLocaleString()}</b> steps yesterday</p>
@@ -127,7 +131,7 @@ export default function QuickStats(p: {
           </div>
         ) : (
           <form action={logSteps} className="space-y-2">
-            <label htmlFor="steps" className="block text-[16px] font-semibold">How many steps did you get yesterday?</label>
+            <label htmlFor="steps" className="sr-only">Your steps yesterday</label>
             <div className="flex gap-2">
               <input type="hidden" name="date" value={p.yesterday} />
               <input id="steps" name="steps" type="text" inputMode="numeric" pattern="[0-9,]*" placeholder="Steps" required className={input} />
@@ -142,14 +146,14 @@ export default function QuickStats(p: {
       </div>
 
       <div className={`${card} space-y-3`}>
-        <Title icon={<IconPlate />}>Food</Title>
-        <p className="text-[16px] leading-snug">You&apos;ve eaten <b className={`${display} text-[24px]`}>{p.kcal.toLocaleString()}</b> calories so far today{p.kcal > 0 && <span className="text-[#a8a8a8]">, with {p.protein} g protein</span>}{p.kcalTarget ? <span className="block text-[12px] text-dim">Your target: {p.kcalTarget.toLocaleString()} calories · {p.proteinTarget} g protein</span> : null}</p>
+        <Title icon={<IconPlate />}>You&apos;ve eaten {p.kcal.toLocaleString()} calories so far today</Title>
+        {(p.kcal > 0 || p.kcalTarget) && <p className="text-[13px] leading-snug text-[#a8a8a8]">{p.kcal > 0 && <span className="block">With {p.protein} g protein</span>}{p.kcalTarget ? <span className="block text-[12px] text-dim">Your target: {p.kcalTarget.toLocaleString()} calories · {p.proteinTarget} g protein</span> : null}</p>}
         <Link href="/food" className="grid min-h-12 place-items-center rounded-xl bg-accent text-[15px] font-semibold text-black">Log your food</Link>
         {p.kcalWeek.some((d) => d.value) && <>
           <BarsWeek days={p.kcalWeek} goal={p.kcalTarget} color="#f5a623" second={{ days: p.proteinWeek, goal: p.proteinTarget, color: "#60a5fa" }} />
           <p className="flex gap-3 text-[11px] text-dim"><span><span className="mr-1 inline-block size-2 rounded-sm bg-accent" />Calories</span><span><span className="mr-1 inline-block size-2 rounded-sm bg-[#60a5fa]" />Protein</span>{p.kcalTarget ? <span>- - target</span> : null}</p>
         </>}
-        <Link href="/food#history" className="block text-[13px] text-accent">See what you&apos;ve been eating &amp; drinking ›</Link>
+        <Link href="/food#history" className="block text-[13px] text-accent">See your previous logs ›</Link>
       </div>
     </>
   );

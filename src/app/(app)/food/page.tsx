@@ -11,6 +11,8 @@ import { CopyMeal, CopyMealTo, FavoriteMeal } from "./MealButtons";
 import AddMealPhoto from "./AddMealPhoto";
 import CopyFromDay from "./CopyFromDay";
 import FoodHistory, { RANGES } from "./FoodHistory";
+import Fold from "@/components/Fold";
+import OpenOnHash from "@/components/OpenOnHash";
 import { Suspense } from "react";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -114,17 +116,6 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
       </div>
 
       <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} myFoods={myFoods} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[], photo: favPic.get(g.id) ? photoUrls.get(favPic.get(g.id)!) ?? null : null })) as GoTo[]} />
-      <FoodRules initial={foodRules} />
-
-      {/* Recipes (October 29): Michael's and the library, to cook and log in a tap. */}
-      <Link href="/food/recipes" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 8h7M9 11.5h5" /></svg>
-        </span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Recipes</span><span className="block text-[12px] text-dim">Michael&apos;s recipes and 2,000+ more. Cook one, log it in a tap.</span></span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-      </Link>
-
       <div className="space-y-2.5">
         {meals.map((m) => (
           <article key={m.id} className="flex gap-3 rounded-2xl border border-border bg-card p-2.5">
@@ -167,6 +158,17 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
 
       {/* November 11: copy from any day, not only yesterday. */}
       <CopyFromDay toDay={day} today={today} />
+
+      {/* November 23 (Michael): her food rules and the recipes, folded together under the meals. */}
+      <Fold id="rules" variant="card" title="Rules and Recipes" sub="What you never eat, and recipes to cook and log in a tap">
+        <FoodRules initial={foodRules} />
+        <Link href="/food/recipes" className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3.5">
+          <span className="text-[14px] font-semibold">📖 Recipes</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-dim">Michael&apos;s recipes and 2,000+ more</span>
+          <span className="text-dim" aria-hidden="true">›</span>
+        </Link>
+      </Fold>
+      <OpenOnHash ids={["rules"]} />
 
       <Suspense fallback={<div className="h-14 animate-pulse rounded-[18px] border border-border bg-card" />}>
         <FoodHistory userId={user!.id} range={range} day={isToday ? null : day} open={!!sp.r} />

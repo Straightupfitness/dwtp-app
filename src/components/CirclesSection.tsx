@@ -35,7 +35,7 @@ const List = ({ children }: { children: React.ReactNode }) => (
  * Her Capacity Circles (October 29: moved into the Progress tab): focus circles, the others she's working on,
  * the ones coming soon and the fix-its. Each opens its circle page.
  */
-export default function CirclesSection({ state }: { state: ProgramState }) {
+export default function CirclesSection({ state, noTitle = false }: { state: ProgramState; noTitle?: boolean }) {
   const growth = state.circles.filter((c) => c.kind === "growth");
   const focus = growth.filter((c) => c.focus);
   const alsoOpen = state.circles.filter((c) => !c.focus && c.status === "open");
@@ -52,8 +52,8 @@ export default function CirclesSection({ state }: { state: ProgramState }) {
 
   return (
     <section id="circles" className="scroll-mt-20 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">Capacity Circles</h2>
+      <div className={`flex items-center gap-2 ${noTitle ? "justify-end" : "justify-between"}`}>
+        {!noTitle && <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">Capacity Circles</h2>}
         <Link href="/circles/how" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-accent px-3 text-[13px] font-semibold text-accent">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
           How this works

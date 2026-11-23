@@ -3,9 +3,9 @@
  * Done workouts fill in with the stage color; a white dot sits on her next workout. No program-wide week number,
  * so it never competes with "Week 2 of 26" on Today.
  */
-export default function PhaseCard({ stage, kindLabel, kindNote, name, weeks, weekOfPhase, perWeek, doneByWeek, next, intro }: {
+export default function PhaseCard({ stage, kindNote, name, weeks, weekOfPhase, perWeek, doneByWeek, next, intro }: {
   stage: { label: string; color: string; tint: string };
-  kindLabel: string; kindNote: string; name: string;
+  kindNote: string; name: string;
   weeks: number; weekOfPhase: number; perWeek: number;
   doneByWeek: number[];   // workouts done in each week of the phase
   next: number | null;    // index of her next workout this week (null when the week is done)
@@ -19,14 +19,9 @@ export default function PhaseCard({ stage, kindLabel, kindNote, name, weeks, wee
         <path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11" strokeLinecap="round" />
       </svg>
       {intro}
-      <div className="flex items-center gap-2">
-        <span className="rounded-full px-2.5 py-1 text-[11px] font-bold tracking-[0.12em] text-black" style={{ background: stage.color }}>{stage.label}</span>
-        <span className="text-[12px] uppercase tracking-[0.12em] text-[#bdbdbd]">{kindLabel}</span>
-      </div>
-      <p className="mt-2 font-[family-name:var(--font-display)] text-[28px] uppercase leading-none">{name}</p>
-      <p className="mt-1.5 text-[13px] font-semibold uppercase tracking-[0.1em]">
-        Week {weekOfPhase} <span className="text-[#9a9a9a]">of {weeks}</span>{status && <><span className="text-[#6b6b6b]"> · </span>{status}</>}
-      </p>
+      {/* November 23 (Michael): "You are in week 2 of" above the phase name, in place of the stage and kind labels. */}
+      <p className="text-[13px] font-semibold uppercase tracking-[0.1em]">You are in week {weekOfPhase} <span className="text-[#9a9a9a]">of</span></p>
+      <p className="mt-1.5 font-[family-name:var(--font-display)] text-[28px] uppercase leading-none">{name}</p>
 
       {/* One block per week, one pip per workout. */}
       <div className="mt-3 flex gap-2.5" role="img" aria-label={`Week ${weekOfPhase} of ${weeks} in this phase${status ? `, ${status.toLowerCase()}` : ""}`}>

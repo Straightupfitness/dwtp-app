@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { loadWeek, type CalEvent } from "@/lib/calendar";
+import { loadCalendar, type CalEvent } from "@/lib/calendar";
+import ScrollToToday from "./ScrollToToday";
 import WorkoutDays from "./WorkoutDays";
-import BookCall from "@/components/BookCall";
-import { IconLessons } from "@/components/Icons";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const COLOR: Record<CalEvent["kind"], string> = {
@@ -12,57 +11,47 @@ const COLOR: Record<CalEvent["kind"], string> = {
 const fmtDay = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 const fmtShort = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
-  const offset = Math.max(-30, Math.min(30, Number((await searchParams).w) || 0));
+export default async function CalendarPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { today, days, week, start, workoutDays, perWeek } = await loadWeek(supabase, user!.id, offset);
-  const nav = "grid size-11 place-items-center rounded-full border border-[#2a2a2a]";
+  const { today, start, weeks, workoutDays, perWeek } = await loadCalendar(supabase, user!.id);
 
+  // November 23 (Michael): one long list of days she scrolls up and down, a week banner between each Sunday and
+  // Monday, and it opens on today.
   return (
     <section className="space-y-3.5">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your week: workouts, lessons and calls</p>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your workouts, lessons and calls</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Calendar</h1>
       </header>
-      <BookCall compact />
-      {/* November 23 (Michael): the Lessons tab moved into the Calendar. Each lesson sits on its day below; this lists them all. */}
-      <Link href="/lessons" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true"><IconLessons /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">See all my lessons</span><span className="block text-[12px] text-dim">This week&apos;s, the ones you&apos;ve opened, and what&apos;s coming.</span></span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-      </Link>
-      {/* November 11 (Sandra looked here for her progress photos): a shortcut to them. */}
-      <Link href="/today#photos" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
-        </span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Progress photos</span><span className="block text-[12px] text-dim">Add a before or after photo on any day, and see them side by side.</span></span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-      </Link>
+      {start && <WorkoutDays initial={workoutDays} perWeek={perWeek} />}
+      <ScrollToToday />
 
-      <div className="flex items-center justify-between gap-2">
-        <Link href={`/calendar?w=${offset - 1}`} className={nav} aria-label="Previous week">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-        </Link>
-        <div className="text-center">
-          <p className={`${display} text-[19px]`}>{week >= 1 && week <= 26 ? `Week ${week}` : start && days[6].date < start ? "Before you start" : "This week"}</p>
-          <p className="text-xs text-dim">{fmtShort(days[0].date)} – {fmtShort(days[6].date)}{offset !== 0 && <> · <Link href="/calendar" className="text-accent">Back to this week</Link></>}</p>
-        </div>
-        <Link href={`/calendar?w=${offset + 1}`} className={nav} aria-label="Next week">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-        </Link>
-      </div>
-
+      {weeks.map(({ monday, week, days }) => {
+        const wk = days[0].events.find((e) => e.kind === "week");
+        const label = start && week >= 1 && week <= 26 ? `Week ${week}` : start && days[6].date < start ? "Before you start" : week > 26 ? "After week 26" : "This week";
+        const banner = (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className={`${display} block text-[22px] leading-none text-accent`}>{label}</span>
+              <span className="mt-1 block text-[12px] text-dim">{fmtShort(days[0].date)} – {fmtShort(days[6].date)}{wk?.detail ? ` · ${wk.locked ? "Locked · " : ""}${wk.detail}` : ""}</span>
+            </span>
+            {wk?.href && !wk.locked && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>}
+          </>
+        );
+        const bcls = "flex items-center gap-3 rounded-2xl border border-[#3a2a0a] bg-[#1a1306] px-3.5 py-3";
+        return (
+          <div key={monday} className="space-y-2">
+            {wk?.href && !wk.locked ? <Link href={wk.href} className={bcls}>{banner}</Link> : <div className={bcls}>{banner}</div>}
       <ol className="space-y-2">
         {days.map((d) => {
           const isToday = d.date === today, past = d.date < today;
           return (
-            <li key={d.date} className={`rounded-2xl border bg-card p-3 ${isToday ? "border-accent" : "border-border"} ${past ? "opacity-80" : ""}`}>
+            <li key={d.date} id={isToday ? "today" : undefined} className={`scroll-mt-24 rounded-2xl border bg-card p-3 ${isToday ? "border-accent" : "border-border"} ${past ? "opacity-80" : ""}`}>
               <p className={`text-[12px] font-semibold uppercase tracking-[0.1em] ${isToday ? "text-accent" : "text-dim"}`}>{isToday ? "Today · " : ""}{fmtDay(d.date)}</p>
-              {d.events.length ? (
+              {d.events.some((e) => e.kind !== "week") ? (
                 <ul className="mt-1.5 space-y-1">
-                  {d.events.map((e, i) => {
+                  {d.events.filter((e) => e.kind !== "week").map((e, i) => {
                     const c = e.color ?? COLOR[e.kind];
                     const body = (
                       <>
@@ -91,8 +80,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           );
         })}
       </ol>
-
-      {start && <WorkoutDays initial={workoutDays} perWeek={perWeek} />}
+          </div>
+        );
+      })}
       <p className="text-xs text-dim">Every day: check off your habits, log your food and weigh in. Times are in your time zone.</p>
     </section>
   );
