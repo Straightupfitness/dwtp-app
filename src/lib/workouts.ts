@@ -79,26 +79,37 @@ export function daysFor(perWeek: number | null, available: number[]) {
 }
 
 /** Her week: the phase, this week's strength days (with done/started), and the cardio menu. */
-export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string, weekOverride?: number) {
-  const { data: p } = await supabase.from("profiles").select("program_start, timezone, strength_days_per_week, workout_program, workout_start_week").eq("id", clientId).single();
+/**
+ * November 23: the calendar loads all 26 weeks at once, so what doesn't change week to week (her profile, the
+ * program's phases, each phase's workouts, her schedule) is fetched once and shared through this memo.
+ */
+export type WeekMemo = Map<string, Promise<unknown>>;
+function memo<T>(m: WeekMemo | undefined, key: string, fn: () => PromiseLike<T>): Promise<T> {
+  if (!m) return Promise.resolve(fn());
+  if (!m.has(key)) m.set(key, Promise.resolve(fn()));
+  return m.get(key) as Promise<T>;
+}
+
+export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string, weekOverride?: number, m?: WeekMemo) {
+  const { data: p } = await memo(m, "profile", () => supabase.from("profiles").select("program_start, timezone, strength_days_per_week, workout_program, workout_start_week").eq("id", clientId).single());
   const today = todayIn(p?.timezone ?? "America/Los_Angeles");
   // Her training week keeps counting before her start date, so workouts don't pause before the Nov 9 launch.
   const current = p?.program_start ? trainingWeek(p.program_start, today) : 0;
   const week = weekOverride ?? current;                         // her training week (sessions are saved by this)
   const programId = (p?.workout_program as string | null) ?? "sltp";
   const pweek = p?.program_start || weekOverride ? programWeekOf(week, p?.workout_start_week as number | null) : 0; // the week of her workout program
-  const [{ data: phases }, { data: prog }] = await Promise.all([
+  const [{ data: phases }, { data: prog }] = await memo(m, "phases", () => Promise.all([
     supabase.from("program_phases").select("id, name, stage, kind, weeks, first_week").eq("program", programId).order("position"),
     supabase.from("programs").select("id, name").eq("id", programId).maybeSingle(),
-  ]);
+  ]));
   const all = (phases ?? []) as Phase[];
   const totalWeeks = all.reduce((n, x) => n + x.weeks, 0);
   const program = { id: programId, name: (prog?.name as string | undefined) ?? "Your program" };
   const phase = pweek >= 1 ? all.find((x) => pweek >= x.first_week && pweek < x.first_week + x.weeks) ?? null : null;
   if (!phase) return { today, week, pweek, current, totalWeeks, program, phases: all, phase: null, weekOfPhase: 0, strength: [] as WorkoutCard[], allStrength: [] as WorkoutCard[], cardio: [] as WorkoutCard[], nextUp: null as WorkoutCard | null, start: p?.program_start ?? null };
 
-  const { data: links } = await supabase.from("phase_workouts")
-    .select("day, from_week, to_week, workouts(id, name, kind, circuit, minutes, workout_items(position, exercises(clip_path, youtube_id, name)))").eq("phase_id", phase.id);
+  const { data: links } = await memo(m, `links:${phase.id}`, () => supabase.from("phase_workouts")
+    .select("day, from_week, to_week, workouts(id, name, kind, circuit, minutes, workout_items(position, exercises(clip_path, youtube_id, name)))").eq("phase_id", phase.id));
   type W = { id: number; name: string; kind: "strength" | "cardio"; circuit: boolean; minutes: number | null; workout_items: { position: number; exercises: { clip_path: string | null; youtube_id: string | null; name: string } | null }[] };
   const wop = pweek - phase.first_week + 1;
   // Some programs run different workouts in different weeks of a phase (13 Hard & Resilient, "Day 1a / 1b").
@@ -124,7 +135,7 @@ export async function loadWorkoutWeek(supabase: SupabaseClient, clientId: string
   const allDays = rows.filter((r) => r.workouts!.kind === "strength" && r.day).map((r) => r.day!) ;
   // Every strength day of this phase (for Michael's planner), whatever she's scheduled for.
   const allStrength = rows.filter((r) => r.workouts!.kind === "strength" && r.day).map(card).sort((a, b) => (a.day ?? 0) - (b.day ?? 0));
-  const schedule = await loadSchedule(supabase, clientId);
+  const schedule = await memo(m, "schedule", () => loadSchedule(supabase, clientId));
   let strength: WorkoutCard[];
   if (schedule) {
     // November 15: Michael's schedule (Monday Day 2, Tuesday Day 1…), in weekday order. Days the phase doesn't have are skipped.

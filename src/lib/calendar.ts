@@ -8,7 +8,7 @@ import { loadProgram } from "./circles";
 import { loadLessons } from "./lessons";
 import { DEADLINE_TZ, zonedInstant } from "./checkin";
 import { programWeek, todayIn, trainingWeek } from "./program";
-import { loadWorkoutWeek } from "./workouts";
+import { loadWorkoutWeek, type WeekMemo } from "./workouts";
 
 export type CalEvent = {
   kind: "week" | "workout" | "call" | "sbw" | "smf" | "checkin" | "medal" | "break";
@@ -34,6 +34,7 @@ type Shared = {
   tws: { week_number: number; is_diet_break: boolean | null; checkin_is_video: boolean | null }[] | null;
   lessons: Awaited<ReturnType<typeof loadLessons>>;
   program: Awaited<ReturnType<typeof loadProgram>>;
+  memo: WeekMemo;
 };
 const loadProfile = async (supabase: SupabaseClient, clientId: string) =>
   (await supabase.from("profiles").select("program_start, timezone, workout_days, strength_days_per_week").eq("id", clientId).single()).data as Profile;
@@ -62,7 +63,7 @@ export async function loadCalendar(supabase: SupabaseClient, clientId: string) {
     loadLessons(supabase, clientId),
     loadProgram(supabase, clientId),
   ]);
-  const shared: Shared = { p, settings, calls, tws, lessons, program };
+  const shared: Shared = { p, settings, calls, tws, lessons, program, memo: new Map() };
   const weeks = await Promise.all(offsets.map((o) => loadWeek(supabase, clientId, o, shared)));
   const cur = weeks.find((w) => w.monday === thisMonday) ?? weeks[0];
   return { today, start, weeks, workoutDays: cur.workoutDays, perWeek: cur.perWeek };
@@ -104,7 +105,7 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
   // November 6: workouts show for any week she has them, before her start date too (workouts keep counting),
   // so she can look ahead at tomorrow's (and next week's) workout.
   const tweek = start ? trainingWeek(start, days[0]) : 0;
-  const plan = start ? await loadWorkoutWeek(supabase, clientId, tweek) : null;
+  const plan = start ? await loadWorkoutWeek(supabase, clientId, tweek, shared?.memo) : null;
   // November 7 (Sandra): a 4-day program never crams two workouts on one day. If she has fewer days picked than
   // workouts, she gets the default days for that many (Mon/Tue/Thu/Fri for 4) until she picks enough.
   const perWeek = plan?.strength.length ?? 0;
@@ -130,7 +131,7 @@ export async function loadWeek(supabase: SupabaseClient, clientId: string, offse
     // All done this week: offer next week's next workout today, so she can start it early.
     let early: CalEvent | null = null;
     if (isCurrent && plan.strength.length && plan.strength.every((w) => w.done)) {
-      const next = await loadWorkoutWeek(supabase, clientId, plan.current + 1);
+      const next = await loadWorkoutWeek(supabase, clientId, plan.current + 1, shared?.memo);
       const w = next.phase ? next.strength.find((x) => !x.done) : null;
       if (w) early = { kind: "workout", title: `Next week · ${w.title}`, detail: `You finished this week. Start it early${w.minutes ? ` · about ${w.minutes} min` : ""}`, href: `/workouts/${w.id}?w=${plan.current + 1}` };
     }

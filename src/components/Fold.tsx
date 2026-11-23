@@ -21,10 +21,10 @@ export default function Fold({ id, title, icon, sub, right, under, defaultOpen =
     try { const v = localStorage.getItem(key); if (v !== null) el.open = v === "1"; } catch { /* private mode: use the default */ }
   }, [key, forceOpen]);
   const toggle = () => { try { localStorage.setItem(key, ref.current?.open ? "1" : "0"); } catch { /* ignore */ } };
-  const chev = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>;
+  const chev = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open/fold:rotate-180"><path d="M6 9l6 6 6-6" /></svg>;
 
   if (variant === "card") return (
-    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">
+    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/fold scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4">
         {icon && <span className="shrink-0 text-accent">{icon}</span>}
         <span className="flex-1 py-2">
@@ -39,7 +39,7 @@ export default function Fold({ id, title, icon, sub, right, under, defaultOpen =
   );
 
   return (
-    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group scroll-mt-20">
+    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/fold scroll-mt-20">
       <summary className="cursor-pointer list-none pt-1">
         <span className="flex min-h-11 items-center gap-2">
           <span className={`${display} flex flex-1 items-center gap-1.5 text-lg font-medium`}>{icon && <span className="text-accent">{icon}</span>}{title}</span>
