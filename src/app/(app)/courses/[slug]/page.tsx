@@ -1,20 +1,31 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { bonusCourse } from "@/lib/bonus-courses";
+import { createClient } from "@/lib/supabase/server";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
+
+/** True only for Michael himself (in "See her app" the role is hers, so coach-only courses stay hidden there too). */
+async function isCoach() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  return data?.role === "coach";
+}
+
 
 /** November 22: one bonus course: what it is and its lessons. */
 export default async function CoursePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const c = bonusCourse(slug);
+  const c = bonusCourse(slug, await isCoach());
   if (!c) notFound();
   const heads = c.lessons.map((l, i) => (l.section && l.section !== c.lessons[i - 1]?.section ? l.section : null));
   return (
     <section className="space-y-4">
       <Link href="/lessons#bonus" className="inline-flex min-h-11 items-center text-sm text-dim">← Lessons</Link>
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Bonus course</p>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{c.coachOnly ? "🔒 Only you can see this course" : "Bonus course"}</p>
         <h1 className={`${display} mt-1 text-[28px] font-semibold leading-tight`}>{c.title}</h1>
         <p className="mt-1 text-[15px] text-[#cfcfcf]">{c.blurb}</p>
       </header>

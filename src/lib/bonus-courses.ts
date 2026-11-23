@@ -1,9 +1,9 @@
 // November 22 (Michael): his bonus courses, moved over from Xperiencify (PCOS Be Gone, Driven Women Challenge,
 // High-T Timeline, Afternoon Energy Fix, Strong & Sculpted, Travel Workout Guide). Every client sees them.
 // Videos: YouTube and Wistia links play as embeds; "code:BC-01" is a video uploaded in Coach → Videos.
-export type BonusBlock = { k: "h" | "p" | "video"; v: string };
+export type BonusBlock = { k: "h" | "p" | "video" | "link"; v: string; t?: string };
 export type BonusLesson = { slug: string; title: string; section?: string; blocks: BonusBlock[] };
-export type BonusCourse = { slug: string; title: string; blurb: string; intro?: BonusBlock[]; lessons: BonusLesson[] };
+export type BonusCourse = { slug: string; title: string; blurb: string; coachOnly?: boolean; intro?: BonusBlock[]; lessons: BonusLesson[] };
 
 export const BONUS_COURSES: BonusCourse[] = [
  {
@@ -857,4 +857,7 @@ export const BONUS_COURSES: BonusCourse[] = [
  }
 ];
 
-export const bonusCourse = (slug: string) => BONUS_COURSES.find((c) => c.slug === slug) ?? null;
+import { COACH_COURSES } from "./coach-courses";
+
+// Coach-only courses (Capacity Jumpstart) are found only for the coach.
+export const bonusCourse = (slug: string, coach = false) => [...BONUS_COURSES, ...(coach ? COACH_COURSES : [])].find((c) => c.slug === slug) ?? null;

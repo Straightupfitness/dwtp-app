@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadLessons } from "@/lib/lessons";
 import LessonRow from "./LessonRow";
 import { BONUS_COURSES } from "@/lib/bonus-courses";
+import { COACH_COURSES } from "@/lib/coach-courses";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 
@@ -78,6 +79,16 @@ export default async function LessonsPage() {
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold">{c.title}</span>
                 <span className="block truncate text-[12px] text-dim">{c.lessons.length} {c.lessons.length === 1 ? "lesson" : "lessons"} · {c.blurb}</span>
+              </span>
+              <span className="text-dim" aria-hidden="true">›</span>
+            </Link>
+          ))}
+          {/* Coach-only courses: only Michael sees these rows (clients never get them). */}
+          {me?.role === "coach" && COACH_COURSES.map((c) => (
+            <Link key={c.slug} href={`/courses/${c.slug}`} className="flex min-h-14 items-center gap-3 bg-[#141008] px-3.5 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">🔒 {c.title}</span>
+                <span className="block truncate text-[12px] text-dim">Only you can see this · {c.lessons.length} lessons</span>
               </span>
               <span className="text-dim" aria-hidden="true">›</span>
             </Link>

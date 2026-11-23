@@ -19,7 +19,7 @@ export const VIDEO_SETS: { title: string; prefix: string; codes: string[] }[] = 
   { title: "Medals: fix-its (Batch 3)", prefix: "MED", codes: Array.from({ length: 35 }, (_, i) => `MED-${i + 51}`) },
   { title: "Medals: later & elite (Batch 3)", prefix: "MED", codes: Array.from({ length: 49 }, (_, i) => `MED-${i + 86}`) },
   // November 22: the Xperiencify-hosted videos of the bonus courses (Strong & Sculpted Days 1–3).
-  { title: "Bonus courses", prefix: "BC", codes: Array.from({ length: 20 }, (_, i) => `BC-${String(i + 1).padStart(2, "0")}`) },
+  { title: "Bonus courses", prefix: "BC", codes: Array.from({ length: 24 }, (_, i) => `BC-${String(i + 1).padStart(2, "0")}`) }, // 21–24: Capacity Jumpstart (coach only)
   { title: "Habits & Homework", prefix: "HH", codes: Array.from({ length: 26 }, (_, i) => `HH-${String(i + 1).padStart(2, "0")}`) },
   { title: "Strong Body Wednesday (by week)", prefix: "SBW", codes: Array.from({ length: 26 }, (_, i) => `SBW-${String(i + 1).padStart(2, "0")}`) },
 ];
