@@ -24,12 +24,14 @@ export default function Fold({ id, title, icon, sub, right, under, defaultOpen =
   const toggle = () => { try { localStorage.setItem(key, ref.current?.open ? "1" : "0"); } catch { /* ignore */ } };
   const chev = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open/fold:rotate-180"><path d="M6 9l6 6 6-6" /></svg>;
 
+  // A sub fold sits inside a title fold, so it has its own group name (or its chevron would follow the outer one).
+  const subChev = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open/sub:rotate-180"><path d="M6 9l6 6 6-6" /></svg>;
   if (variant === "sub") return (
-    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/fold scroll-mt-20 rounded-2xl border border-border bg-card">
+    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/sub scroll-mt-20 rounded-2xl border border-border bg-card">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-4">
         <span className={`${display} flex flex-1 items-center gap-1.5 text-[15px] font-medium leading-tight text-[#cfcfcf]`}>{icon && <span className="shrink-0 text-accent">{icon}</span>}{title}</span>
         {right}
-        {chev}
+        {subChev}
       </summary>
       <div className="space-y-3 px-3 pb-3">{children}</div>
     </details>
