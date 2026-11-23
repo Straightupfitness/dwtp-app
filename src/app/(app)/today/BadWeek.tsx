@@ -40,12 +40,12 @@ export function BadWeekOffer({ left }: { left: number }) {
   const [pending, start] = useTransition();
   return (
     // November 23 (Michael): the last thing on Today, laid out like "Book a call with Michael", with a red border.
-    <section className="rounded-2xl border border-[#ef4444] bg-card px-4">
+    <section className="rounded-2xl border border-border bg-card px-4">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 text-left">
         <span className="flex flex-1 items-center gap-1.5 font-[family-name:var(--font-display)] text-[15px] font-medium uppercase leading-tight text-[#cfcfcf]">
-          <span className="shrink-0 text-[15px] leading-none" aria-hidden="true">😮‍💨</span>Having a bad week?
+          <span className="shrink-0 text-accent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" /><path d="m5.6 5.6 3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9" /></svg></span>Having a bad week?
         </span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" aria-hidden="true" className={`shrink-0 transition ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className={`shrink-0 transition ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       {open && (
         <div className="space-y-2.5 pb-3.5 text-[14px] leading-snug text-[#cfcfcf]">

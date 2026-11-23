@@ -25,7 +25,7 @@ import DailyCombo from "@/components/DailyCombo";
 import { Suspense } from "react";
 import TodayProgress, { TodayWeight } from "./TodayProgress";
 import Fold from "@/components/Fold";
-import { SleekFold } from "@/components/Sleek";
+import { Cal, SleekFold, SleekLink } from "@/components/Sleek";
 import SectionIcon from "@/components/SectionIcon";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -203,9 +203,7 @@ export default async function TodayPage() {
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
-      <Link href="/log" className="flex min-h-11 items-center justify-between rounded-xl border border-dashed border-[#3a3a3a] px-3.5 text-[13px]">
-        <span><b>Missed a day?</b> <span className="text-dim">Fill in weight, steps, sleep, food, water and habits</span></span><span className="text-accent">›</span>
-      </Link>
+      <SleekLink href="/log" icon={<Cal />}>Missed a day? <span className="font-normal text-[#444]">Fill in weight, steps, sleep, food, water and habits</span></SleekLink>
       </Fold>
 
       {all.length > 0 && (
