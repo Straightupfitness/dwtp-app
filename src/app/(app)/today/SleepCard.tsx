@@ -31,15 +31,15 @@ export default function SleepCard({ date, minutes, preview = false }: { date: st
   return (
     <div id="sleep" className="space-y-2.5 rounded-2xl border border-border bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className={`${display} flex items-center gap-1.5 text-[17px] font-medium leading-none`}>
-          <span className="text-[#818cf8]"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></svg></span>
-          Last night&apos;s sleep
+        <p className={`${display} flex items-center gap-1.5 text-[15px] font-medium leading-tight text-[#cfcfcf]`}>
+          <span className="shrink-0 text-[#818cf8]"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></svg></span>
+          How many hours of sleep did you get last night?
         </p>
         {shown != null && <button type="button" onClick={() => save(null)} className="min-h-8 text-[12px] text-dim underline">Clear</button>}
       </div>
       {shown != null ? (
         <p className="text-[15px]"><b className={`${display} text-[26px] tabular-nums`}>{fmt(shown)}</b> <span className="text-dim">logged{shown >= 7 ? " · nice" : ""}</span></p>
-      ) : <p className="text-[13px] text-dim">How many hours did you sleep? Tap the closest one.</p>}
+      ) : null}
       <div className="flex flex-wrap gap-1.5">
         {[5, 6, 6.5, 7, 7.5, 8, 9].map((h) => (
           <button key={h} type="button" onClick={() => save(h)} aria-pressed={shown === h}

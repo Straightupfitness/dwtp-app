@@ -5,13 +5,14 @@ const display = "font-[family-name:var(--font-display)] uppercase";
 
 /**
  * November 23 (Michael): a folded section that remembers, on her phone, whether she left it open or closed.
- * "title" looks like "Today's habits" (icon + display title, no box); "card" looks like "Your previous logs" on Food.
+ * "title" looks like "Track your numbers" (icon + display title, no box); "card" looks like "Your previous logs" on Food;
+ * "sub" looks like the cards inside Today's sections ("How many steps did you get yesterday?").
  */
 export default function Fold({ id, title, icon, sub, right, under, defaultOpen = false, forceOpen = false, variant = "title", children }: {
   id: string; title: React.ReactNode; icon?: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode;
   /** Shown under the title even when folded (her habits' progress bar). */
   under?: React.ReactNode;
-  defaultOpen?: boolean; forceOpen?: boolean; variant?: "title" | "card"; children: React.ReactNode;
+  defaultOpen?: boolean; forceOpen?: boolean; variant?: "title" | "card" | "sub"; children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const key = `fold:${id}`;
@@ -22,6 +23,17 @@ export default function Fold({ id, title, icon, sub, right, under, defaultOpen =
   }, [key, forceOpen]);
   const toggle = () => { try { localStorage.setItem(key, ref.current?.open ? "1" : "0"); } catch { /* ignore */ } };
   const chev = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open/fold:rotate-180"><path d="M6 9l6 6 6-6" /></svg>;
+
+  if (variant === "sub") return (
+    <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/fold scroll-mt-20 rounded-2xl border border-border bg-card">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-4">
+        <span className={`${display} flex flex-1 items-center gap-1.5 text-[15px] font-medium leading-tight text-[#cfcfcf]`}>{icon && <span className="shrink-0 text-accent">{icon}</span>}{title}</span>
+        {right}
+        {chev}
+      </summary>
+      <div className="space-y-3 px-3 pb-3">{children}</div>
+    </details>
+  );
 
   if (variant === "card") return (
     <details id={id} ref={ref} open={defaultOpen || forceOpen} onToggle={toggle} className="group/fold scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">

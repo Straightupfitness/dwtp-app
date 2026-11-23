@@ -11,7 +11,7 @@ import { loadProgressPhotos } from "@/lib/progress-photos";
 import type { ProgramState } from "@/lib/circles";
 
 /**
- * November 23 (Michael), second pass: near the bottom of Today, three folded sections in the "Today's habits" style:
+ * November 23 (Michael), second pass: near the bottom of Today, a folded "Your progress" holding three folded cards:
  * Your Capacity Circles, Progress photos, Badges. Each remembers whether she left it open. Opening Today also awards
  * any badge she has just earned (so it shows in Community).
  */
@@ -21,20 +21,20 @@ export default async function TodayProgress({ userId, state, today, started }: {
   const earned = status.filter((b) => b.earned).length;
   const count = (t: string) => <span className="text-[13px] text-[#a8a8a8]">{t}</span>;
   return (
-    <>
+    <Fold id="progress" title="Your progress" icon={<SectionIcon name="progress" />}>
       {started && (
-        <Fold id="progress" title="Your Capacity Circles" icon={<SectionIcon name="circles" />}>
+        <Fold id="capacity-circles" variant="sub" title="Your Capacity Circles" icon={<SectionIcon name="circles" />}>
           <CirclesSection state={state} noTitle />
         </Fold>
       )}
-      <Fold id="progress-photos" title="Progress photos" icon={<SectionIcon name="photos" />} right={photos.length ? count(`${photos.length}`) : null}>
+      <Fold id="progress-photos" variant="sub" title="Progress photos" icon={<SectionIcon name="photos" />} right={photos.length ? count(`${photos.length}`) : null}>
         <ProgressPhotos photos={photos} userId={userId} today={today} noTitle />
       </Fold>
-      <Fold id="badges" title="Badges" icon={<SectionIcon name="badges" />} right={count(`${earned} of ${status.length} earned`)}>
+      <Fold id="badges" variant="sub" title="Badges" icon={<SectionIcon name="badges" />} right={count(`${earned} of ${status.length} earned`)}>
         <BadgesCard badges={status} noTitle />
       </Fold>
-      <OpenOnHash ids={["progress", "circles", "photos", "progress-photos", "badges", "weight-graph"]} />
-    </>
+      <OpenOnHash ids={["progress", "capacity-circles", "circles", "photos", "progress-photos", "badges", "weight-graph"]} />
+    </Fold>
   );
 }
 

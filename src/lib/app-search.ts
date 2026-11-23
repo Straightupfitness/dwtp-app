@@ -11,7 +11,7 @@ const PAGES: SearchHit[] = [
   { title: "Today's water", where: "Today", href: "/today", words: "water ounces oz gallon drink hydration" },
   { title: "Weight", where: "Today", href: "/today", words: "weigh in weight scale log weight" },
   { title: "Steps", where: "Today → Steps", href: "/today", words: "steps walk walking step count steps graph chart last 30 days" },
-  { title: "Today's habits", where: "Today", href: "/today", words: "habits check off daily to do" },
+  { title: "Track your habits", where: "Today", href: "/today#habits", words: "habits check off daily to do" },
   { title: "Missed a day? Fill it in", where: "Today → Missed a day?", href: "/log", words: "past day yesterday forgot missed log fill in" },
   { title: "Food log", where: "Food", href: "/food", words: "food log meal photo voice calories protein fiber eat breakfast lunch dinner snack" },
   { title: "My foods", where: "Food → My foods", href: "/food", words: "my foods saved favorites re-add again usual" },

@@ -77,7 +77,7 @@ export default async function TodayPage() {
             ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
             : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
         </p>
-        <a href="#progress" className="block" aria-label="See your Capacity Circles">
+        <a href="#capacity-circles" className="block" aria-label="See your Capacity Circles">
           <p className="mb-1.5 text-right text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
             {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
           </p>
@@ -195,7 +195,7 @@ export default async function TodayPage() {
 
       {startNote}
       {badNow && <BadWeekActive left={badLeft} />}
-      {/* November 23 (Michael): her numbers under one folded title, in the "Today's habits" style. */}
+      {/* November 23 (Michael): her numbers under one folded title, in the same style as her habits. */}
       <Fold id="numbers" title="Track your numbers" icon={<SectionIcon name="numbers" />} defaultOpen>
       <QuickStats today={today} yesterday={yesterday}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
@@ -211,7 +211,7 @@ export default async function TodayPage() {
       </Fold>
 
       {all.length > 0 && (
-        <Fold id="habits" title={badNow ? "Your other habits (optional this week)" : "Today\u2019s habits"} icon={<IconHabits />} defaultOpen
+        <Fold id="habits" title={badNow ? "Your other habits (optional this week)" : "Track your habits"} icon={<IconHabits />} defaultOpen
           right={<span className="text-[13px] text-[#a8a8a8]"><b className="text-text">{doneCount}</b> of {all.length} done</span>}
           under={<div className="mt-1 h-1.5 rounded-full bg-[#262626]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round((doneCount / all.length) * 100)}%` }} /></div>}>
       {/* November 15 (Michael): her habits grouped under Focus circles, then Fix-its, then anything else open. */}
@@ -258,8 +258,10 @@ export default async function TodayPage() {
       <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-card" />}>
         <TodayProgress userId={user!.id} state={state} today={today} started={!notStarted} />
       </Suspense>
-      <BookCall />
-      {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
+      <Fold id="help" title="Need help?" icon={<SectionIcon name="help" />}>
+        <BookCall />
+        {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
+      </Fold>
 
     </section>
   );

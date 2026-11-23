@@ -15,8 +15,8 @@ export default function WaterCard({ oz, goal }: { oz: number; goal: number }) {
   return (
     <div className="space-y-2.5 rounded-2xl border border-border bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className={`${display} flex items-center gap-1.5 text-[17px] font-medium leading-none`}><span className="text-[#38bdf8]"><IconWater /></span>Today&apos;s water</p>
-        <p className="text-[12px] text-dim">{hit ? <span className="text-[#7ee2a8]">Goal hit</span> : `${goal - shown} oz to go`}</p>
+        <p className={`${display} flex items-center gap-1.5 text-[15px] font-medium leading-tight text-[#cfcfcf]`}><span className="shrink-0 text-[#38bdf8]"><IconWater /></span>How much water did you drink so far today?</p>
+        <p className="shrink-0 text-[12px] text-dim">{hit ? <span className="text-[#7ee2a8]">Goal hit</span> : `${goal - shown} oz to go`}</p>
       </div>
       <div className="flex items-center gap-3">
         <span className={`${display} shrink-0 text-[26px] leading-none tabular-nums`}>{shown} <span className="text-[12px] normal-case text-dim">/ {goal} oz</span></span>
