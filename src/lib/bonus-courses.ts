@@ -685,18 +685,6 @@ export const BONUS_COURSES: BonusCourse[] = [
     "blocks": [
      {
       "k": "p",
-      "v": "Below the video you will see the exact instructions for each exercise"
-     },
-     {
-      "k": "video",
-      "v": "https://straightupfitness.wistia.com/medias/007mkl438m"
-     },
-     {
-      "k": "h",
-      "v": "Couple reminders before you start:"
-     },
-     {
-      "k": "p",
       "v": "> ​Each workout is full-body: So I don't recommend doing 2 in a row (take a day off between workouts)\n​\n> A 'Superset' is 2 or more exercises performed in a row: Without stopping, until you finish the last exercise of the 'Superset'\n> The goal is to get the entire workout done in 30 min: So you can head right back to la playa afterwards\n> ​Don't go TOO heavy: Use your vacation as a 'deload' week and these workouts as a means to 'refresh' your routine with something new (and lightweight)"
      },
      {
@@ -755,18 +743,6 @@ export const BONUS_COURSES: BonusCourse[] = [
     "blocks": [
      {
       "k": "p",
-      "v": "Below the video you will see the exact instructions for each exercise"
-     },
-     {
-      "k": "video",
-      "v": "https://straightupfitness.wistia.com/medias/usytocsw05"
-     },
-     {
-      "k": "h",
-      "v": "Couple reminders before you start:"
-     },
-     {
-      "k": "p",
       "v": "> ​Each workout is full-body: So I don't recommend doing 2 in a row (take a day off between workouts)\n​\n> A 'Superset' is 2 or more exercises performed in a row: Without stopping, until you finish the last exercise of the 'Superset'\n> The goal is to get the entire workout done in 30 min: So you can head right back to la playa afterwards\n> ​Don't go TOO heavy: Use your vacation as a 'deload' week and these workouts as a means to 'refresh' your routine with something new (and lightweight)"
      },
      {
@@ -823,18 +799,6 @@ export const BONUS_COURSES: BonusCourse[] = [
     "slug": "day-3",
     "title": "Travel Workout Day 3",
     "blocks": [
-     {
-      "k": "p",
-      "v": "Below the video you will see the exact instructions for each exercise"
-     },
-     {
-      "k": "video",
-      "v": "https://straightupfitness.wistia.com/medias/1yl5m1okxc"
-     },
-     {
-      "k": "h",
-      "v": "Couple reminders before you start:"
-     },
      {
       "k": "p",
       "v": "> ​Each workout is full-body: So I don't recommend doing 2 in a row (take a day off between workouts)\n> A 'Superset' is 2 or more exercises performed in a row: Without stopping, until you finish the last exercise of the 'Superset'\n> The goal is to get the entire workout done in 30 min: So you can head right back to la playa afterwards\n> ​Don't go TOO heavy: Use your vacation as a 'deload' week and these workouts as a means to 'refresh' your routine with something new (and lightweight)"
