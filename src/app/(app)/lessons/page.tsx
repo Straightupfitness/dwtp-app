@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadLessons } from "@/lib/lessons";
 import LessonRow from "./LessonRow";
+import { BONUS_COURSES } from "@/lib/bonus-courses";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 
@@ -62,6 +63,27 @@ export default async function LessonsPage() {
           ))}
         </div>
       </>}
+
+      {/* November 22 (Michael): his old Xperiencify courses, folded away at the bottom so they don't take up room. */}
+      <details id="bonus" className="group scroll-mt-20 rounded-2xl border border-border bg-card">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3.5">
+          <span aria-hidden="true">🎁</span>
+          <span className={`${display} flex-1 text-[17px]`}>Bonus courses</span>
+          <span className="text-xs text-dim">{BONUS_COURSES.length}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
+        </summary>
+        <div className="divide-y divide-border border-t border-border">
+          {BONUS_COURSES.map((c) => (
+            <Link key={c.slug} href={`/courses/${c.slug}`} className="flex min-h-14 items-center gap-3 px-3.5 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">{c.title}</span>
+                <span className="block truncate text-[12px] text-dim">{c.lessons.length} {c.lessons.length === 1 ? "lesson" : "lessons"} · {c.blurb}</span>
+              </span>
+              <span className="text-dim" aria-hidden="true">›</span>
+            </Link>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }

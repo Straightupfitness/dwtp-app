@@ -1,4 +1,5 @@
 import "server-only";
+import { BONUS_COURSES } from "./bonus-courses";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** November 19 (Sara: "Is there a search bar anywhere?"): one thing she can find from the search box. */
@@ -18,6 +19,7 @@ const PAGES: SearchHit[] = [
   { title: "Workouts", where: "Workouts", href: "/workouts", words: "workout strength training exercise lift gym program day" },
   { title: "Cardio", where: "Workouts", href: "/workouts", words: "cardio sprints jump rope kettlebell bike" },
   { title: "Lessons", where: "Lessons", href: "/lessons", words: "lessons videos habits homework strong body wednesday strong mind friday sbw smf h&h" },
+  { title: "Bonus courses", where: "Lessons", href: "/lessons#bonus", words: "bonus courses pcos be gone driven women challenge high-t timeline testosterone afternoon energy fix strong sculpted travel workout guide hotel" },
   { title: "Your circles and medals", where: "Progress → Circles", href: "/progress#circles", words: "circles medals capacity rings fix-it focus" },
   { title: "Progress", where: "Progress", href: "/progress", words: "progress charts results weight trend cps capacity points badges" },
   { title: "Progress photos", where: "Progress → Photos", href: "/progress#photos", words: "photos pictures before after progress pics" },
@@ -52,6 +54,11 @@ export async function loadSearchIndex(supabase: SupabaseClient): Promise<SearchH
     if (r && c) out.push({ title: i.title as string, where: `${c.name} · Medal ${r.ring_number}`, href: `/circles/${c.slug}`, words: "habit" });
   }
   const KIND: Record<string, string> = { hh: "Habits & Homework", sbw: "Strong Body Wednesday", smf: "Strong Mind Friday", other: "Bonus" };
+  // November 22: the bonus courses and their lessons.
+  for (const c of BONUS_COURSES) {
+    out.push({ title: c.title, where: "Lessons · Bonus course", href: `/courses/${c.slug}`, words: `bonus course ${c.blurb}` });
+    for (const bl of c.lessons) out.push({ title: bl.title, where: `Bonus course · ${c.title}`, href: `/courses/${c.slug}/${bl.slug}`, words: "bonus course lesson video" });
+  }
   for (const l of lessons ?? []) out.push({ title: l.title as string, where: `Lessons · ${KIND[l.kind as string] ?? "Lesson"} · Week ${l.week_number}`, href: `/lessons/${l.id}`, words: "lesson video" });
   return out;
 }
