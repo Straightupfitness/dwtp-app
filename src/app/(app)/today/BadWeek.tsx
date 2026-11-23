@@ -40,14 +40,15 @@ export function BadWeekOffer({ left }: { left: number }) {
   const [pending, start] = useTransition();
   return (
     // November 23 (Michael): the last thing on Today, laid out like "Book a call with Michael", with a red border.
-    <section className="rounded-2xl border border-[#ef4444] bg-card p-3.5">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 text-left">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#2a1010] text-[20px]" aria-hidden="true">😮‍💨</span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Having a bad week?</span><span className="block text-[12px] text-[#a8a8a8]">Ease off without falling off</span></span>
+    <section className="rounded-2xl border border-[#ef4444] bg-card px-4">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 text-left">
+        <span className="flex flex-1 items-center gap-1.5 font-[family-name:var(--font-display)] text-[15px] font-medium uppercase leading-tight text-[#cfcfcf]">
+          <span className="shrink-0 text-[15px] leading-none" aria-hidden="true">😮‍💨</span>Having a bad week?
+        </span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" aria-hidden="true" className={`shrink-0 transition ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       {open && (
-        <div className="mt-3 space-y-2.5 text-[14px] leading-snug text-[#cfcfcf]">
+        <div className="space-y-2.5 pb-3.5 text-[14px] leading-snug text-[#cfcfcf]">
           <p>Work deadline, sick kid, travel, the flu. When life wins a week, switch to the Bad Week Plan and do just three things:</p>
           <ol className="list-decimal space-y-1 pl-5">{BAD_WEEK_THREE.map((t) => <li key={t.title}>{t.title}</li>)}</ol>
           <p>Everything else pauses, and the week still counts. You get {BAD_WEEK_LIMIT} across the 26 weeks{left < BAD_WEEK_LIMIT ? ` (${left} left)` : ""}.</p>

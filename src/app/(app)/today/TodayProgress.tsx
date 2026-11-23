@@ -6,6 +6,7 @@ import CirclesSection from "@/components/CirclesSection";
 import ProgressPhotos from "@/components/ProgressPhotos";
 import OpenOnHash from "@/components/OpenOnHash";
 import Fold from "@/components/Fold";
+import { SleekFold } from "@/components/Sleek";
 import SectionIcon from "@/components/SectionIcon";
 import { loadProgressPhotos } from "@/lib/progress-photos";
 import type { ProgramState } from "@/lib/circles";
@@ -44,9 +45,6 @@ export async function TodayWeight({ userId }: { userId: string }) {
   const data = await loadDaily(supabase, userId);
   if (!data.weights.length) return null;
   return (
-    <details className="group border-t border-border pt-2">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[13px] font-semibold text-accent">See my weight graph <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
-      <div className="pt-2"><WeightCard data={data} /></div>
-    </details>
+    <SleekFold label="See my weight graph"><WeightCard data={data} /></SleekFold>
   );
 }

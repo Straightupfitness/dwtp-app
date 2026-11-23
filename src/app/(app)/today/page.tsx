@@ -25,6 +25,7 @@ import DailyCombo from "@/components/DailyCombo";
 import { Suspense } from "react";
 import TodayProgress, { TodayWeight } from "./TodayProgress";
 import Fold from "@/components/Fold";
+import { SleekFold } from "@/components/Sleek";
 import SectionIcon from "@/components/SectionIcon";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -137,13 +138,10 @@ export default async function TodayPage() {
   }));
   const stepGoal = goals?.step_goal ?? 10000;
   const stepsMore = steps30.some((d) => d.steps) && (
-    <details className="group border-t border-border pt-2">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[13px] font-semibold text-accent">See my last 30 days <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
-      <div className="pt-2">
-        <DailyCombo days={steps30} only={["stp"]}
-          goals={{ steps: stepGoal, startWeight: null, goalWeight: null, calories: null, protein: 0, fiber: 0, potassium: 0, water: 0 }} />
-      </div>
-    </details>
+    <SleekFold label="See my last 30 days">
+      <DailyCombo days={steps30} only={["stp"]}
+        goals={{ steps: stepGoal, startWeight: null, goalWeight: null, calories: null, protein: 0, fiber: 0, potassium: 0, water: 0 }} />
+    </SleekFold>
   );
   const byDay = new Map<string, { kcal: number; protein: number }>();
   for (const m of meals ?? []) { const d = todayIn(tz, new Date(m.eaten_at)); const t = byDay.get(d) ?? { kcal: 0, protein: 0 }; t.kcal += m.calories ?? 0; t.protein += Number(m.protein_g ?? 0); byDay.set(d, t); }
@@ -234,7 +232,7 @@ export default async function TodayPage() {
                         {!all && `${done}/${cg.items.length}`}
                         {all && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>}
                       </span>
-                      <span className={`${display} flex-1 text-[17px]`} style={{ color: cg.color }}>{cg.name}</span>
+                      <span className={`${display} flex-1 text-[15px] font-medium leading-tight`} style={{ color: cg.color }}>{cg.name}</span>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true" className="shrink-0 transition group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
                     </summary>
                     <div className="mb-2 ml-11 divide-y divide-border border-t border-border">
@@ -259,7 +257,7 @@ export default async function TodayPage() {
         <TodayProgress userId={user!.id} state={state} today={today} started={!notStarted} />
       </Suspense>
       <Fold id="help" title="Need help?" icon={<SectionIcon name="help" />}>
-        <BookCall />
+        <BookCall sub />
         {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
       </Fold>
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SleekLink } from "@/components/Sleek";
 import { IconPlate, IconScale } from "@/components/Icons";
 import { logSteps, logWeight } from "./actions";
 
@@ -116,9 +117,9 @@ export default function QuickStats(p: {
         )}
         <WeightWeek days={p.weightWeek} />
         {/* November 3: an easy way to add a weigh-in she missed. */}
-        <Link href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`} className="block text-[13px] text-accent">
-          {p.weightWeek[5]?.value == null ? "Forgot yesterday? Add yesterday's weight ›" : "Add or fix another day's weight ›"}
-        </Link>
+        <SleekLink href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`}>
+          {p.weightWeek[5]?.value == null ? "Forgot yesterday? Add yesterday\u2019s weight" : "Add or fix another day\u2019s weight"}
+        </SleekLink>
         {p.weightMore}
       </div>
 
@@ -141,7 +142,7 @@ export default function QuickStats(p: {
           </form>
         )}
         {p.stepsWeek.some((d) => d.value) && <BarsWeek days={p.stepsWeek} goal={p.stepGoal} color="#a3e635" />}
-        <Link href={`/log?d=${p.yesterday}`} className="block text-[13px] text-accent">Add or fix steps for another day ›</Link>
+        <SleekLink href={`/log?d=${p.yesterday}`}>Forgot yesterday? Add yesterday&apos;s steps</SleekLink>
         {p.stepsMore}
       </div>
 
@@ -153,7 +154,6 @@ export default function QuickStats(p: {
           <BarsWeek days={p.kcalWeek} goal={p.kcalTarget} color="#f5a623" second={{ days: p.proteinWeek, goal: p.proteinTarget, color: "#60a5fa" }} />
           <p className="flex gap-3 text-[11px] text-dim"><span><span className="mr-1 inline-block size-2 rounded-sm bg-accent" />Calories</span><span><span className="mr-1 inline-block size-2 rounded-sm bg-[#60a5fa]" />Protein</span>{p.kcalTarget ? <span>- - target</span> : null}</p>
         </>}
-        <Link href="/food#history" className="block text-[13px] text-accent">See your previous logs ›</Link>
       </div>
     </>
   );
