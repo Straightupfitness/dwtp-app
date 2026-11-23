@@ -17,7 +17,7 @@ export async function addProgressPhoto(path: string, takenOn: string, pose: stri
     await supabase.storage.from("progress-photos").remove([path]);
     return { error: "Progress photos aren't switched on yet. Ask Michael." };
   }
-  revalidatePath("/progress");
+  revalidatePath("/today");
   return { ok: true };
 }
 
@@ -29,6 +29,6 @@ export async function deleteProgressPhoto(id: string) {
   if (!data) return { error: "Photo not found" };
   await supabase.storage.from("progress-photos").remove([data.path]);
   await supabase.from("progress_photos").delete().eq("id", id).eq("client_id", user.id);
-  revalidatePath("/progress");
+  revalidatePath("/today");
   return { ok: true };
 }

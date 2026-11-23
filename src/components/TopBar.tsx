@@ -27,10 +27,10 @@ export default function TopBar({ coach, unread, alerts = 0, name, avatarPath }: 
           <Image src="/brand/dwtp-logo.png" alt="DWTP" width={67} height={32} className="h-8 w-auto mix-blend-lighten" priority />
         </Link>
         <div className="flex items-center gap-0.5">
-          <Btn href={coach ? "/coach/calendar" : "/calendar"} label="Calendar" icon={<IconCalendar />} />
+          {coach && <Btn href="/coach/calendar" label="Calendar" icon={<IconCalendar />} />}
           {/* November 11: her notifications, so the number on the app icon means something. */}
           <Btn href="/notifications" label="Alerts" icon={<Bell />} badge={alerts} aria={alerts ? `Notifications, ${alerts} new` : "Notifications"} />
-          <Btn href="/faq" label="Search" icon={<Search />} aria="Search the app and the FAQ" />
+          <Btn href="/faq" label="Search & FAQ" icon={<Search />} aria="Search the app and the FAQ" />
           <Btn href={coach ? "/coach/inbox" : "/chat"} label={coach ? "Inbox" : "Chat"} icon={<IconChat />} badge={unread}
             aria={unread ? `${coach ? "Inbox" : "Chat with Michael"}, ${unread} unread` : coach ? "Inbox" : "Chat with Michael"} />
           <Btn href="/me" label="Account" icon={<Avatar name={name} path={avatarPath} size={22} coach={coach} />} />

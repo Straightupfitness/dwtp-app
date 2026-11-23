@@ -5,6 +5,8 @@ export type FoodItem = {
   protein_g: number;
   fiber_g: number;
   potassium_mg: number;
+  /** November 23: true when it's an alcoholic drink (the food AI marks it); its calories count as alcohol. */
+  alcohol?: boolean;
 };
 
 export type FoodEstimate = { items: FoodItem[]; notes?: string };
@@ -52,4 +54,16 @@ export function parseQty(s: string): { n: number; unit: string; rest: string } |
   if (!m) return null;
   const n = (m[1] ? Number(m[1]) : 0) + (m[2] ? Number(m[2]) / Number(m[3]) : Number(m[4] ?? 0));
   return n > 0 ? { n, unit: s.slice(m[0].length).trim().toLowerCase(), rest: s.slice(m[0].length).trim() } : null;
+}
+
+/**
+ * November 23 (Michael): is this an alcoholic drink? The food AI marks drinks from now on (alcohol: true/false);
+ * older meals are matched by name (wine, beer, margarita, vodka soda...), leaving out food cooked with it.
+ */
+const DRINK = /\b(wine|ros[eé]|prosecco|champagne|cava|mimosa|sangria|beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer|white ?claw|truly|high ?noon|margarita|martini|mojito|cocktail|spritz|aperol|negroni|daiquiri|paloma|cosmo(politan)?|old fashioned|manhattan|bloody mary|vodka|tequila|mezcal|whiske?y|bourbon|scotch|rum|gin|brandy|cognac|sake|soju|hard kombucha|liqueur|baileys|kahl[uú]a|limoncello|shot|merlot|cabernet|pinot|chardonnay|sauvignon|riesling|malbec|zinfandel|moscato|syrah|shiraz|tempranillo|chianti|bellini|michelada|mule)\b/i;
+const NOT_A_DRINK = /non[- ]?alcoholic|alcohol[- ]free|\b(n\/a|na|zero|0\.0%?)\b|vinegar|batter|braised|sauce|reduction|glaze|cake|cupcake|cookie|ginger ?beer|root ?beer|ginger ?ale|cream of|marinade|seltzer water|sparkling water|mineral water|steamed|poached|risotto|chicken|beef|shrimp|mussels|clams|salmon|pasta|bread|shot of espresso|espresso shot|wheatgrass|ginger shot|chowder|rose ?water|rosewater|candy|gumm(y|ies)|ice cream|chocolate|truffle/i;
+export function isAlcohol(i: Pick<FoodItem, "name" | "alcohol">) {
+  if (typeof i.alcohol === "boolean") return i.alcohol;
+  const n = i.name ?? "";
+  return DRINK.test(n) && !NOT_A_DRINK.test(n);
 }

@@ -14,9 +14,6 @@ import MedalVideo from "@/components/MedalVideo";
 import { needsBlueprint } from "@/lib/blueprint";
 import ItemCheck from "../circles/ItemCheck";
 import QuickStats from "./QuickStats";
-import { after } from "next/server";
-import { adminClient } from "@/lib/supabase/admin";
-import { progressFor } from "@/lib/badges-server";
 import WaterCard from "./WaterCard";
 import SleepCard from "./SleepCard";
 import CirclesGlance from "@/components/CirclesGlance";
@@ -25,6 +22,9 @@ import { BadWeekActive, BadWeekOffer } from "./BadWeek";
 import { BAD_WEEK_LIMIT, loadBadWeeks } from "@/lib/bad-weeks";
 import { loadCycle } from "@/lib/cycle";
 import CycleToday from "@/components/cycle/CycleToday";
+import DailyCombo from "@/components/DailyCombo";
+import { Suspense } from "react";
+import TodayProgress from "./TodayProgress";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
@@ -81,12 +81,12 @@ export default async function TodayPage() {
             ? <>Your program starts {j.startsIn === 1 ? "tomorrow" : `in ${j.startsIn} days`}</>
             : <>You have <b className="font-bold"><CpCount total={pts} /></b> <span className="text-[#7ee2a8]">(+{wk} this week)</span></>}
         </p>
-        <Link href="/progress" className="block" aria-label="See your progress">
+        <a href="#progress" className="block" aria-label="See your progress">
           <p className="mb-1.5 text-right text-[11px] font-semibold uppercase tabular-nums tracking-[0.12em]">
             {jw < 1 ? `${JOURNEY_WEEKS} weeks ahead` : jw > JOURNEY_WEEKS ? `Week ${jw}` : <>Week {jw} <span className="text-dim">of {JOURNEY_WEEKS}</span></>}
           </p>
           <StageBars week={jw} />
-        </Link>
+        </a>
       </div>
     </header>
   );
@@ -106,9 +106,7 @@ export default async function TodayPage() {
     </p>
   );
 
-  // Award any badge she has just earned (so it shows in Community even if she never opens Progress).
-  const uid = user!.id;
-  after(async () => { try { await progressFor(adminClient(), uid); } catch (e) { console.error("badges", e); } });
+  // Badges she has just earned are awarded by "Your progress" at the bottom (it runs progressFor every time Today opens).
 
   const { open } = currentWindow(state.programStart);
   const yesterday = addDays(today, -1);
@@ -119,7 +117,7 @@ export default async function TodayPage() {
     supabase.from("nutrition_targets").select("calorie_target, protein_g").eq("client_id", user!.id).maybeSingle(),
     supabase.from("water_days").select("oz").eq("client_id", user!.id).eq("day", today).maybeSingle(),
     open ? supabase.from("checkins").select("id").eq("client_id", user!.id).eq("week_number", open.week).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("health_days").select("day, steps, sleep_minutes").eq("client_id", user!.id).gte("day", addDays(today, -8)),
+    supabase.from("health_days").select("day, steps, sleep_minutes").eq("client_id", user!.id).gte("day", addDays(today, -31)),
     supabase.from("profiles").select("step_goal").eq("id", user!.id).single(),
   ]);
   const todayMeals = (meals ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === today);
@@ -136,6 +134,21 @@ export default async function TodayPage() {
   const change = weightToday && firstInWeek && firstInWeek.date !== today ? Number(weightToday.weight_lbs) - firstInWeek.value! : null;
   const stepsWeek = week7(yesterday).map((date) => ({ date, value: (health ?? []).find((h) => h.day === date)?.steps ?? null }));
   const stepsYesterday = stepsWeek[6].value;
+  // November 23 (Michael): her steps for the last 30 finished days, in the same chart style as the food rows.
+  const steps30 = Array.from({ length: 30 }, (_, i) => addDays(yesterday, i - 29)).map((date) => ({
+    date, meals: 0, calories: 0, protein: 0, fiber: 0, potassium: 0, alcohol: 0, weight: null, water: null,
+    steps: (health ?? []).find((h) => h.day === date)?.steps ?? null,
+  }));
+  const stepGoal = goals?.step_goal ?? 10000;
+  const stepsMore = steps30.some((d) => d.steps) && (
+    <details className="group border-t border-border pt-2">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[13px] font-semibold text-accent">See my last 30 days <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
+      <div className="pt-2">
+        <DailyCombo days={steps30} only={["stp"]}
+          goals={{ steps: stepGoal, startWeight: null, goalWeight: null, calories: null, protein: 0, fiber: 0, potassium: 0, water: 0 }} />
+      </div>
+    </details>
+  );
   const byDay = new Map<string, { kcal: number; protein: number }>();
   for (const m of meals ?? []) { const d = todayIn(tz, new Date(m.eaten_at)); const t = byDay.get(d) ?? { kcal: 0, protein: 0 }; t.kcal += m.calories ?? 0; t.protein += Number(m.protein_g ?? 0); byDay.set(d, t); }
   const kcalWeek = week7(today).map((date) => ({ date, value: byDay.has(date) ? Math.round(byDay.get(date)!.kcal) : null }));
@@ -188,7 +201,7 @@ export default async function TodayPage() {
       {badNow && <BadWeekActive left={badLeft} />}
       <QuickStats today={today} yesterday={yesterday}
         weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
-        steps={stepsYesterday} stepGoal={goals?.step_goal ?? 10000} stepsWeek={stepsWeek}
+        steps={stepsYesterday} stepGoal={stepGoal} stepsWeek={stepsWeek} stepsMore={stepsMore}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
@@ -247,6 +260,10 @@ export default async function TodayPage() {
       {!circleGroups.length && !notStarted && <p className="text-dim">No habits open yet. Your next medal opens soon.</p>}
       {week >= 1 && !badNow && <BadWeekOffer left={badLeft} />}
       <BookCall />
+      {/* November 23 (Michael): the Progress tab folded into Today, near the bottom. */}
+      <Suspense fallback={<div id="progress" className="h-16 animate-pulse rounded-[18px] border border-border bg-card" />}>
+        <TodayProgress userId={user!.id} state={state} today={today} />
+      </Suspense>
 
     </section>
   );

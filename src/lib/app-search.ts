@@ -10,7 +10,7 @@ const PAGES: SearchHit[] = [
   { title: "Last night's sleep", where: "Today", href: "/today#sleep", words: "sleep track sleep hours bed tired rest night" },
   { title: "Today's water", where: "Today", href: "/today", words: "water ounces oz gallon drink hydration" },
   { title: "Weight", where: "Today", href: "/today", words: "weigh in weight scale log weight" },
-  { title: "Steps", where: "Today", href: "/today", words: "steps walk walking step count" },
+  { title: "Steps", where: "Today → Steps", href: "/today", words: "steps walk walking step count steps graph chart last 30 days" },
   { title: "Today's habits", where: "Today", href: "/today", words: "habits check off daily to do" },
   { title: "Missed a day? Fill it in", where: "Today → Missed a day?", href: "/log", words: "past day yesterday forgot missed log fill in" },
   { title: "Food log", where: "Food", href: "/food", words: "food log meal photo voice calories protein fiber eat breakfast lunch dinner snack" },
@@ -18,20 +18,21 @@ const PAGES: SearchHit[] = [
   { title: "Food rules", where: "Food", href: "/food", words: "food rules never pork allergies preferences" },
   { title: "Workouts", where: "Workouts", href: "/workouts", words: "workout strength training exercise lift gym program day" },
   { title: "Cardio", where: "Workouts", href: "/workouts", words: "cardio sprints jump rope kettlebell bike" },
-  { title: "Lessons", where: "Lessons", href: "/lessons", words: "lessons videos habits homework strong body wednesday strong mind friday sbw smf h&h" },
-  { title: "Bonus courses", where: "Lessons", href: "/lessons#bonus", words: "bonus courses pcos be gone driven women challenge high-t timeline testosterone afternoon energy fix strong sculpted travel workout guide hotel" },
-  { title: "Your circles and medals", where: "Progress → Circles", href: "/progress#circles", words: "circles medals capacity rings fix-it focus" },
-  { title: "Progress", where: "Progress", href: "/progress", words: "progress charts results weight trend cps capacity points badges" },
-  { title: "Progress photos", where: "Progress → Photos", href: "/progress#photos", words: "photos pictures before after progress pics" },
+  { title: "All my lessons", where: "Calendar → See all my lessons", href: "/lessons", words: "lessons videos habits homework strong body wednesday strong mind friday sbw smf h&h" },
+  { title: "Bonus courses", where: "Search & FAQ", href: "/faq#bonus", words: "bonus courses pcos be gone driven women challenge high-t timeline testosterone afternoon energy fix strong sculpted travel workout guide hotel" },
+  { title: "Your circles and medals", where: "Today → Your progress", href: "/today#circles", words: "circles medals capacity rings fix-it focus" },
+  { title: "Your progress", where: "Today → Your progress", href: "/today#progress", words: "progress results weight trend goal weight graph cps capacity points badges" },
+  { title: "What you've been eating & drinking", where: "Food", href: "/food#history", words: "food day by day calories protein fiber potassium alcohol drinks wine beer water graph chart history targets goals" },
+  { title: "Progress photos", where: "Today → Your progress", href: "/today#photos", words: "photos pictures before after progress pics" },
   { title: "Weekly check-in", where: "Check-in", href: "/checkin", words: "check in check-in weekly questions video" },
   { title: "Chat with Michael", where: "Chat (top right)", href: "/chat", words: "chat message michael question coach text" },
-  { title: "Calendar", where: "Calendar (top)", href: "/calendar", words: "calendar schedule workout days group call replay" },
+  { title: "Calendar", where: "Calendar (bottom)", href: "/calendar", words: "calendar schedule workout days group call replay" },
   { title: "Real Talk Tuesday (group call)", where: "Community / Calendar", href: "/community", words: "group call zoom tuesday replay real talk" },
   { title: "Community", where: "Community", href: "/community", words: "community posts group women share" },
   { title: "Cycle tracker", where: "Account → Cycle tracker", href: "/cycle", words: "cycle period menstrual menopause symptoms hormones" },
   { title: "Alerts", where: "Alerts (top)", href: "/notifications", words: "alerts notifications reminders" },
   { title: "Account and notifications", where: "Account (your picture)", href: "/me", words: "account profile name birthday picture photo notifications email settings sign out log out" },
-  { title: "How circles work", where: "Progress → Circles", href: "/circles/how", words: "how circles work medals streak 14 days" },
+  { title: "How circles work", where: "Today → Your progress", href: "/circles/how", words: "how circles work medals streak 14 days" },
 ];
 
 export async function loadSearchIndex(supabase: SupabaseClient): Promise<SearchHit[]> {
@@ -56,7 +57,7 @@ export async function loadSearchIndex(supabase: SupabaseClient): Promise<SearchH
   const KIND: Record<string, string> = { hh: "Habits & Homework", sbw: "Strong Body Wednesday", smf: "Strong Mind Friday", other: "Bonus" };
   // November 22: the bonus courses and their lessons.
   for (const c of BONUS_COURSES) {
-    out.push({ title: c.title, where: "Lessons · Bonus course", href: `/courses/${c.slug}`, words: `bonus course ${c.blurb}` });
+    out.push({ title: c.title, where: "Search & FAQ · Bonus course", href: `/courses/${c.slug}`, words: `bonus course ${c.blurb}` });
     for (const bl of c.lessons) out.push({ title: bl.title, where: `Bonus course · ${c.title}`, href: `/courses/${c.slug}/${bl.slug}`, words: "bonus course lesson video" });
   }
   for (const l of lessons ?? []) out.push({ title: l.title as string, where: `Lessons · ${KIND[l.kind as string] ?? "Lesson"} · Week ${l.week_number}`, href: `/lessons/${l.id}`, words: "lesson video" });

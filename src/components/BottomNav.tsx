@@ -2,16 +2,16 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { IconClients, IconKpis, IconLeads, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconProgress } from "./Icons";
+import { IconClients, IconKpis, IconLeads, IconCommunity, IconFood, IconLessons, IconToday, IconWorkouts, IconCalendar } from "./Icons";
 
 // Order set by Michael (October 28); Circles moved into Progress (October 29). Workouts took FAQ's place in the bar (October 28); FAQ lives in the top bar now.
 const CLIENT = [
+  // November 23: Progress folded into Today, Lessons into the Calendar, Calendar moved down from the top bar.
   { href: "/today", label: "Today", Icon: IconToday },
+  { href: "/calendar", label: "Calendar", Icon: IconCalendar },
   { href: "/food", label: "Food", Icon: IconFood },
   { href: "/workouts", label: "Workouts", Icon: IconWorkouts },
-  { href: "/progress", label: "Progress", Icon: IconProgress },
   { href: "/community", label: "Community", Icon: IconCommunity },
-  { href: "/lessons", label: "Lessons", Icon: IconLessons },
 ];
 const COACH = [
   { href: "/coach/kpis", label: "KPIs", Icon: IconKpis }, // November 17: left of Leads
@@ -40,8 +40,8 @@ export default function BottomNav({ coach = false }: { coach?: boolean }) {
     return () => { document.removeEventListener("focusout", fix); document.removeEventListener("change", fix); vv?.removeEventListener("resize", fix); };
   }, []);
   const tabs = coach ? COACH : CLIENT;
-  // The circles live inside Progress (October 29), so a circle page lights up Progress.
-  const here = path.startsWith("/circles") ? "/progress" : path;
+  // Circles and progress live on Today now (November 23); lessons live in the Calendar.
+  const here = coach ? path : path.startsWith("/circles") || path.startsWith("/progress") ? "/today" : path.startsWith("/lessons") ? "/calendar" : path;
   const active = tabs.filter((t) => here.startsWith(t.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

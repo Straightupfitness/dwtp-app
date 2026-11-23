@@ -35,8 +35,6 @@ export default function ProgressView({ data, badges, range, base, coach = false,
 }) {
   const g = data.goals;
   const days = data.days.slice(-range);
-  const last = data.weights[data.weights.length - 1] ?? null;
-  const lost = g.startWeight && last ? Math.round((g.startWeight - last.lbs) * 10) / 10 : null;
   const series = (f: (d: (typeof days)[number]) => number | null) => days.map((d) => ({ date: d.date, value: f(d) }));
   const hasSteps = days.some((d) => d.steps);
 
@@ -62,28 +60,7 @@ export default function ProgressView({ data, badges, range, base, coach = false,
         </div>
       </section>
 
-      <section className={`${card} space-y-3`}>
-        <H right={lost !== null && lost !== 0 ? <span className={`text-[13px] font-semibold ${lost > 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lost > 0 ? `−${lost}` : `+${-lost}`} lbs since the start</span> : null}>Weight</H>
-        {last && <p className="text-[13px] text-[#a8a8a8]">Latest <b className="text-text">{last.lbs} lbs</b> on {short(last.date)}{g.goalWeight ? ` · ${Math.abs(Math.round((last.lbs - g.goalWeight) * 10) / 10)} lbs to goal` : ""}</p>}
-        {coach ? <WeightDots points={data.weights} goal={g.goalWeight} /> : <WeightLine points={data.weights} goal={g.goalWeight} />}
-        {!coach && data.weights.length > 0 && (
-          <details className="group">
-            <summary className="cursor-pointer list-none text-[13px] font-semibold text-accent">Every weigh-in ({data.weights.length}) <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
-            <ul className="mt-2 max-h-64 divide-y divide-border overflow-y-auto rounded-xl border border-border text-[14px]">
-              {[...data.weights].reverse().map((w, i, a) => {
-                const prev = a[i + 1];
-                const ch = prev ? Math.round((w.lbs - prev.lbs) * 10) / 10 : null;
-                return (
-                  <li key={w.date} className="flex justify-between px-3 py-2">
-                    <span className="text-[#a8a8a8]">{short(w.date)}</span>
-                    <span><b>{w.lbs}</b> lbs{ch !== null && ch !== 0 && <span className={`ml-2 text-[12px] ${ch < 0 ? "text-[#7ee2a8]" : "text-dim"}`}>{ch > 0 ? "+" : "−"}{Math.abs(ch)}</span>}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </details>
-        )}
-      </section>
+      <WeightCard data={data} coach={coach} />
 
       {coach && (
         <section className={`${card} space-y-3`}>
@@ -134,6 +111,37 @@ export default function ProgressView({ data, badges, range, base, coach = false,
         </div>
       </details>
     </div>
+  );
+}
+
+/** Her weight since the start, with her goal weight as a dashed line (Today's "Your progress" and Michael's client page). */
+export function WeightCard({ data, coach = false }: { data: Daily; coach?: boolean }) {
+  const g = data.goals;
+  const last = data.weights[data.weights.length - 1] ?? null;
+  const lost = g.startWeight && last ? Math.round((g.startWeight - last.lbs) * 10) / 10 : null;
+  return (
+    <section id={coach ? undefined : "weight-graph"} className={`${card} scroll-mt-20 space-y-3`}>
+      <H right={lost !== null && lost !== 0 ? <span className={`text-[13px] font-semibold ${lost > 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lost > 0 ? `−${lost}` : `+${-lost}`} lbs since the start</span> : null}>Weight</H>
+      {last && <p className="text-[13px] text-[#a8a8a8]">Latest <b className="text-text">{last.lbs} lbs</b> on {short(last.date)}{g.goalWeight ? ` · ${Math.abs(Math.round((last.lbs - g.goalWeight) * 10) / 10)} lbs to goal` : ""}</p>}
+      {coach ? <WeightDots points={data.weights} goal={g.goalWeight} /> : <WeightLine points={data.weights} goal={g.goalWeight} />}
+      {!coach && data.weights.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer list-none text-[13px] font-semibold text-accent">Every weigh-in ({data.weights.length}) <span className="inline-block transition group-open:rotate-180">⌄</span></summary>
+          <ul className="mt-2 max-h-64 divide-y divide-border overflow-y-auto rounded-xl border border-border text-[14px]">
+            {[...data.weights].reverse().map((w, i, a) => {
+              const prev = a[i + 1];
+              const ch = prev ? Math.round((w.lbs - prev.lbs) * 10) / 10 : null;
+              return (
+                <li key={w.date} className="flex justify-between px-3 py-2">
+                  <span className="text-[#a8a8a8]">{short(w.date)}</span>
+                  <span><b>{w.lbs}</b> lbs{ch !== null && ch !== 0 && <span className={`ml-2 text-[12px] ${ch < 0 ? "text-[#7ee2a8]" : "text-dim"}`}>{ch > 0 ? "+" : "−"}{Math.abs(ch)}</span>}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+    </section>
   );
 }
 

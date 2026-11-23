@@ -3,14 +3,14 @@
  * Feeds her Progress tab, Michael's view of each client, and the badges.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DAILY_TARGETS } from "./food";
+import { DAILY_TARGETS, isAlcohol, type FoodItem } from "./food";
 import { programWeekOf, todayIn, trainingWeek } from "./program";
 import { daysFor } from "./workouts";
 
 export const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 export type Day = {
-  date: string; meals: number; calories: number; protein: number; fiber: number; potassium: number;
+  date: string; meals: number; calories: number; protein: number; fiber: number; potassium: number; alcohol: number;
   weight: number | null; steps: number | null; water: number | null;
 };
 export type Goals = {
@@ -28,7 +28,7 @@ export async function loadDaily(supabase: SupabaseClient, clientId: string, span
   const from = addDays(today, -(span - 1));
 
   const [{ data: food }, { data: weights }, { data: health }, { data: water }, { data: t }, { data: sessions }] = await Promise.all([
-    supabase.from("food_logs").select("eaten_at, calories, protein_g, fiber_g, potassium_mg").eq("client_id", clientId)
+    supabase.from("food_logs").select("eaten_at, calories, protein_g, fiber_g, potassium_mg, items").eq("client_id", clientId)
       .gte("eaten_at", addDays(from, -1) + "T00:00:00Z").order("eaten_at").limit(2000),
     supabase.from("weight_logs").select("log_date, weight_lbs").eq("client_id", clientId).order("log_date"),
     supabase.from("health_days").select("day, steps").eq("client_id", clientId).gte("day", from),
@@ -40,17 +40,19 @@ export async function loadDaily(supabase: SupabaseClient, clientId: string, span
   const byDay = new Map<string, Day>();
   for (let i = 0; i < span; i++) {
     const date = addDays(from, i);
-    byDay.set(date, { date, meals: 0, calories: 0, protein: 0, fiber: 0, potassium: 0, weight: null, steps: null, water: null });
+    byDay.set(date, { date, meals: 0, calories: 0, protein: 0, fiber: 0, potassium: 0, alcohol: 0, weight: null, steps: null, water: null });
   }
   for (const f of food ?? []) {
     const d = byDay.get(todayIn(tz, new Date(f.eaten_at)));
     if (!d) continue;
     d.meals++; d.calories += f.calories ?? 0; d.protein += Number(f.protein_g ?? 0); d.fiber += Number(f.fiber_g ?? 0); d.potassium += f.potassium_mg ?? 0;
+    // November 23: calories from alcoholic drinks (marked by the food AI, or matched by name for older meals).
+    for (const i of (Array.isArray(f.items) ? f.items : []) as FoodItem[]) if (i?.name && isAlcohol(i)) d.alcohol += Number(i.calories) || 0;
   }
   for (const w of weights ?? []) { const d = byDay.get(w.log_date); if (d) d.weight = Number(w.weight_lbs); }
   for (const h of health ?? []) { const d = byDay.get(h.day); if (d) d.steps = h.steps; }
   for (const w of water ?? []) { const d = byDay.get(w.day); if (d) d.water = w.oz; }
-  const days = [...byDay.values()].map((d) => ({ ...d, protein: Math.round(d.protein), fiber: Math.round(d.fiber), calories: Math.round(d.calories) }));
+  const days = [...byDay.values()].map((d) => ({ ...d, protein: Math.round(d.protein), fiber: Math.round(d.fiber), calories: Math.round(d.calories), alcohol: Math.round(d.alcohol) }));
 
   const goals: Goals = {
     startWeight: p?.start_weight_lbs != null ? Number(p.start_weight_lbs) : (weights?.[0] ? Number(weights[0].weight_lbs) : null),

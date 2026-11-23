@@ -10,7 +10,7 @@ export default function CirclesGlance({ state }: { state: ProgramState }) {
   const all = state.circles.filter((c) => c.kind === "growth");
   const medals = all.reduce((n, c) => n + c.ringsComplete, 0), total = all.reduce((n, c) => n + c.rings.length, 0);
   return (
-    <Link href="/progress#circles" className="block space-y-2.5 rounded-2xl border border-border bg-card p-3">
+    <Link href="/today#circles" className="block space-y-2.5 rounded-2xl border border-border bg-card p-3">
       <span className="flex items-baseline justify-between gap-2">
         <span className="font-[family-name:var(--font-display)] text-[17px] font-medium uppercase leading-none">Your circles</span>
         <span className="text-[12px] text-dim"><b className="text-text">{medals}</b> of {total} medals <span aria-hidden="true">›</span></span>

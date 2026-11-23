@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadWeek, type CalEvent } from "@/lib/calendar";
 import WorkoutDays from "./WorkoutDays";
 import BookCall from "@/components/BookCall";
-import BackButton from "@/components/BackButton";
+import { IconLessons } from "@/components/Icons";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const COLOR: Record<CalEvent["kind"], string> = {
@@ -21,14 +21,19 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <section className="space-y-3.5">
-      <BackButton fallback="/today" />
       <header>
-        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your week at a glance</p>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-accent">Your week: workouts, lessons and calls</p>
         <h1 className={`${display} mt-1 text-[30px] font-semibold`}>Calendar</h1>
       </header>
       <BookCall compact />
+      {/* November 23 (Michael): the Lessons tab moved into the Calendar. Each lesson sits on its day below; this lists them all. */}
+      <Link href="/lessons" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true"><IconLessons /></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">See all my lessons</span><span className="block text-[12px] text-dim">This week&apos;s, the ones you&apos;ve opened, and what&apos;s coming.</span></span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </Link>
       {/* November 11 (Sandra looked here for her progress photos): a shortcut to them. */}
-      <Link href="/progress#photos" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <Link href="/today#photos" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1708] text-accent" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
         </span>

@@ -10,6 +10,8 @@ import Link from "next/link";
 import { CopyMeal, CopyMealTo, FavoriteMeal } from "./MealButtons";
 import AddMealPhoto from "./AddMealPhoto";
 import CopyFromDay from "./CopyFromDay";
+import FoodHistory, { RANGES } from "./FoodHistory";
+import { Suspense } from "react";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
 const SLOT_LABEL: Record<string, string> = { meal_1: "Meal 1", meal_2: "Meal 2", meal_3: "Meal 3", other: "Other" };
@@ -27,14 +29,17 @@ function Mini({ label, value, target, unit, fmt }: { label: string; value: numbe
   );
 }
 
-export default async function FoodPage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
+export default async function FoodPage({ searchParams }: { searchParams: Promise<{ d?: string; r?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user!.id).single();
   const tz = profile?.timezone ?? "America/Los_Angeles";
   const today = todayIn(tz);
   // Previous days (October 29): /food?d=2026-10-27. Today unless she picked a day in the last 62.
-  const asked = (await searchParams).d;
+  const sp = await searchParams;
+  const asked = sp.d;
+  const r = Number(sp.r);
+  const range = (RANGES as readonly number[]).includes(r) ? r : 14;
   const day = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked < today && asked >= addDays(today, -MAX_BACK) ? asked : today;
   const isToday = day === today;
   const prev = addDays(day, -1);
@@ -162,6 +167,10 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
 
       {/* November 11: copy from any day, not only yesterday. */}
       <CopyFromDay toDay={day} today={today} />
+
+      <Suspense fallback={<div className="h-14 animate-pulse rounded-[18px] border border-border bg-card" />}>
+        <FoodHistory userId={user!.id} range={range} day={isToday ? null : day} open={!!sp.r} />
+      </Suspense>
     </section>
   );
 }

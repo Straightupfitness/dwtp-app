@@ -23,7 +23,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const heads = c.lessons.map((l, i) => (l.section && l.section !== c.lessons[i - 1]?.section ? l.section : null));
   return (
     <section className="space-y-4">
-      <Link href="/lessons#bonus" className="inline-flex min-h-11 items-center text-sm text-dim">← Lessons</Link>
+      <Link href="/faq#bonus" className="inline-flex min-h-11 items-center text-sm text-dim">← Bonus courses</Link>
       <header>
         <p className="text-[11px] uppercase tracking-[0.15em] text-accent">{c.coachOnly ? "🔒 Only you can see this course" : "Bonus course"}</p>
         <h1 className={`${display} mt-1 text-[28px] font-semibold leading-tight`}>{c.title}</h1>

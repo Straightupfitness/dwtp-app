@@ -89,6 +89,8 @@ export default function QuickStats(p: {
   weight: number | null; change: number | null; weightWeek: DayVal[];
   steps: number | null; stepGoal: number; stepsWeek: DayVal[];
   kcal: number; kcalTarget: number | null; protein: number; proteinTarget: number; kcalWeek: DayVal[]; proteinWeek: DayVal[];
+  /** November 23: her steps day by day (folded), right under the steps card's own week. */
+  stepsMore?: React.ReactNode;
 }) {
   return (
     <>
@@ -136,6 +138,7 @@ export default function QuickStats(p: {
         )}
         {p.stepsWeek.some((d) => d.value) && <BarsWeek days={p.stepsWeek} goal={p.stepGoal} color="#a3e635" />}
         <Link href={`/log?d=${p.yesterday}`} className="block text-[13px] text-accent">Add or fix steps for another day ›</Link>
+        {p.stepsMore}
       </div>
 
       <div className={`${card} space-y-3`}>
@@ -146,6 +149,7 @@ export default function QuickStats(p: {
           <BarsWeek days={p.kcalWeek} goal={p.kcalTarget} color="#f5a623" second={{ days: p.proteinWeek, goal: p.proteinTarget, color: "#60a5fa" }} />
           <p className="flex gap-3 text-[11px] text-dim"><span><span className="mr-1 inline-block size-2 rounded-sm bg-accent" />Calories</span><span><span className="mr-1 inline-block size-2 rounded-sm bg-[#60a5fa]" />Protein</span>{p.kcalTarget ? <span>- - target</span> : null}</p>
         </>}
+        <Link href="/food#history" className="block text-[13px] text-accent">See what you&apos;ve been eating &amp; drinking ›</Link>
       </div>
     </>
   );
