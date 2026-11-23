@@ -16,7 +16,7 @@ export default async function FoodHistory({ userId, range, day, open }: { userId
   const data = await loadDaily(supabase, userId, range);
   const href = (r: number) => `/food?${day ? `d=${day}&` : ""}r=${r}#history`;
   return (
-    <details id="history" open={open} className="group scroll-mt-20 rounded-[18px] border border-border bg-card">
+    <details id="history" open={open} className="group scroll-mt-20 overflow-hidden rounded-[18px] border border-border bg-card">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4">
         <span className="flex-1">
           <span className={`${display} block text-lg leading-tight`}>What you&apos;ve been eating &amp; drinking</span>

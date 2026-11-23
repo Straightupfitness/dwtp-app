@@ -85,11 +85,13 @@ function Labels({ days, has }: { days: Daily["days"]; has: (d: Daily["days"][num
         const dom = Number(d.date.slice(8));
         const month = new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
         const monday = new Date(d.date + "T12:00:00Z").getUTCDay() === 1;
+        // November 23: on a phone, 30 days of two-digit dates don't fit, so past 3 weeks only every other date shows.
         const text = dom === 1 ? month : days.length > 100 ? (monday ? String(dom) : "") : String(dom);
+        const skip = days.length > 21 && days.length <= 100 && dom !== 1 && dom % 2 === 0;
         return (
-          <span key={d.date} className={`flex-1 overflow-visible whitespace-nowrap text-center ${has(d) ? "text-[#d6d6d6]" : "text-[#6a6a6a]"} ${days.length > 60 ? "text-[8px]" : "text-[10px]"}`}>
+          <span key={d.date} className={`min-w-0 flex-1 overflow-visible whitespace-nowrap text-center ${has(d) ? "text-[#d6d6d6]" : "text-[#6a6a6a]"} ${days.length > 60 ? "text-[8px]" : days.length > 21 ? "text-[8px] md:text-[10px]" : "text-[10px]"}`}>
             {days.length <= 31 && <span className="block font-semibold">{wk(d.date)}</span>}
-            <span className="block">{text}</span>
+            <span className={`block ${skip ? "max-md:invisible" : ""}`}>{text}</span>
           </span>
         );
       })}
