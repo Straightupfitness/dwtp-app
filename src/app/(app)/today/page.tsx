@@ -203,7 +203,7 @@ export default async function TodayPage() {
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
-      <SleekLink href="/log" icon={<Cal />}>Missed a day? <span className="font-normal text-[#444]">Fill in weight, steps, sleep, food, water and habits</span></SleekLink>
+      <SleekLink href="/log" icon={<Cal />}>Missed a day? Fill it in</SleekLink>
       </Fold>
 
       {all.length > 0 && (
