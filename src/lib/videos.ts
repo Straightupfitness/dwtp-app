@@ -7,7 +7,7 @@ import { supabaseUrl } from "./supabase/config";
  */
 export type ProgramVideo = { code: string; url: string; portrait: boolean | null; seconds: number | null };
 
-export const VIDEO_CODE = /^(ONB|7X|CHK|MED|HH|SBW|SMF|SUP|FAQ)-(\d{1,3})$/;
+export const VIDEO_CODE = /^(ONB|7X|CHK|MED|HH|SBW|SMF|SUP|FAQ|BC)-(\d{1,3})$/;
 
 /** The codes Michael has scripts for, grouped the way he records them. */
 export const VIDEO_SETS: { title: string; prefix: string; codes: string[] }[] = [
@@ -26,7 +26,7 @@ export const VIDEO_SETS: { title: string; prefix: string; codes: string[] }[] = 
 
 /** "chk 2.mp4", "CHK-02 final.mov" → "CHK-02". Null when the name has no code. */
 export function codeFromFileName(name: string): string | null {
-  const m = name.toUpperCase().match(/\b(ONB|7X|CHK|MED|HH|SBW|SMF|SUP|FAQ)[\s_-]*0*(\d{1,3})\b/);
+  const m = name.toUpperCase().match(/\b(ONB|7X|CHK|MED|HH|SBW|SMF|SUP|FAQ|BC)[\s_-]*0*(\d{1,3})\b/);
   return m ? `${m[1]}-${m[2].padStart(2, "0")}` : null;
 }
 
