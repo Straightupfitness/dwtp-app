@@ -25,7 +25,7 @@ import DailyCombo from "@/components/DailyCombo";
 import { Suspense } from "react";
 import TodayProgress, { TodayWeight } from "./TodayProgress";
 import Fold from "@/components/Fold";
-import { Cal, SleekFold, SleekLink } from "@/components/Sleek";
+import { SleekFold } from "@/components/Sleek";
 import SectionIcon from "@/components/SectionIcon";
 
 const display = "font-[family-name:var(--font-display)] uppercase";
@@ -138,7 +138,7 @@ export default async function TodayPage() {
   }));
   const stepGoal = goals?.step_goal ?? 10000;
   const stepsMore = steps30.some((d) => d.steps) && (
-    <SleekFold label="See my last 30 days">
+    <SleekFold label="See my steps graph">
       <DailyCombo days={steps30} only={["stp"]}
         goals={{ steps: stepGoal, startWeight: null, goalWeight: null, calories: null, protein: 0, fiber: 0, potassium: 0, water: 0 }} />
     </SleekFold>
@@ -203,7 +203,6 @@ export default async function TodayPage() {
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}
-      <SleekLink href="/log" icon={<Cal />}>Missed a day? Fill it in</SleekLink>
       </Fold>
 
       {all.length > 0 && (

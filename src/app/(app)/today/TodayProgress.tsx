@@ -24,7 +24,7 @@ export default async function TodayProgress({ userId, state, today, started }: {
   return (
     <Fold id="progress" title="Your progress" icon={<SectionIcon name="progress" />}>
       {started && (
-        <Fold id="capacity-circles" variant="sub" title="Your Capacity Circles" icon={<SectionIcon name="circles" />}>
+        <Fold id="capacity-circles" variant="sub" title="Capacity Circles" icon={<SectionIcon name="circles" />}>
           <CirclesSection state={state} noTitle />
         </Fold>
       )}

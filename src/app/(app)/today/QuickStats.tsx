@@ -118,7 +118,7 @@ export default function QuickStats(p: {
         <WeightWeek days={p.weightWeek} />
         {/* November 3: an easy way to add a weigh-in she missed. */}
         <SleekLink href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`}>
-          {p.weightWeek[5]?.value == null ? "Add yesterday\u2019s weight" : "Add or fix another day\u2019s weight"}
+          Missed a day? Fill it in
         </SleekLink>
         {p.weightMore}
       </div>
@@ -142,7 +142,7 @@ export default function QuickStats(p: {
           </form>
         )}
         {p.stepsWeek.some((d) => d.value) && <BarsWeek days={p.stepsWeek} goal={p.stepGoal} color="#a3e635" />}
-        <SleekLink href={`/log?d=${p.yesterday}`}>Add yesterday&apos;s steps</SleekLink>
+        <SleekLink href={`/log?d=${p.yesterday}`}>Missed a day? Fill it in</SleekLink>
         {p.stepsMore}
       </div>
 

@@ -19,7 +19,7 @@ function Row({ c, sub, active = true }: { c: CircleState; sub: string; active?: 
   return (
     <Link href={`/circles/${c.slug}`} className="flex min-h-[72px] items-center gap-3 px-3.5 py-2">
       <span className="min-w-0 flex-1">
-        <span className="block font-[family-name:var(--font-display)] text-[19px] uppercase leading-tight" style={{ color: active ? c.color : "#cbd5e1" }}>{c.name}</span>
+        <span className="block font-[family-name:var(--font-display)] text-[15px] font-medium uppercase leading-tight" style={{ color: active ? c.color : "#cbd5e1" }}>{c.name}</span>
         <span className="block text-[13px] text-[#a8a8a8]">{sub}</span>
       </span>
       <Medals c={c} size={60} center />
@@ -60,13 +60,8 @@ export default function CirclesSection({ state, noTitle = false }: { state: Prog
         </Link>
       </div>
 
-      <Label>Here are the three circles I want you to prioritize:</Label>
-      <List>{focus.map((c) => <Row key={c.id} c={c} sub={progress(c)} />)}</List>
-
-      {alsoOpen.length > 0 && <>
-        <Label>Here are circles you are also working on:</Label>
-        <List>{alsoOpen.map((c) => <Row key={c.id} c={c} sub={progress(c)} />)}</List>
-      </>}
+      {/* November 23 (Michael): one list, her focus circles first, no headings. */}
+      <List>{[...focus, ...alsoOpen].map((c) => <Row key={c.id} c={c} sub={progress(c)} />)}</List>
 
       {coming.length > 0 && <>
         <details className="group">
