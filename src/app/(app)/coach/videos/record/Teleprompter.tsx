@@ -34,7 +34,9 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   const [secs, setSecs] = useState(0);
   const [wpm, setWpm] = useState(() => Number(saved("dwtp-tp-wpm", "150")) || 150);
   const [size, setSize] = useState(() => Number(saved("dwtp-tp-size", "40")) || 40);
-  const [vertical, setVertical] = useState(() => saved("dwtp-tp-vertical", "1") === "1");
+  // Medals are vertical like his phone videos; Habits & Homework were shot horizontal (HH-01 to HH-04). Remembered per set.
+  const vKey = `dwtp-tp-vertical-${set}`;
+  const [vertical, setVertical] = useState(() => saved(vKey, set === "hh" ? "0" : "1") === "1");
   const [paused, setPaused] = useState(false);
   const [pv, setPv] = useState(() => saved("dwtp-tp-prompter") === "1");
   const [mirror, setMirror] = useState(() => saved("dwtp-tp-mirror") === "1");
@@ -218,7 +220,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   </>;
   const actions = <>
     {mode === "setup" && <>
-      <label className="flex items-center gap-1.5 text-white/70"><input type="checkbox" checked={vertical} onChange={(e) => { setVertical(e.target.checked); keep("dwtp-tp-vertical", e.target.checked ? "1" : "0"); }} /> Vertical (9:16){pv ? "" : ", like your phone videos"}</label>
+      <label className="flex items-center gap-1.5 text-white/70"><input type="checkbox" checked={vertical} onChange={(e) => { setVertical(e.target.checked); keep(vKey, e.target.checked ? "1" : "0"); }} /> Vertical (9:16){pv ? "" : ", like your phone videos"}</label>
       {devices}
       <button type="button" onClick={begin} className={`${pv ? "min-h-10 px-5" : "min-h-12 px-7"} rounded-full bg-[#ef4444] text-[16px] font-bold`}>● Record {code}</button>
       {!pv && <span className="text-[12px] text-white/50">Space = start / pause · Enter = stop · ↑ ↓ = move the script</span>}
