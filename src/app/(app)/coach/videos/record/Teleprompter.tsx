@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { registerVideo } from "../actions";
@@ -17,6 +17,40 @@ const MP4 = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp
  * medal (program-videos/MED-51.mp4), then straight on to the next script. Recorded vertical (9:16) by default so it
  * matches his phone videos. Space pauses the scroll; ↑ ↓ nudge it.
  */
+type Recognizer = {
+  lang: string; continuous: boolean; interimResults: boolean; start: () => void; stop: () => void; abort: () => void;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null;
+};
+const noop = () => () => {};
+const hasSpeech = () => !!((window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
+/** A word as speech recognition would hear it: lower case, no punctuation ("8,000" → "8000"). */
+const norm = (w: string) => w.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9%]/g, "");
+const near = (a: string, b: string) => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
+  if (Math.abs(a.length - b.length) > 1 || a.length < 4) return false;
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i) || a.slice(i) === b.slice(i + 1);
+};
+/**
+ * Where in the script is he? The script word (from a little behind "from" to 40 words ahead) where the last words he
+ * said line up best. Needs 2 words in a row to agree (or one long word right next to where he was), so a stray word
+ * doesn't jump the script.
+ */
+function matchAt(script: string[], heard: string[], from: number) {
+  let best = from, bestScore = 0;
+  const lo = Math.max(0, from - 3), hi = Math.min(script.length - 1, from + 40);
+  for (let i = lo; i <= hi; i++) {
+    let score = 0;
+    for (let k = 0; k < heard.length && i - k >= 0; k++) { if (near(script[i - k], heard[heard.length - 1 - k])) score++; else if (k === 0) break; }
+    const ok = score >= 2 || (score === 1 && heard[heard.length - 1].length >= 5 && i - from <= 6);
+    if (ok && (score > bestScore || (score === bestScore && i < best))) { best = i; bestScore = score; }
+  }
+  return best;
+}
+
 export type ScriptSet = { key: string; label: string };
 
 /**
@@ -38,6 +72,11 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   const vKey = `dwtp-tp-vertical-${set}`;
   const [vertical, setVertical] = useState(() => saved(vKey, set === "hh" ? "0" : "1") === "1");
   const [paused, setPaused] = useState(false);
+  // November 27 (Michael): the script follows his voice (speech recognition in the browser) instead of a fixed speed.
+  const [voice, setVoice] = useState(() => saved("dwtp-tp-voice", "1") === "1");
+  const [voiceNote, setVoiceNote] = useState("");
+  const word = useRef(0); // the script word he has reached
+  const sr = useRef<{ stop: () => void; abort: () => void } | null>(null);
   const [pv, setPv] = useState(() => saved("dwtp-tp-prompter") === "1");
   const [mirror, setMirror] = useState(() => saved("dwtp-tp-mirror") === "1");
   const [pvSize, setPvSize] = useState(() => Number(saved("dwtp-tp-pvsize", "52")) || 52);
@@ -59,6 +98,8 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   const pos = useRef(0);
   const s = scripts[code];
   const text = s.text.replace(/\*/g, "");
+  const parts = useMemo(() => text.split(/(\s+)/), [text]);
+  const scriptWords = useMemo(() => parts.filter((x, k) => k % 2 === 0).map(norm), [parts]);
   const words = text.split(/\s+/).length;
   const at = codes.indexOf(code);
 
@@ -89,13 +130,48 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     if (v && st && v.srcObject !== st) { v.srcObject = st; v.play().catch(() => {}); }
   }, [pv]);
 
-  // Scroll the script while recording, at his speaking speed.
+  // Follow his voice: listen while recording, and move "at" to the script word he just said.
+  const canVoice = useSyncExternalStore(noop, hasSpeech, () => false);
+  const following = voice && canVoice;
+  useEffect(() => {
+    if (mode !== "recording" || !following) return;
+    const W = window as unknown as { SpeechRecognition?: new () => Recognizer; webkitSpeechRecognition?: new () => Recognizer };
+    const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition!;
+    let live = true;
+    const start = () => {
+      const r = new Ctor();
+      r.lang = "en-US"; r.continuous = true; r.interimResults = true;
+      r.onresult = (e) => {
+        let said = "";
+        for (let k = Math.max(0, e.results.length - 3); k < e.results.length; k++) said += " " + e.results[k][0].transcript;
+        const heard = said.split(/\s+/).map(norm).filter(Boolean).slice(-5);
+        const next = matchAt(scriptWords, heard, word.current);
+        if (next > word.current) word.current = next;
+      };
+      r.onerror = (ev) => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { setVoiceNote("The browser won't let the app listen. The script scrolls at your set speed instead."); live = false; } };
+      r.onend = () => { if (live) { try { start(); } catch { /* ignore */ } } };
+      try { r.start(); } catch { /* already running */ }
+      sr.current = r;
+    };
+    start();
+    return () => { live = false; try { sr.current?.abort(); } catch { /* ignore */ } sr.current = null; };
+  }, [mode, following, scriptWords]);
+
+  // Scroll the script while recording: to the word he's on (voice), or at his set speaking speed.
   useEffect(() => {
     if (mode !== "recording") return;
     let last = performance.now();
     const step = (now: number) => {
       const el = box.current;
-      if (el && !paused) {
+      if (el && !paused && following && !voiceNote) {
+        // Keep the line he's reading about a quarter of the way down, easing there smoothly.
+        const w = el.querySelector<HTMLElement>(`[data-w="${word.current}"]`);
+        if (w) {
+          const target = Math.max(0, w.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight * 0.22);
+          if (target > pos.current) pos.current += (target - pos.current) * Math.min(1, ((now - last) / 1000) * 5);
+          el.scrollTop = pos.current;
+        }
+      } else if (el && !paused) {
         const total = el.scrollHeight - el.clientHeight;
         const seconds = (words / wpm) * 60;
         pos.current = Math.min(total, pos.current + (total / Math.max(5, seconds)) * ((now - last) / 1000));
@@ -107,7 +183,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     raf.current = requestAnimationFrame(step);
     const t = setInterval(() => setSecs((x) => x + 1), 1000);
     return () => { cancelAnimationFrame(raf.current); clearInterval(t); };
-  }, [mode, paused, wpm, words]);
+  }, [mode, paused, wpm, words, following, voiceNote]);
 
   const stopRec = useCallback(() => { if (rec.current?.state === "recording") rec.current.stop(); }, []);
 
@@ -116,7 +192,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     if (!st) return;
     const type = MP4.find((t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t));
     if (!type) { setErr("This browser can't record MP4. Use the latest Chrome or Safari."); return; }
-    pos.current = 0; if (box.current) box.current.scrollTop = 0;
+    pos.current = 0; word.current = 0; setVoiceNote(""); if (box.current) box.current.scrollTop = 0;
     setErr(""); setNote(""); setPaused(false); setSecs(0); setCount(3); setMode("countdown");
     let n = 3;
     const t = setInterval(() => {
@@ -152,7 +228,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   }
 
   function redo() { if (url) URL.revokeObjectURL(url); setBlob(null); setUrl(null); setMode("setup"); }
-  function go(next: string) { if (url) URL.revokeObjectURL(url); setBlob(null); setUrl(null); setCode(next); setMode("setup"); pos.current = 0; if (box.current) box.current.scrollTop = 0; window.history.replaceState(null, "", `?set=${set}&code=${next}`); }
+  function go(next: string) { if (url) URL.revokeObjectURL(url); setBlob(null); setUrl(null); setCode(next); setMode("setup"); pos.current = 0; word.current = 0; if (box.current) box.current.scrollTop = 0; window.history.replaceState(null, "", `?set=${set}&code=${next}`); }
 
   async function upload() {
     if (!blob) return;
@@ -203,7 +279,8 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   );
   const sliders = (
     <span className="flex items-center gap-3 text-white/70">
-      <label className="flex items-center gap-1.5">Speed <input type="range" min={90} max={220} step={5} value={wpm} onChange={(e) => { setWpm(+e.target.value); keep("dwtp-tp-wpm", e.target.value); }} /> {wpm}</label>
+      <label className="flex items-center gap-1.5" title={canVoice ? "The script follows your voice as you read" : "This browser can't listen; use Chrome or Safari"}><input type="checkbox" checked={voice} disabled={busy || !canVoice} onChange={(e) => { setVoice(e.target.checked); keep("dwtp-tp-voice", e.target.checked ? "1" : "0"); }} /> Follow my voice</label>
+      {(!following || voiceNote) && <label className="flex items-center gap-1.5">Speed <input type="range" min={90} max={220} step={5} value={wpm} onChange={(e) => { setWpm(+e.target.value); keep("dwtp-tp-wpm", e.target.value); }} /> {wpm}</label>}
       <label className="flex items-center gap-1.5">Text <input type="range" min={24} max={96} step={2} value={fontSize} onChange={(e) => setFont(+e.target.value)} /></label>
       <label className="flex items-center gap-1.5"><input type="checkbox" checked={pv} disabled={busy} onChange={(e) => togglePv(e.target.checked)} /> Prompter view</label>
       {pv && <label className="flex items-center gap-1.5"><input type="checkbox" checked={mirror} onChange={(e) => { setMirror(e.target.checked); keep("dwtp-tp-mirror", e.target.checked ? "1" : "0"); }} /> Mirror</label>}
@@ -211,7 +288,9 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   );
   const scriptBox = (cls: string, pClass: string) => (
     <div ref={box} className={`${cls} overflow-hidden`} style={{ maskImage: "linear-gradient(transparent, black 10%, black 82%, transparent)" }}>
-      <p className={`${pClass} whitespace-pre-line font-semibold leading-[1.35]`} style={{ fontSize, transform: pv && mirror ? "scaleX(-1)" : undefined }}>{text}</p>
+      <p className={`${pClass} whitespace-pre-line font-semibold leading-[1.35]`} style={{ fontSize, transform: pv && mirror ? "scaleX(-1)" : undefined }}>
+        {parts.map((x, k) => (k % 2 === 0 ? <span key={k} data-w={k / 2}>{x}</span> : x))}
+      </p>
     </div>
   );
   const devices = <>
@@ -234,6 +313,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
       <button type="button" disabled={mode === "uploading"} onClick={redo} className={`${pv ? "min-h-10" : "min-h-12"} rounded-full border border-white/30 px-6`}>↺ Redo</button>
       {url && <a href={url} download={`${code}.mp4`} className={`${pv ? "min-h-10" : "min-h-12"} content-center rounded-full border border-white/30 px-6`}>⬇ Download</a>}
     </>}
+    {voiceNote && <span className="text-[#e7d3a8]">{voiceNote}</span>}
     {note && <span className="text-[#7ddc8f]">{note}</span>}
     {err && <span className="text-[#ff9a9a]">{err}</span>}
   </>;
