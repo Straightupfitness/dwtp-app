@@ -2,11 +2,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { awardAutoHabit, closeOutRings } from "@/lib/progress";
+import { asUnit, okWeight, toLbs } from "@/lib/units";
 
 export async function logWeight(formData: FormData) {
-  const weight = Number(formData.get("weight"));
+  // November 26: typed in her unit (lbs or kg), saved in pounds.
+  const unit = asUnit(formData.get("unit"));
+  const typed = Number(String(formData.get("weight") ?? "").replace(",", "."));
   const date = String(formData.get("date"));
-  if (!weight || weight < 60 || weight > 600) return;
+  if (!typed || !okWeight(typed, unit)) return;
+  const weight = toLbs(typed, unit);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -91,6 +95,17 @@ export async function undoBadWeek() {
   const { programWeek, todayIn } = await import("@/lib/program");
   const week = programWeek(p?.program_start ?? null, todayIn(p?.timezone ?? "America/Los_Angeles"));
   await supabase.from("bad_weeks").delete().eq("client_id", user.id).eq("week_number", week);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** November 26: she picks pounds or kilograms for her weight (needs SQL 41). */
+export async function setWeightUnit(unit: "lbs" | "kg") {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in" };
+  const { error } = await supabase.from("profiles").update({ weight_unit: unit === "kg" ? "kg" : "lbs" }).eq("id", user.id);
+  if (error) return { error: /weight_unit/.test(error.message) ? "Kilograms aren't switched on yet." : error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }

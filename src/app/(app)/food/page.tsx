@@ -116,6 +116,12 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
       </div>
 
       <MealLogger key={day} day={day} isToday={isToday} userId={user!.id} defaultSlot={nextSlot} myFoods={myFoods} goTos={(saved ?? []).map((g) => ({ id: g.id, name: g.name, items: g.items as FoodItem[], photo: favPic.get(g.id) ? photoUrls.get(favPic.get(g.id)!) ?? null : null })) as GoTo[]} />
+      {/* November 26 (Michael): her 3 go-to meals, the heart of the food side, and what they cost. */}
+      <Link href="/food/go-to" className="flex min-h-12 items-center gap-2.5 rounded-2xl border border-accent/50 bg-card px-3.5">
+        <span className="text-[18px]" aria-hidden="true">🍽️</span>
+        <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold">My 3 go-to meals</span><span className="block truncate text-[12px] text-dim">Plan them, get your shopping list, and see how much it costs</span></span>
+        <span className="text-dim" aria-hidden="true">›</span>
+      </Link>
       <div className="space-y-2.5">
         {meals.map((m) => (
           <article key={m.id} className="flex gap-3 rounded-2xl border border-border bg-card p-2.5">

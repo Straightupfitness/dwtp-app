@@ -5,14 +5,14 @@ import { sleepOn, habitOn, stepsOn, waterOn, weightOn } from "./actions";
 const input = "min-h-11 min-w-0 flex-1 rounded-lg border border-[#2a2a2a] bg-bg px-3 text-lg outline-none focus:border-accent";
 const btn = "min-h-11 shrink-0 rounded-lg bg-accent px-4 text-sm font-semibold text-black disabled:opacity-40";
 
-export function WeightDay({ date, value }: { date: string; value: number | null }) {
+export function WeightDay({ date, value, unit = "lbs" }: { date: string; value: number | null; unit?: "lbs" | "kg" }) {
   const [v, setV] = useState(value === null ? "" : String(value));
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   return (
-    <form onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await weightOn(date, v.trim() ? Number(v) : null); setMsg(r?.error ?? "Saved."); }); }} className="space-y-1.5">
+    <form onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await weightOn(date, v.trim() ? Number(v.replace(",", ".")) : null, unit); setMsg(r?.error ?? "Saved."); }); }} className="space-y-1.5">
       <div className="flex gap-2">
-        <input value={v} onChange={(e) => setV(e.target.value)} type="number" step="0.1" inputMode="decimal" placeholder="lbs" aria-label="Weight in lbs" className={input} />
+        <input value={v} onChange={(e) => setV(e.target.value)} type="number" step="0.1" inputMode="decimal" placeholder={unit} aria-label={`Weight in ${unit}`} className={input} />
         <button disabled={pending} className={btn}>{pending ? "…" : "Save"}</button>
       </div>
       {msg && <p className="text-xs text-dim">{msg}</p>}

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { progressFor } from "@/lib/badges-server";
 import { loadDaily } from "@/lib/daily";
+import { toUnit, type WeightUnit } from "@/lib/units";
 import { BadgesCard, WeightCard } from "@/components/ProgressView";
 import CirclesSection from "@/components/CirclesSection";
 import ProgressPhotos from "@/components/ProgressPhotos";
@@ -40,11 +41,15 @@ export default async function TodayProgress({ userId, state, today, started }: {
 }
 
 /** Her weight graph with her goal-weight line, folded under the weigh-in card. */
-export async function TodayWeight({ userId }: { userId: string }) {
+export async function TodayWeight({ userId, unit = "lbs" }: { userId: string; unit?: WeightUnit }) {
   const supabase = await createClient();
-  const data = await loadDaily(supabase, userId);
+  const raw = await loadDaily(supabase, userId);
+  // November 26: in her unit (lbs or kg).
+  const cv = (n: number | null) => (n == null ? n : toUnit(n, unit));
+  const data = unit === "lbs" ? raw : { ...raw, weights: raw.weights.map((w) => ({ ...w, lbs: toUnit(w.lbs, unit) })),
+    goals: { ...raw.goals, goalWeight: cv(raw.goals.goalWeight), startWeight: cv(raw.goals.startWeight) } };
   if (!data.weights.length) return null;
   return (
-    <SleekFold label="See my weight graph"><WeightCard data={data} /></SleekFold>
+    <SleekFold label="See my weight graph"><WeightCard data={data} unit={unit} /></SleekFold>
   );
 }

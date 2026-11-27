@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { loadWeightUnit, toUnit } from "@/lib/units";
 import { createClient } from "@/lib/supabase/server";
 import { loadProgram } from "@/lib/circles";
 import { todayIn } from "@/lib/program";
@@ -36,6 +37,7 @@ export default async function LogDay({ searchParams }: { searchParams: Promise<{
     supabase.from("health_days").select("steps, sleep_minutes").eq("client_id", user!.id).eq("day", day).maybeSingle(),
   ]);
   const doneIds = new Set((logs ?? []).map((l) => l.item_id as string));
+  const unit = await loadWeightUnit(supabase, user!.id); // November 26: lbs or kg
   const tz = p?.timezone ?? "America/Los_Angeles";
   const mealsThatDay = (food ?? []).filter((m) => todayIn(tz, new Date(m.eaten_at)) === day);
   const days = Array.from({ length: 8 }, (_, i) => addDays(today, -i)).reverse();
@@ -64,7 +66,7 @@ export default async function LogDay({ searchParams }: { searchParams: Promise<{
 
       <div className={card}>
         <p className={`${display} text-[17px]`}>Weight</p>
-        <WeightDay key={day} date={day} value={w ? Number(w.weight_lbs) : null} />
+        <WeightDay key={`${day}-${unit}`} date={day} value={w ? toUnit(Number(w.weight_lbs), unit) : null} unit={unit} />
       </div>
 
       <div className={card}>

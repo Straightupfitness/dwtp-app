@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SleekLink } from "@/components/Sleek";
+import UnitSwitch from "./UnitSwitch";
 import { IconPlate, IconScale } from "@/components/Icons";
 import { logSteps, logWeight } from "./actions";
 
@@ -94,7 +95,10 @@ export default function QuickStats(p: {
   stepsMore?: React.ReactNode;
   /** November 23: her weight graph with the goal line (folded), under the weigh-in. */
   weightMore?: React.ReactNode;
+  /** November 26: pounds or kilograms (her weights arrive already in this unit). */
+  unit?: "lbs" | "kg";
 }) {
+  const u = p.unit ?? "lbs";
   return (
     <>
       <div className={`${card} space-y-3`}>
@@ -102,20 +106,22 @@ export default function QuickStats(p: {
         <Title icon={<IconScale />}>What was your weight this morning?</Title>
         {p.weight !== null ? (
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[16px] leading-snug">You weighed <b className={`${display} text-[24px]`}>{p.weight.toFixed(1)}</b> lbs this morning</p>
-            {p.change !== null && <span className={`shrink-0 text-right text-[12px] leading-tight ${p.change <= 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{p.change > 0 ? "+" : "−"}{Math.abs(p.change).toFixed(1)} lbs<br />this week</span>}
+            <p className="text-[16px] leading-snug">You weighed <b className={`${display} text-[24px]`}>{p.weight.toFixed(1)}</b> {u} this morning</p>
+            {p.change !== null && <span className={`shrink-0 text-right text-[12px] leading-tight ${p.change <= 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{p.change > 0 ? "+" : "−"}{Math.abs(p.change).toFixed(1)} {u}<br />this week</span>}
           </div>
         ) : (
           <form action={logWeight} className="space-y-2">
-            <label htmlFor="weight" className="sr-only">Your weight this morning, in pounds</label>
+            <label htmlFor="weight" className="sr-only">Your weight this morning, in {u === "kg" ? "kilograms" : "pounds"}</label>
             <div className="flex gap-2">
               <input type="hidden" name="date" value={p.today} />
-              <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder="lbs" required className={input} />
+              <input type="hidden" name="unit" value={u} />
+              <input id="weight" name="weight" type="number" step="0.1" inputMode="decimal" placeholder={u} required className={input} />
               <button className={button}>Log</button>
             </div>
           </form>
         )}
         <WeightWeek days={p.weightWeek} />
+        <UnitSwitch unit={u} />
         {/* November 3: an easy way to add a weigh-in she missed. */}
         <SleekLink href={`/log?d=${p.weightWeek[5]?.value == null ? p.yesterday : p.today}`}>
           Missed a day? Fill it in

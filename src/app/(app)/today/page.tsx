@@ -25,6 +25,7 @@ import DailyCombo from "@/components/DailyCombo";
 import { Suspense } from "react";
 import TodayProgress, { TodayWeight } from "./TodayProgress";
 import Fold from "@/components/Fold";
+import { loadWeightUnit, toUnit } from "@/lib/units";
 import { SleekFold } from "@/components/Sleek";
 import SectionIcon from "@/components/SectionIcon";
 
@@ -122,13 +123,15 @@ export default async function TodayPage() {
   const protein = Math.round(todayMeals.reduce((s, m) => s + Number(m.protein_g ?? 0), 0));
   const proteinTarget = target?.protein_g ?? DAILY_TARGETS.protein_g;
   const kcalTarget = target?.calorie_target ?? null;
-  const w = weights ?? [];
+  // November 26: her weights in her unit (lbs or kg).
+  const unit = await loadWeightUnit(supabase, user!.id);
+  const w = (weights ?? []).map((x) => ({ ...x, weight_lbs: toUnit(Number(x.weight_lbs), unit) }));
   const weightToday = w.find((x) => x.log_date === today);
   // The last 7 days for the little charts (weight and food end today; steps end yesterday).
   const week7 = (end: string) => Array.from({ length: 7 }, (_, i) => addDays(end, i - 6));
   const weightWeek = week7(today).map((date) => { const x = w.find((r) => r.log_date === date); return { date, value: x ? Number(x.weight_lbs) : null }; });
   const firstInWeek = weightWeek.find((d) => d.value !== null);
-  const change = weightToday && firstInWeek && firstInWeek.date !== today ? Number(weightToday.weight_lbs) - firstInWeek.value! : null;
+  const change = weightToday && firstInWeek && firstInWeek.date !== today ? Math.round((Number(weightToday.weight_lbs) - firstInWeek.value!) * 10) / 10 : null;
   const stepsWeek = week7(yesterday).map((date) => ({ date, value: (health ?? []).find((h) => h.day === date)?.steps ?? null }));
   const stepsYesterday = stepsWeek[6].value;
   // November 23 (Michael): her steps for the last 30 finished days, in the same chart style as the food rows.
@@ -196,10 +199,10 @@ export default async function TodayPage() {
       {/* November 23 (Michael): her numbers under one folded title, in the same style as her habits. */}
       <Fold id="numbers" title="Track your numbers" icon={<SectionIcon name="numbers" />} defaultOpen>
       <QuickStats today={today} yesterday={yesterday}
-        weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek}
+        weight={weightToday ? Number(weightToday.weight_lbs) : null} change={change} weightWeek={weightWeek} unit={unit}
         steps={stepsYesterday} stepGoal={stepGoal} stepsWeek={stepsWeek} stepsMore={stepsMore}
         kcal={kcal} kcalTarget={kcalTarget} protein={protein} proteinTarget={proteinTarget} kcalWeek={kcalWeek} proteinWeek={proteinWeek}
-        weightMore={<Suspense fallback={null}><TodayWeight userId={user!.id} /></Suspense>} />
+        weightMore={<Suspense fallback={null}><TodayWeight userId={user!.id} unit={unit} /></Suspense>} />
       <WaterCard oz={water?.oz ?? 0} goal={profile?.water_goal_oz ?? 128} />
       <SleepCard key={today} date={today} preview={!!viewing} minutes={((health ?? []) as { day: string; sleep_minutes?: number | null }[]).find((h) => h.day === today)?.sleep_minutes ?? null} />
       {cyc?.mode && <CycleToday mode={cyc.mode} cycle={cyc.cycle} log={cyc.log} hasPeriods={cyc.periods.length > 0} preview={!!viewing} />}

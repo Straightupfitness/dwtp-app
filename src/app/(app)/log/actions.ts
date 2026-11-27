@@ -53,9 +53,11 @@ export async function sleepOn(date: string, hours: number | null) {
   return { ok: true };
 }
 
-export async function weightOn(date: string, weight: number | null) {
+export async function weightOn(date: string, typed: number | null, unit: "lbs" | "kg" = "lbs") {
   const { supabase, user, ok } = await me();
   if (!user || !ok(date)) return { error: "Pick a day in the past year." };
+  // November 26: typed in her unit, saved in pounds.
+  const weight = typed === null ? null : unit === "kg" ? Math.round((typed / 0.45359237) * 10) / 10 : typed;
   if (weight === null) { await supabase.from("weight_logs").delete().eq("client_id", user.id).eq("log_date", date); }
   else {
     if (!(weight >= 60 && weight <= 600)) return { error: "That weight doesn't look right." };

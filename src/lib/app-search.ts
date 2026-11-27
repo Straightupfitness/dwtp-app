@@ -15,6 +15,7 @@ const PAGES: SearchHit[] = [
   { title: "Missed a day? Fill it in", where: "Today → Missed a day?", href: "/log", words: "past day yesterday forgot missed log fill in" },
   { title: "Food log", where: "Food", href: "/food", words: "food log meal photo voice calories protein fiber eat breakfast lunch dinner snack" },
   { title: "My foods", where: "Food → My foods", href: "/food", words: "my foods saved favorites re-add again usual" },
+  { title: "My 3 go-to meals", where: "Food → My 3 go-to meals", href: "/food/go-to", words: "go-to meals favorite three backup shopping list grocery cost price budget how much will this cost store brand" },
   { title: "Food rules", where: "Food → Rules and Recipes", href: "/food#rules", words: "food rules never pork allergies preferences" },
   { title: "Workouts", where: "Workouts", href: "/workouts", words: "workout strength training exercise lift gym program day" },
   { title: "Cardio", where: "Workouts", href: "/workouts", words: "cardio sprints jump rope kettlebell bike" },

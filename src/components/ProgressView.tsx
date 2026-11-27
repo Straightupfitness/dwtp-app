@@ -115,14 +115,14 @@ export default function ProgressView({ data, badges, range, base, coach = false,
 }
 
 /** Her weight since the start, with her goal weight as a dashed line (Today's "Your progress" and Michael's client page). */
-export function WeightCard({ data, coach = false }: { data: Daily; coach?: boolean }) {
+export function WeightCard({ data, coach = false, unit = "lbs" }: { data: Daily; coach?: boolean; unit?: "lbs" | "kg" }) {
   const g = data.goals;
   const last = data.weights[data.weights.length - 1] ?? null;
   const lost = g.startWeight && last ? Math.round((g.startWeight - last.lbs) * 10) / 10 : null;
   return (
     <section id={coach ? undefined : "weight-graph"} className={`${card} scroll-mt-20 space-y-3`}>
-      <H right={lost !== null && lost !== 0 ? <span className={`text-[13px] font-semibold ${lost > 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lost > 0 ? `−${lost}` : `+${-lost}`} lbs since the start</span> : null}>Weight</H>
-      {last && <p className="text-[13px] text-[#a8a8a8]">Latest <b className="text-text">{last.lbs} lbs</b> on {short(last.date)}{g.goalWeight ? ` · ${Math.abs(Math.round((last.lbs - g.goalWeight) * 10) / 10)} lbs to goal` : ""}</p>}
+      <H right={lost !== null && lost !== 0 ? <span className={`text-[13px] font-semibold ${lost > 0 ? "text-[#7ee2a8]" : "text-[#a8a8a8]"}`}>{lost > 0 ? `−${lost}` : `+${-lost}`} {unit} since the start</span> : null}>Weight</H>
+      {last && <p className="text-[13px] text-[#a8a8a8]">Latest <b className="text-text">{last.lbs} {unit}</b> on {short(last.date)}{g.goalWeight ? ` · ${Math.abs(Math.round((last.lbs - g.goalWeight) * 10) / 10)} ${unit} to goal` : ""}</p>}
       {coach ? <WeightDots points={data.weights} goal={g.goalWeight} /> : <WeightLine points={data.weights} goal={g.goalWeight} />}
       {!coach && data.weights.length > 0 && (
         <details className="group">
@@ -134,7 +134,7 @@ export function WeightCard({ data, coach = false }: { data: Daily; coach?: boole
               return (
                 <li key={w.date} className="flex justify-between px-3 py-2">
                   <span className="text-[#a8a8a8]">{short(w.date)}</span>
-                  <span><b>{w.lbs}</b> lbs{ch !== null && ch !== 0 && <span className={`ml-2 text-[12px] ${ch < 0 ? "text-[#7ee2a8]" : "text-dim"}`}>{ch > 0 ? "+" : "−"}{Math.abs(ch)}</span>}</span>
+                  <span><b>{w.lbs}</b> {unit}{ch !== null && ch !== 0 && <span className={`ml-2 text-[12px] ${ch < 0 ? "text-[#7ee2a8]" : "text-dim"}`}>{ch > 0 ? "+" : "−"}{Math.abs(ch)}</span>}</span>
                 </li>
               );
             })}

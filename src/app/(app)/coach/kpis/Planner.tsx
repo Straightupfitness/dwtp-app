@@ -493,7 +493,9 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
   if (seenEvents !== events) { setSeenEvents(events); setEvs(events); }
   const [openEv, setOpenEv] = useState<CalEvent | null>(null);
   // November 20: what comes back on a day: his weekly schedule and the year's birthdays.
-  const repeatsOn = (d: Date) => evs.filter((e) => (e.kind === "weekly" ? e.weekday === d.getDay() : e.month === d.getMonth() + 1 && e.day === d.getDate()));
+  // November 26: and his one-time events.
+  const repeatsOn = (d: Date) => evs.filter((e) => (e.kind === "once" ? e.on_date === ymd(d) : e.kind === "weekly" ? e.weekday === d.getDay() : e.month === d.getMonth() + 1 && e.day === d.getDate()));
+  const [newAt, setNewAt] = useState<{ date: string; min: number } | null>(null);
   const [offset, setOffset] = useState(0); // days from today
   const [open, setOpen] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -516,7 +518,7 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-[12px] text-dim">Drag a task from the matrix onto a day and time.</p>
+        <p className="text-[12px] text-dim">Drag a task from the matrix onto a day and time, or tap an empty spot to add an event.</p>
         <span className="flex gap-1">
           <button type="button" onClick={() => setOffset((x) => x - 7)} className="min-h-8 rounded-lg border border-border px-2.5 text-[13px]" aria-label="Previous week">‹</button>
           <button type="button" onClick={() => setOffset(0)} disabled={offset === 0} className="min-h-8 rounded-lg border border-border px-2.5 text-[12px] disabled:opacity-40">Today</button>
@@ -552,7 +554,7 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
                 {/* Half-hour spots to drop on */}
                 {Array.from({ length: (LAST - FIRST + 1) * 2 }, (_, k) => {
                   const mins = FIRST * 60 + k * 30, zone = `slot|${day}|${mins}`;
-                  return <div key={k} data-drop={zone} className={`absolute inset-x-0 ${k % 2 ? "border-b border-border/70" : "border-b border-dashed border-border/30"} ${dnd.over === zone ? "bg-accent/25" : ""}`} style={{ top: k * (HOUR_PX / 2), height: HOUR_PX / 2 }} />;
+                  return <div key={k} data-drop={zone} onClick={() => setNewAt({ date: day, min: mins })} className={`absolute inset-x-0 cursor-pointer hover:bg-white/[0.04] ${k % 2 ? "border-b border-border/70" : "border-b border-dashed border-border/30"} ${dnd.over === zone ? "bg-accent/25" : ""}`} style={{ top: k * (HOUR_PX / 2), height: HOUR_PX / 2 }} />;
                 })}
                 {day === today && now.getHours() >= FIRST && now.getHours() <= LAST && (
                   <div className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-[#ef4444]" style={{ top: ((now.getHours() - FIRST) * 60 + now.getMinutes()) / 60 * HOUR_PX }} />
@@ -564,8 +566,8 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
                     const at = new Date(d); at.setHours(0, e.start_min!, 0, 0);
                     return (
                       <button key={key} type="button" onClick={() => setOpenEv(e)} title={`${timeLabel(at)} · ${e.title}`}
-                        className="absolute z-[15] overflow-hidden rounded-md border border-[#38bdf8]/50 bg-[#10202b] px-1 py-0.5 text-left text-[10px] leading-tight text-[#cfeaff]" style={pos}>
-                        <span className="block text-[9px] text-[#7cc9f0]">{timeLabel(at)}</span><span className="line-clamp-2">{e.title}</span>
+                        className={`absolute z-[15] overflow-hidden rounded-md border px-1 py-0.5 text-left text-[10px] leading-tight ${e.kind === "once" ? "border-[#a78bfa]/60 bg-[#1c1630] text-[#e4dcff]" : "border-[#38bdf8]/50 bg-[#10202b] text-[#cfeaff]"}`} style={pos}>
+                        <span className={`block text-[9px] ${e.kind === "once" ? "text-[#b9a6ff]" : "text-[#7cc9f0]"}`}>{timeLabel(at)}{e.remind_min != null ? " 🔔" : ""}</span><span className="line-clamp-2">{e.title}</span>
                       </button>
                     );
                   }
@@ -585,7 +587,7 @@ function Scheduler({ plan, items, dnd, events }: { plan: Plan; items: PlanItem[]
           })}
         </div>
       </div>
-      <Repeats evs={evs} setEvs={setEvs} open={openEv} setOpen={setOpenEv} />
+      <Repeats evs={evs} setEvs={setEvs} open={openEv} setOpen={setOpenEv} newAt={newAt} clearNew={() => setNewAt(null)} />
       {openItem && openItem.sched_at && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label="Scheduled task">
           <div className="w-full max-w-sm space-y-2.5 rounded-[18px] border border-border bg-[#121212] p-4" onClick={(e) => e.stopPropagation()}>
@@ -619,11 +621,20 @@ const fromTime = (t: string) => { const m = t.match(/^(\d{1,2}):(\d{2})/); retur
  * November 20: his weekly schedule and the year's birthdays, listed under the calendar: add, change or remove them.
  * Birthdays send him a reminder 2 days before.
  */
-function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: CalEvent[]) => void; open: CalEvent | null; setOpen: (e: CalEvent | null) => void }) {
+const REMIND: [number | null, string][] = [[null, "No reminder"], [0, "When it starts"], [10, "10 min before"], [15, "15 min before"], [30, "30 min before"], [60, "1 hour before"], [120, "2 hours before"], [1440, "1 day before"]];
+const remindLabel = (m: number | null | undefined) => REMIND.find(([v]) => v === (m ?? null))?.[1] ?? `${m} min before`;
+const dateLabel = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+function Repeats({ evs, setEvs, open, setOpen, newAt, clearNew }: { evs: CalEvent[]; setEvs: (e: CalEvent[]) => void; open: CalEvent | null; setOpen: (e: CalEvent | null) => void; newAt?: { date: string; min: number } | null; clearNew?: () => void }) {
   const [form, setForm] = useState<(Omit<CalEvent, "id"> & { id: string | null }) | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const blank = (kind: "weekly" | "yearly"): Omit<CalEvent, "id"> & { id: string | null } => ({ id: null, title: "", kind, weekday: 1, month: 1, day: 1, start_min: kind === "weekly" ? 540 : null, minutes: 60, icon: kind === "yearly" ? "🎂" : null, note: null });
+  const blank = (kind: "weekly" | "yearly" | "once", date?: string, min?: number): Omit<CalEvent, "id"> & { id: string | null } => ({ id: null, title: "", kind, weekday: 1, month: 1, day: 1,
+    start_min: kind === "yearly" ? null : min ?? 540, minutes: 60, icon: kind === "yearly" ? "🎂" : null, note: null,
+    on_date: kind === "once" ? date ?? new Date().toLocaleDateString("en-CA") : null, remind_min: kind === "yearly" ? null : 60 });
+  // November 26: tapping an empty spot on the calendar starts a one-time event there.
+  const [seenNew, setSeenNew] = useState(newAt);
+  if (newAt !== seenNew) { setSeenNew(newAt); if (newAt) { setForm(blank("once", newAt.date, newAt.min)); setErr(""); clearNew?.(); } }
   const edit = (e: CalEvent) => { setForm({ ...e }); setErr(""); setOpen(null); };
   const save = async () => {
     if (!form) return;
@@ -639,9 +650,20 @@ function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: 
   const remove = async (e: CalEvent) => { const r = await deleteEvent(e.id); if (!("error" in r && r.error)) { setEvs(evs.filter((x) => x.id !== e.id)); setForm(null); setOpen(null); } };
   const weekly = evs.filter((e) => e.kind === "weekly").sort((a, b) => ((a.weekday ?? 0) + 6) % 7 - ((b.weekday ?? 0) + 6) % 7 || (a.start_min ?? -1) - (b.start_min ?? -1));
   const yearly = evs.filter((e) => e.kind === "yearly").sort((a, b) => (a.month ?? 0) - (b.month ?? 0) || (a.day ?? 0) - (b.day ?? 0));
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const once = evs.filter((e) => e.kind === "once" && (e.on_date ?? "") >= todayStr).sort((a, b) => (a.on_date ?? "").localeCompare(b.on_date ?? "") || (a.start_min ?? -1) - (b.start_min ?? -1));
   const box = "min-h-10 rounded-lg border border-border bg-bg px-2 text-[14px] text-text outline-none focus:border-accent";
   return (
     <>
+      {/* November 26 (Michael): one-time events, with a reminder on his phone before each one. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
+        <button type="button" onClick={() => { setForm(blank("once")); setErr(""); }} className="min-h-9 rounded-lg bg-accent px-3 font-semibold text-black">+ Add an event</button>
+        {once.slice(0, 6).map((e) => (
+          <button key={e.id} type="button" onClick={() => setOpen(e)} className="min-h-9 rounded-lg border border-[#a78bfa]/40 px-2.5 text-left text-[12px]">
+            <span className="text-[#b9a6ff]">{dateLabel(e.on_date!)} · {minLabel(e.start_min)}{e.remind_min != null ? " 🔔" : ""}</span> {e.title}
+          </button>
+        ))}
+      </div>
       <details className="mt-2 text-[13px]">
         <summary className="cursor-pointer text-dim">Weekly schedule &amp; birthdays ({weekly.length} weekly · {yearly.length} yearly) · edit</summary>
         <div className="mt-2 grid gap-3 md:grid-cols-2">
@@ -663,7 +685,8 @@ function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: 
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label={open.title}>
           <div className="w-full max-w-sm space-y-2 rounded-[18px] border border-border bg-[#121212] p-4" onClick={(e) => e.stopPropagation()}>
             <p className="text-[16px] font-semibold">{open.icon ? `${open.icon} ` : ""}{open.title}</p>
-            <p className="text-[13px] text-dim">{open.kind === "weekly" ? `Every ${WEEKDAYS[open.weekday ?? 0]} · ${minLabel(open.start_min)}${open.start_min !== null ? ` · ${open.minutes} min` : ""}` : `Every year on ${MONTHS[(open.month ?? 1) - 1]} ${open.day} · reminder 2 days before`}</p>
+            <p className="text-[13px] text-dim">{open.kind === "once" ? `${dateLabel(open.on_date ?? todayStr)} · ${minLabel(open.start_min)}${open.start_min !== null ? ` · ${open.minutes} min` : ""}` : open.kind === "weekly" ? `Every ${WEEKDAYS[open.weekday ?? 0]} · ${minLabel(open.start_min)}${open.start_min !== null ? ` · ${open.minutes} min` : ""}` : `Every year on ${MONTHS[(open.month ?? 1) - 1]} ${open.day} · reminder 2 days before`}</p>
+            {open.kind !== "yearly" && open.start_min !== null && <p className="text-[13px] text-dim">🔔 {remindLabel(open.remind_min)}</p>}
             {open.note && <p className="text-[14px]">{open.note}</p>}
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={() => edit(open)} className="min-h-10 flex-1 rounded-xl border border-border text-[13px] font-semibold">Change</button>
@@ -675,9 +698,16 @@ function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: 
       {form && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setForm(null)} role="dialog" aria-modal="true" aria-label="Repeating event">
           <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void save(); }} className="w-full max-w-sm space-y-2.5 rounded-[18px] border border-border bg-[#121212] p-4">
-            <p className="font-[family-name:var(--font-display)] text-lg uppercase">{form.id ? "Change" : "Add"} {form.kind === "weekly" ? "a weekly event" : "a yearly date"}</p>
-            <input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={form.kind === "weekly" ? "Train at HG" : "Name"} className={`${box} w-full`} />
-            {form.kind === "weekly" ? (
+            <p className="font-[family-name:var(--font-display)] text-lg uppercase">{form.id ? "Change" : "Add"} {form.kind === "once" ? "an event" : form.kind === "weekly" ? "a weekly event" : "a yearly date"}</p>
+            <input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={form.kind === "once" ? "Dentist, call with Jenny…" : form.kind === "weekly" ? "Train at HG" : "Name"} className={`${box} w-full`} />
+            {!form.id && form.kind !== "yearly" && (
+              <div className="flex gap-1 text-[12px]">
+                {(["once", "weekly"] as const).map((k) => <button key={k} type="button" onClick={() => setForm({ ...form, kind: k, on_date: k === "once" ? form.on_date ?? todayStr : null })} className={`min-h-8 rounded-lg border px-2.5 ${form.kind === k ? "border-accent text-accent" : "border-border text-dim"}`}>{k === "once" ? "One time" : "Every week"}</button>)}
+              </div>
+            )}
+            {form.kind === "once" ? (
+              <input type="date" value={form.on_date ?? ""} onChange={(e) => setForm({ ...form, on_date: e.target.value })} className={`${box} w-full [color-scheme:dark]`} aria-label="Date" />
+            ) : form.kind === "weekly" ? (
               <div className="flex flex-wrap gap-1">{WEEKDAYS.map((w, k) => <button key={w} type="button" onClick={() => setForm({ ...form, weekday: k })} className={`min-h-9 rounded-lg border px-2.5 text-[13px] ${form.weekday === k ? "border-accent text-accent" : "border-border text-dim"}`}>{w}</button>)}</div>
             ) : (
               <div className="flex gap-2">
@@ -693,6 +723,13 @@ function Repeats({ evs, setEvs, open, setOpen }: { evs: CalEvent[]; setEvs: (e: 
                 <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })} className={box}>{[15, 30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`}</option>)}</select>
               </>}
             </div>
+            {form.kind !== "yearly" && form.start_min !== null && (
+              <label className="flex items-center gap-2 text-[13px] text-dim">🔔 Remind me
+                <select value={form.remind_min ?? ""} onChange={(e) => setForm({ ...form, remind_min: e.target.value === "" ? null : Number(e.target.value) })} className={box}>
+                  {REMIND.map(([v, l]) => <option key={l} value={v ?? ""}>{l}</option>)}
+                </select>
+              </label>
+            )}
             <input value={form.note ?? ""} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Note (optional)" className={`${box} w-full`} />
             {err && <p className="text-[13px] text-[var(--red)]">{err}</p>}
             <button disabled={busy} className="min-h-11 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
