@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const MAX_SECONDS = 480;
@@ -25,6 +26,15 @@ function pageContext(viewing: { id: string; first: string } | null) {
  * to her chat (on her client page, a check-in, or while he's looking at her app), or download it.
  */
 export default function RecordMyself({ viewing }: { viewing: { id: string; first: string } | null }) {
+  const path = usePathname();
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const isField = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest("input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, [contenteditable=true], select");
+    const on = (e: FocusEvent) => setTyping(isField(e.target));
+    const off = () => setTimeout(() => setTyping(isField(document.activeElement)), 0);
+    document.addEventListener("focusin", on); document.addEventListener("focusout", off);
+    return () => { document.removeEventListener("focusin", on); document.removeEventListener("focusout", off); };
+  }, []);
   const [mode, setMode] = useState<Mode>("idle");
   const [kind, setKind] = useState<Kind>("me");
   const [screenOk, setScreenOk] = useState(false);
@@ -162,10 +172,13 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
   }
 
   const btn = "min-h-10 rounded-lg px-3.5 text-[14px] font-semibold";
+  // November 26 (Michael): when it's just sitting there, it's a small round camera button, and it steps aside on chat
+  // screens and while he's typing, so it never covers a message box or a button.
+  const hide = mode === "idle" && (typing || /^\/(chat|coach\/inbox|coach\/text)/.test(path ?? ""));
   const corner = left ? "left-4" : "right-4";
   return (
     <div className="print:hidden">
-      {(mode === "idle" || mode === "done" || mode === "choose") && (
+      {(mode === "idle" || mode === "done" || mode === "choose") && !hide && (
         <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] right-4 z-40 flex flex-col items-end gap-2 md:bottom-6">
           {mode === "choose" && (
             <div className="w-64 space-y-1 rounded-2xl border border-border bg-[#121212] p-2 shadow-2xl" role="menu">
@@ -182,8 +195,9 @@ export default function RecordMyself({ viewing }: { viewing: { id: string; first
           {done && mode === "done" && <p className="max-w-xs rounded-lg bg-[#132a1b] p-2 text-[13px] text-[#7ddc8f]">{done}</p>}
           {err && <p className="max-w-xs rounded-lg bg-[#2a1515] p-2 text-[13px] text-[#ff9a9a]">{err}</p>}
           <button type="button" onClick={() => { setErr(""); setDone(""); setMode(mode === "choose" ? "idle" : "choose"); }} aria-expanded={mode === "choose"}
-            className="min-h-12 rounded-full bg-accent px-5 text-[15px] font-semibold text-black shadow-2xl">
-            {mode === "choose" ? "✕ Close" : "🎥 Record myself"}
+            title="Record myself" aria-label={mode === "choose" ? "Close" : "Record myself"}
+            className={`rounded-full shadow-2xl ${mode === "choose" ? "min-h-11 bg-accent px-4 text-[14px] font-semibold text-black" : "grid size-11 place-items-center border border-accent/60 bg-black/80 text-[18px] opacity-80 hover:opacity-100"}`}>
+            {mode === "choose" ? "✕ Close" : "🎥"}
           </button>
         </div>
       )}

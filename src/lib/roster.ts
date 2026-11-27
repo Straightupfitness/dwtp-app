@@ -49,6 +49,9 @@ export type RosterRow = {
   /** November 6: Bad Week Plan this week, and how many she has used. */
   badWeek: boolean; badUsed: number;
   stepGoal: number; targets: { kcal: number | null; protein: number; fiber: number; potassium: number };
+  /** November 26 (Michael): like his leads. She: her last chat message or check-in. He: his last chat message,
+   * check-in reply, or text from his phone through the app. ISO times. */
+  heardAt: string | null; reachedAt: string | null; phone: string | null;
 };
 
 export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]> {
@@ -73,6 +76,20 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
     lastSeenMap(),
   ]);
   // November 11: who has done her Driven Woman Blueprint (an old pre-November 10 assessment doesn't count).
+  // November 26: who reached out last. Messages from the last 120 days; his texts need SQL 41 (profiles.last_texted_at).
+  const msgs = await all<{ client_id: string; sender_id: string; created_at: string }>((a, b) => supabase.from("messages").select("client_id, sender_id, created_at")
+    .in("client_id", ids).gte("created_at", addDays(since, -110) + "T00:00:00Z").order("created_at", { ascending: false }).range(a, b)).catch(() => []);
+  const heard = new Map<string, string>(), reached = new Map<string, string>();
+  const later = (m: Map<string, string>, id: string, t: string | null | undefined) => { if (t && (!m.has(id) || t > m.get(id)!)) m.set(id, t); };
+  for (const m of msgs) later(m.sender_id === m.client_id ? heard : reached, m.client_id, m.created_at);
+  for (const c of checkins) {
+    later(heard, c.client_id, c.submitted_at);
+    for (const rp of (Array.isArray(c.checkin_replies) ? c.checkin_replies : c.checkin_replies ? [c.checkin_replies] : []) as { sent_at: string | null }[]) later(reached, c.client_id, rp.sent_at);
+  }
+  const phoneOf = new Map<string, string | null>();
+  { const { data: ph } = await supabase.from("profiles").select("id, phone").in("id", ids); for (const x of ph ?? []) phoneOf.set(x.id as string, (x.phone as string | null) ?? null); }
+  { const { data: tx, error } = await supabase.from("profiles").select("id, last_texted_at").in("id", ids); if (!error) for (const x of tx ?? []) later(reached, x.id as string, x.last_texted_at as string | null); }
+
   const { data: bps } = await supabase.from("assessments").select("client_id, submitted_at, answers").in("client_id", ids);
   const bpOf = new Map((bps ?? []).map((b) => [b.client_id as string, blueprintDone(b.submitted_at as string | null) ? "done" as const : Object.keys((b.answers as object) ?? {}).some((k) => k !== "previous") && !b.submitted_at ? "started" as const : "not-started" as const]));
 
@@ -174,6 +191,7 @@ export async function loadRoster(supabase: SupabaseClient): Promise<RosterRow[]>
       targets: { kcal: t?.calorie_target ?? null, protein: t?.protein_g ?? DAILY_TARGETS.protein_g, fiber: t?.fiber_g ?? DAILY_TARGETS.fiber_g, potassium: t?.potassium_mg ?? DAILY_TARGETS.potassium_mg },
       weighins, weighins7: weighins.days.filter((x) => x.seen).length,
       lastCheckin: latestCheckin ? { week: latestCheckin.week_number, at: latestCheckin.submitted_at!, id: latestCheckin.id } : null,
+      heardAt: heard.get(c.id) ?? null, reachedAt: reached.get(c.id) ?? null, phone: phoneOf.get(c.id) ?? null,
     };
     return row;
   });

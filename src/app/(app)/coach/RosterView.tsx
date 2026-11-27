@@ -10,15 +10,27 @@ import type { FoodWeekData } from "@/lib/food-week";
 import { TextLink } from "./clients/[id]/WelcomeButton";
 import SeeHerApp from "./clients/[id]/SeeHerApp";
 import type { RosterRow } from "@/lib/roster";
+import { smsLink } from "./text/TextQueue";
+import { markClientTexted } from "./text/actions";
 
-type SortKey = "attention" | "name" | "seen" | "goal" | "weighins" | "checkin" | "kcalAvg" | "steps";
+type SortKey = "attention" | "name" | "seen" | "goal" | "weighins" | "checkin" | "kcalAvg" | "steps" | "heard" | "reached";
 const SORT_VALUE: Record<Exclude<SortKey, "attention" | "name">, (r: RosterRow) => number | null> = {
   seen: (r) => r.hoursSinceSeen ?? 1e9, goal: (r) => r.goalWeight, weighins: (r) => r.weighins7, checkin: (r) => (r.lastCheckin ? Date.parse(r.lastCheckin.at) : null), kcalAvg: (r) => r.kcalAvg,
   steps: (r) => r.stepsAvg,
+  // November 26: longest ago first (who she hasn't heard from / who he hasn't reached), never at the very top.
+  heard: (r) => (r.heardAt ? -Date.parse(r.heardAt) : 1e15), reached: (r) => (r.reachedAt ? -Date.parse(r.reachedAt) : 1e15),
+};
+/** "Today 3:40 PM", "Yesterday", "Tue Nov 24", or "–". */
+const contact = (iso: string | null) => {
+  if (!iso) return { top: "–", sub: "" };
+  const la = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const d = new Date(iso), today = la(new Date()), y = la(new Date(Date.now() - 864e5)), day = la(d);
+  const days = Math.round((Date.parse(today) - Date.parse(day)) / 864e5);
+  return { top: day === today ? "Today" : day === y ? "Yesterday" : when(iso), sub: day === today || day === y ? at(iso) : `${days}d ago` };
 };
 // November 2: name · last in app · weight · steps · calories (7 days each) · last check-in · alerts.
-const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(56px,0.35fr)_minmax(190px,1.2fr)_minmax(190px,1.2fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(150px,1fr)]";
-const MID: string[] = ["goal", "weighins", "steps", "kcalAvg", "checkin"]; // centered, with a divider (November 3)
+const COLS = "md:grid-cols-[24px_minmax(150px,1.1fr)_minmax(118px,0.75fr)_minmax(56px,0.35fr)_minmax(190px,1.2fr)_minmax(190px,1.2fr)_minmax(235px,1.45fr)_minmax(115px,0.75fr)_minmax(92px,0.6fr)_minmax(92px,0.6fr)_minmax(150px,1fr)]";
+const MID: string[] = ["goal", "weighins", "steps", "kcalAvg", "checkin", "heard", "reached"]; // centered, with a divider (November 3)
 const letter = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
 // November 10: whole numbers only (8k, not 8.4k), so each day has room to breathe.
 const kk = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
@@ -155,7 +167,7 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
       {/* One row per client (November 2): her last 7 days of weight, steps and calories side by side. */}
       <div className={`sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 hidden gap-2 bg-bg/95 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.06em] text-dim backdrop-blur md:grid ${COLS}`}>
         <span />
-        {([["name", "Client"], ["seen", "Last in app"], ["goal", "Goal"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"]] as [SortKey, string][]).map(([key, label]) => (
+        {([["name", "Client"], ["seen", "Last in app"], ["goal", "Goal"], ["weighins", "Weight"], ["steps", "Steps"], ["kcalAvg", "Calories · P F K"], ["checkin", "Last check-in"], ["heard", "She reached out"], ["reached", "I reached out"]] as [SortKey, string][]).map(([key, label]) => (
           <span key={key} className={`min-w-0 ${MID.includes(key) ? "border-l border-[#2a2a2a] pl-2 text-center" : ""}`}>
             <button type="button" onClick={() => setSort(key)} aria-label={`Sort by ${label}`}
               className={`uppercase ${MID.includes(key) ? "w-full text-center" : "text-left"} ${sort.key === key ? "text-accent" : "hover:text-text"}`}>{label}{sort.key === key ? (sort.dir === 1 ? " ↓" : " ↑") : ""}</button>
@@ -186,7 +198,8 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
           return (
             <li key={r.id} className={`grid grid-cols-[24px_1fr_auto] items-center gap-x-2 gap-y-1.5 px-2.5 py-2 ${COLS} md:gap-x-2 ${on ? "bg-accent/10" : ""}`}>
               <input type="checkbox" checked={on} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} className="size-[18px] accent-[var(--accent)] md:order-1" />
-              <Link href={`/coach/clients/${r.id}`} className="flex min-w-0 items-center gap-2 md:order-2">
+              <span className="flex min-w-0 items-center gap-1 md:order-2">
+              <Link href={`/coach/clients/${r.id}`} className="flex min-w-0 flex-1 items-center gap-2">
                 <Avatar name={r.name} path={r.avatar} size={32} />
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-semibold leading-tight">{r.name}</span>
@@ -194,6 +207,13 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                   <span className="mt-0.5 block md:hidden"><SeenStrip seen={r.seen} size={12} /></span>
                 </span>
               </Link>
+                {/* November 26 (Michael): text her from his own phone, "Hi {first}, " ready to go. */}
+                {r.phone && (
+                  <a href={smsLink(r.phone, `Hi ${r.first}, `)} onClick={() => { void markClientTexted(r.id).catch(() => {}); }}
+                    title={`Text ${r.first} from your phone`} aria-label={`Text ${r.first} from your phone`}
+                    className="grid size-8 shrink-0 place-items-center rounded-lg border border-border text-[15px] hover:border-accent">📱</a>
+                )}
+              </span>
               {/* Alerts, stacked on the right. */}
               <span className="flex max-w-[230px] flex-wrap content-center justify-end gap-0.5 justify-self-end md:order-4 md:max-w-none md:self-stretch md:justify-self-stretch md:border-l md:border-[#262626] md:pl-2">
                 {alerts.map((x, i) => x.href
@@ -230,6 +250,17 @@ export default function RosterView({ rows }: { rows: RosterRow[] }) {
                     ? <Link href={`/coach/checkins/${c.id}`} className={`${cell} md:flex md:flex-col md:justify-center`}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline md:block ${current ? "text-[#7ee2a8]" : ""}`}>{current ? "✓ " : ""}{when(c.at)}</span><span className={`${sub} ml-1 inline md:ml-0 md:block`}>{c.week >= 1 ? `Week ${c.week}` : "Pre-launch"} · {at(c.at)}</span></Link>
                     : <span className={`${cell} md:flex md:flex-col md:justify-center`}><span className="mr-1 text-[10px] uppercase text-dim md:hidden">Check-in</span><span className={`${val} inline text-dim md:block`}>–</span></span>;
                 })()}
+                {/* November 26 (Michael): who reached out last, like his leads. */}
+                {([["She reached out", r.heardAt, "Her last chat message or check-in"], ["I reached out", r.reachedAt, "Your last chat message, check-in reply, or text from the app"]] as const).map(([label, iso, tip]) => {
+                  const c = contact(iso), stale = !!iso && (Date.now() - Date.parse(iso)) / 864e5 >= 7;
+                  return (
+                    <span key={label} className={`${cell} md:flex md:flex-col md:justify-center md:text-center`} title={`${tip}${iso ? `: ${new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}` : ""}`}>
+                      <span className="mr-1 text-[10px] uppercase text-dim md:hidden">{label}</span>
+                      <span className={`${val} inline md:block ${!iso ? "text-dim" : stale ? "text-[#fb7185]" : ""}`}>{c.top}</span>
+                      {c.sub && <span className={`${sub} ml-1 inline md:ml-0 md:block`}>{c.sub}</span>}
+                    </span>
+                  );
+                })}
               </span>
             </li>
           );

@@ -1,6 +1,15 @@
 import type { Daily } from "@/lib/daily";
 
 const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
+const longDay = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+/**
+ * November 26 (Michael): hovering (or tapping) a day shows its exact number right away. Edge days anchor their label
+ * to the side so it isn't cut off.
+ */
+function Tip({ i, n, children }: { i: number; n: number; children: React.ReactNode }) {
+  const side = i < n * 0.2 ? "left-0" : i > n * 0.8 ? "right-0" : "left-1/2 -translate-x-1/2";
+  return <span className={`pointer-events-none absolute -top-1 z-20 hidden -translate-y-full whitespace-nowrap rounded-md border border-[#3a3a3a] bg-[#0d0d0d] px-2 py-1 text-[12px] font-semibold text-white shadow-lg group-hover/day:block group-focus/day:block ${side}`}>{children}</span>;
+}
 const wk = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" });
 
 /**
@@ -56,13 +65,19 @@ export default function DailyCombo({ days, goals, withWeight = false, only }: { 
             <div className="relative">
               {r.goal && <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-[#7ee2a8]/50" style={{ top: H - H / CAP }} aria-hidden="true" />}
               <div className={`flex items-end ${days.length > 60 ? "gap-px" : "gap-[3px]"}`} style={{ height: H }}>
-                {days.map((d) => {
+                {days.map((d, i) => {
                   const v = r.get(d);
                   // November 20 (Michael): a day with nothing logged gets a gray dash, so every day is visible.
-                  if (v === null || v <= 0) return <span key={d.date} className="flex-1 border-b-2 border-[#4a4a4a]" title={`${d.date}: nothing logged`} />;
-                  const st = r.hit(v);
-                  return <span key={d.date} className="flex-1 rounded-t-[3px]" title={`${d.date}: ${r.key === "stp" ? Math.round(v).toLocaleString() : Math.round(v)} ${r.unit}`}
-                    style={{ height: Math.max(3, (Math.min(v / target, CAP) / CAP) * H), background: st === "over" ? "#ef4444" : r.color, opacity: st === "under" ? 0.32 : 1 }} />;
+                  const empty = v === null || v <= 0;
+                  const st = empty ? "under" : r.hit(v);
+                  const num = empty ? (r.key === "alc" && v === 0 ? "No drinks" : "Nothing logged") : `${Math.round(v).toLocaleString()}${r.unit ? ` ${r.unit}` : r.key === "stp" ? " steps" : ""}`;
+                  return (
+                    <span key={d.date} tabIndex={-1} className="group/day relative flex h-full flex-1 items-end hover:bg-white/[0.06]">
+                      {empty ? <span className="w-full border-b-2 border-[#4a4a4a]" />
+                        : <span className="w-full rounded-t-[3px]" style={{ height: Math.max(3, (Math.min(v / target, CAP) / CAP) * H), background: st === "over" ? "#ef4444" : r.color, opacity: st === "under" ? 0.32 : 1 }} />}
+                      <Tip i={i} n={days.length}><span className="text-dim">{longDay(d.date)}</span> · {num}{!empty && r.goal ? <span className="text-dim"> / {Math.round(r.goal).toLocaleString()}</span> : null}</Tip>
+                    </span>
+                  );
                 })}
               </div>
             </div>
@@ -128,9 +143,14 @@ function WeightRow({ days, goal }: { days: Daily["days"]; goal: number | null })
           {goal && goal >= lo && goal <= hi && <line x1="0" x2="100" y1={y(goal)} y2={y(goal)} stroke="#7ee2a8" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.6" />}
           <path d={pts.map((p, k) => `${k ? "L" : "M"}${x(p.i)},${y(p.v)}`).join(" ")} fill="none" stroke="#f5a623" strokeWidth="1.5" vectorEffect="non-scaling-stroke" opacity="0.6" />
         </svg>
-        {days.map((d, i) => d.weight === null
-          ? <span key={d.date} className="absolute bottom-0 h-0.5 bg-[#4a4a4a]" style={{ left: `calc(${(i / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)` }} title={`${d.date}: no weigh-in`} />
-          : <span key={d.date} className={`absolute ${n > 60 ? "size-1.5" : "size-2"} -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f5a623]`} style={{ left: `${x(i)}%`, top: y(d.weight) }} title={`${d.date}: ${d.weight} lbs`} />)}
+        {days.map((d, i) => (
+          <span key={d.date} tabIndex={-1} className="group/day absolute inset-y-0 hover:bg-white/[0.06]" style={{ left: `${(i / n) * 100}%`, width: `${100 / n}%` }}>
+            {d.weight === null
+              ? <span className="absolute inset-x-px bottom-0 h-0.5 bg-[#4a4a4a]" />
+              : <span className={`absolute left-1/2 ${n > 60 ? "size-1.5" : "size-2"} -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f5a623]`} style={{ top: y(d.weight) }} />}
+            <Tip i={i} n={n}><span className="text-dim">{longDay(d.date)}</span> · {d.weight === null ? "No weigh-in" : `${d.weight} lbs`}</Tip>
+          </span>
+        ))}
       </div>
       <Labels days={days} has={(d) => d.weight !== null} />
     </div>

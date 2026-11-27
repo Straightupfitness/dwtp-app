@@ -1,5 +1,6 @@
 "use client";
 import { markReachedOut } from "../leads/actions";
+import { markClientTexted } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
@@ -10,6 +11,7 @@ const LEAD_FIELDS: [string, string][] = [["{first}", "First name"], ["{last}", "
 const SENT_KEY = "dwtp-text-sent";
 const fmt = (n: number | null | undefined) => (n === undefined ? "" :  n === null ? "" : String(Math.round(n * 10) / 10));
 
+export const smsLink = (phone: string, body: string) => smsHref(phone, body);
 export function fill(t: string, r: TextRow) {
   const togo = r.weight != null && r.goal != null ? Math.max(0, Math.round((r.weight - r.goal) * 10) / 10) : null;
   return t
@@ -42,7 +44,7 @@ const smsHref = (phone: string, body: string) => {
  * he taps send, swipes back, and the next one is highlighted. Progress is kept on this phone (the app may reload
  * while he's in Messages).
  */
-export default function TextQueue({ rows, kind = "clients", via = "sms" }: { rows: TextRow[]; kind?: "clients" | "leads"; via?: Via }) {
+export default function TextQueue({ rows: all, kind = "clients", via = "sms" }: { rows: TextRow[]; kind?: "clients" | "leads"; via?: Via }) {
   const V = VIA[via];
   const addr = (r: TextRow) => (via === "sms" ? r.phone : r.handle ?? null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -51,7 +53,10 @@ export default function TextQueue({ rows, kind = "clients", via = "sms" }: { row
   const [tpl, setTpl] = useState("Hi {first}, ");
   const [sent, setSent] = useState<Record<string, number>>({});
   const [step, setStep] = useState<"write" | "send">("write");
-  const key = useMemo(() => rows.map((r) => r.id).sort().join(","), [rows]);
+  // November 26 (Michael): ✕ takes someone off this batch (picked by mistake, or he changed his mind).
+  const [gone, setGone] = useState<string[]>([]);
+  const key = useMemo(() => all.map((r) => r.id).sort().join(","), [all]);
+  const rows = all.filter((r) => !gone.includes(r.id));
 
   useEffect(() => {
     try {
@@ -60,9 +65,15 @@ export default function TextQueue({ rows, kind = "clients", via = "sms" }: { row
       // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring this phone's saved draft and progress once
       if (t) setTpl(t);
       if (s.key === key && s.sent && Object.keys(s.sent).length) { setSent(s.sent); setStep("send"); if (s.tpl) setTpl(s.tpl); }
+      if (s.key === key && Array.isArray((s as { gone?: string[] }).gone)) setGone((s as { gone?: string[] }).gone!);
     } catch {}
   }, [key, TPL_KEY]);
-  const save = (next: Record<string, number>) => { setSent(next); try { localStorage.setItem(SENT_KEY, JSON.stringify({ key, tpl, sent: next })); } catch {} };
+  const save = (next: Record<string, number>, g = gone) => { setSent(next); try { localStorage.setItem(SENT_KEY, JSON.stringify({ key, tpl, sent: next, gone: g })); } catch {} };
+  const remove = (id: string) => { const g = [...gone, id]; setGone(g); save(sent, g); };
+  const X = ({ r }: { r: TextRow }) => (
+    <button type="button" onClick={() => remove(r.id)} aria-label={`Don't send to ${r.first}`} title={`Don't send to ${r.first}`}
+      className="grid size-9 shrink-0 place-items-center rounded-full text-[18px] text-dim hover:bg-[#2a1515] hover:text-[#ff9a9a]">✕</button>
+  );
 
   const withPhone = rows.filter((r) => addr(r)), noPhone = rows.filter((r) => !addr(r));
   const nextId = withPhone.find((r) => !sent[r.id])?.id;
@@ -82,6 +93,12 @@ export default function TextQueue({ rows, kind = "clients", via = "sms" }: { row
           <p className="whitespace-pre-line">{fill(tpl, rows[0])}</p>
         </div>
       )}
+      <div className="flex flex-wrap gap-1.5" aria-label="Sending to">
+        {rows.map((r) => (
+          <span key={r.id} className="flex items-center gap-0.5 rounded-full border border-border bg-card pl-3 text-[13px]">{r.name}<X r={r} /></span>
+        ))}
+        {gone.length > 0 && <button type="button" onClick={() => { setGone([]); save(sent, []); }} className="min-h-9 px-2 text-[13px] text-accent underline">Undo ({gone.length} removed)</button>}
+      </div>
       {noPhone.length > 0 && <p className="text-[13px] text-[#e7d3a8]">{V.none} for {noPhone.map((r) => r.first).join(", ")}, so they&apos;re skipped. Add it on her {kind === "leads" ? "lead (Details)" : "client page"}.</p>}
       <button type="button" disabled={!tpl.trim() || !withPhone.length} onClick={() => { try { localStorage.setItem(TPL_KEY, tpl); } catch {} save({}); setStep("send"); }}
         className="min-h-12 w-full rounded-xl bg-accent font-semibold text-black disabled:opacity-50">Next: send to {withPhone.length} →</button>
@@ -108,11 +125,12 @@ export default function TextQueue({ rows, kind = "clients", via = "sms" }: { row
                 <a href={chatHref(via, addr(r)!, body)} target={via === "sms" ? undefined : "_blank"} rel="noopener noreferrer"
                   onClick={() => {
                     if (via !== "sms") { void navigator.clipboard?.writeText(body).then(() => setCopied(r.id)).catch(() => {}); }
-                    save({ ...sent, [r.id]: Date.now() }); if (kind === "leads") void markReachedOut(r.id).catch(() => {});
+                    save({ ...sent, [r.id]: Date.now() }); if (kind === "leads") void markReachedOut(r.id).catch(() => {}); else void markClientTexted(r.id).catch(() => {});
                   }}
                   className={`flex min-h-11 shrink-0 items-center rounded-xl px-3.5 text-[14px] font-semibold ${isNext ? "bg-accent text-black" : "border border-border"}`}>
                   {isSent ? "Again" : `${V.icon} ${V.verb} ${r.first}`}
                 </a>
+                {!isSent && <X r={r} />}
               </div>
             </li>
           );
