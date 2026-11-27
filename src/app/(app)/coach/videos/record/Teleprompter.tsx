@@ -86,6 +86,13 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
   const [micId, setMicId] = useState(() => saved("dwtp-mic"));
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
+  // November 27 (Michael): "Keep going": one continuous shoot. Enter ends a week, saves the raw take to his Mac
+  // (Downloads, "HH-05 raw.mp4") and rolls straight into the next script after a 3-2-1. Esc during the countdown stops.
+  const [keepGoing, setKeepGoing] = useState(() => saved("dwtp-tp-keepgoing") === "1");
+  const keepRef = useRef(keepGoing);
+  const [shot, setShot] = useState<Set<string>>(new Set());
+  const [autoStart, setAutoStart] = useState(false);
+  const countTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const live = useRef<HTMLVideoElement>(null);
@@ -198,7 +205,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     const t = setInterval(() => {
       n -= 1; setCount(n);
       if (n > 0) return;
-      clearInterval(t);
+      clearInterval(t); countTimer.current = null;
       // Vertical: draw the middle 9:16 of the camera onto a canvas and record that.
       let src: MediaStream = st;
       const v = live.current!;
@@ -221,11 +228,25 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
         (src as MediaStream & { _stopDraw?: () => void })._stopDraw?.();
         if (src !== st) src.getVideoTracks().forEach((tr) => tr.stop());
         const b = new Blob(chunks.current, { type: "video/mp4" });
+        if (keepRef.current) {
+          // Keep going: save this week's raw take to his Mac and roll into the next one.
+          const u = URL.createObjectURL(b), a = document.createElement("a");
+          a.href = u; a.download = `${code} raw.mp4`; document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(u), 60_000);
+          const nowShot = new Set(shot).add(code);
+          setShot(nowShot);
+          const next = codes.slice(codes.indexOf(code) + 1).find((c) => !done.has(c) && !nowShot.has(c));
+          if (next) { go(next); setNote(`✓ ${code} saved to Downloads. Next: ${next}.`); setAutoStart(true); }
+          else { setMode("setup"); setNote(`✓ ${code} saved. That was the last one. 🎉`); }
+          return;
+        }
         setBlob(b); setUrl(URL.createObjectURL(b)); setMode("review");
       };
       rec.current = r; r.start(1000); setMode("recording");
     }, 1000);
+    countTimer.current = t;
   }
+  function cancelCountdown() { if (countTimer.current) clearInterval(countTimer.current); countTimer.current = null; setMode("setup"); setNote("Stopped. Press Space to start this week."); }
 
   function redo() { if (url) URL.revokeObjectURL(url); setBlob(null); setUrl(null); setMode("setup"); }
   function go(next: string) { if (url) URL.revokeObjectURL(url); setBlob(null); setUrl(null); setCode(next); setMode("setup"); pos.current = 0; word.current = 0; if (box.current) box.current.scrollTop = 0; window.history.replaceState(null, "", `?set=${set}&code=${next}`); }
@@ -246,12 +267,20 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     if (next) go(next); else redo();
   }
 
+  // Keep going: start the next week's countdown on its own.
+  useEffect(() => {
+    if (!autoStart || mode !== "setup") return;
+    const t = setTimeout(() => { setAutoStart(false); begin(); }, 900);
+    return () => clearTimeout(t);
+  });
+
   // Keys: space starts / pauses, Enter stops, ↑ ↓ nudge the script.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest("input, select, textarea")) return;
       if (e.code === "Space") { e.preventDefault(); if (mode === "setup") begin(); else if (mode === "recording") setPaused((p) => !p); }
       if (e.code === "Enter" && mode === "recording") { e.preventDefault(); stopRec(); }
+      if (e.code === "Escape" && (mode === "countdown" || autoStart)) { e.preventDefault(); setAutoStart(false); cancelCountdown(); }
       if ((e.code === "ArrowDown" || e.code === "ArrowUp") && box.current) { e.preventDefault(); pos.current = Math.max(0, pos.current + (e.code === "ArrowDown" ? 60 : -60)); box.current.scrollTop = pos.current; }
     };
     window.addEventListener("keydown", onKey);
@@ -283,6 +312,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
       {(!following || voiceNote) && <label className="flex items-center gap-1.5">Speed <input type="range" min={90} max={220} step={5} value={wpm} onChange={(e) => { setWpm(+e.target.value); keep("dwtp-tp-wpm", e.target.value); }} /> {wpm}</label>}
       <label className="flex items-center gap-1.5">Text <input type="range" min={24} max={96} step={2} value={fontSize} onChange={(e) => setFont(+e.target.value)} /></label>
       <label className="flex items-center gap-1.5"><input type="checkbox" checked={pv} disabled={busy} onChange={(e) => togglePv(e.target.checked)} /> Prompter view</label>
+      <label className="flex items-center gap-1.5" title="Enter ends a week, saves it to Downloads and starts the next script"><input type="checkbox" checked={keepGoing} disabled={busy} onChange={(e) => { setKeepGoing(e.target.checked); keepRef.current = e.target.checked; keep("dwtp-tp-keepgoing", e.target.checked ? "1" : "0"); }} /> Keep going</label>
       {pv && <label className="flex items-center gap-1.5"><input type="checkbox" checked={mirror} onChange={(e) => { setMirror(e.target.checked); keep("dwtp-tp-mirror", e.target.checked ? "1" : "0"); }} /> Mirror</label>}
     </span>
   );
@@ -301,7 +331,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
     {mode === "setup" && <>
       <label className="flex items-center gap-1.5 text-white/70"><input type="checkbox" checked={vertical} onChange={(e) => { setVertical(e.target.checked); keep(vKey, e.target.checked ? "1" : "0"); }} /> Vertical (9:16){pv ? "" : ", like your phone videos"}</label>
       {devices}
-      <button type="button" onClick={begin} className={`${pv ? "min-h-10 px-5" : "min-h-12 px-7"} rounded-full bg-[#ef4444] text-[16px] font-bold`}>● Record {code}</button>
+      <button type="button" onClick={begin} className={`${pv ? "min-h-10 px-5" : "min-h-12 px-7"} rounded-full bg-[#ef4444] text-[16px] font-bold`}>● {keepGoing ? `Start at ${code}` : `Record ${code}`}</button>
       {!pv && <span className="text-[12px] text-white/50">Space = start / pause · Enter = stop · ↑ ↓ = move the script</span>}
     </>}
     {mode === "recording" && <>
@@ -332,7 +362,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
         {reviewing && url
           ? <video src={url} controls autoPlay playsInline className="absolute inset-0 m-auto h-full max-h-full w-auto bg-black" />
           : scriptBox("absolute inset-0 px-[5vw]", "pb-[60vh] pt-[6vh] text-left")}
-        {mode === "countdown" && <div className="absolute inset-0 grid place-items-center bg-black/60 text-[160px] font-bold">{count}</div>}
+        {mode === "countdown" && <div className="absolute inset-0 grid place-items-center bg-black/60 text-[160px] font-bold">{count}{keepGoing && <button type="button" onClick={cancelCountdown} className="absolute bottom-6 rounded-full border border-white/40 px-5 py-2 text-[16px] font-semibold">Stop here (Esc)</button>}</div>}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 py-2 text-[13px]">
         {/* A small framing preview beside the buttons (kept running while recording, just hidden). */}
@@ -364,7 +394,7 @@ export default function Teleprompter({ scripts, uploaded, start, set, sets }: { 
         {vertical && !reviewing && (
           <div className="pointer-events-none absolute inset-y-0 left-1/2 aspect-[9/16] h-full -translate-x-1/2 rounded-xl border-2 border-dashed border-[#f5a623]/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
         )}
-        {mode === "countdown" && <div className="absolute inset-0 grid place-items-center text-[160px] font-bold text-white/90">{count}</div>}
+        {mode === "countdown" && <div className="absolute inset-0 grid place-items-center text-[160px] font-bold text-white/90">{count}{keepGoing && <button type="button" onClick={cancelCountdown} className="absolute bottom-6 rounded-full border border-white/40 bg-black/60 px-5 py-2 text-[16px] font-semibold">Stop here (Esc)</button>}</div>}
         {reviewing && url && (
           <video src={url} controls autoPlay playsInline className="absolute inset-0 m-auto h-full max-h-full w-auto bg-black" />
         )}
